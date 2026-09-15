@@ -34,22 +34,6 @@ jobs:
     name: "Backend Vulture"
     uses: ./.github/workflows/_backend_vulture.yaml
 
-  frontend-style:
-    name: "Frontend style"
-    uses: ./.github/workflows/_frontend_style.yaml
-
-  frontend-lint:
-    name: "Frontend lint"
-    uses: ./.github/workflows/_frontend_lint.yaml
-
-  frontend-typecheck:
-    name: "Frontend typecheck"
-    uses: ./.github/workflows/_frontend_typecheck.yaml
-
-  frontend-security:
-    name: "Frontend security"
-    uses: ./.github/workflows/_frontend_security.yaml
-
   backend-tests:
     name: "Backend tests"
     needs:
@@ -68,25 +52,6 @@ jobs:
       - backend-lint
       - backend-types
     uses: ./.github/workflows/_backend_query_plans.yaml
-
-  frontend-tests:
-    name: "Frontend tests"
-    needs:
-      - frontend-style
-      - frontend-lint
-      - frontend-typecheck
-      - frontend-security
-    uses: ./.github/workflows/_frontend_tests.yaml
-
-  frontend-lighthouse:
-    name: "Frontend Lighthouse"
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-    needs:
-      - frontend-tests
-    permissions:
-      contents: read
-    uses: ./.github/workflows/_frontend_lighthouse.yaml
-
 
   dockerfile-lint:
     name: "Dockerfile lint"
@@ -109,23 +74,9 @@ jobs:
       - backend-tests
     uses: ./.github/workflows/_backend_docker_image_security.yaml
 
-  frontend-docker-image-security:
-    name: "Frontend Docker image security"
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-    needs:
-      - backend-tests
-    uses: ./.github/workflows/_frontend_docker_image_security.yaml
-
   nginx-docker-image-security:
     name: "Nginx Docker image security"
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     needs:
       - backend-tests
     uses: ./.github/workflows/_nginx_docker_image_security.yaml
-
-  infra-security:
-    name: "Infrastructure security"
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-    needs:
-      - backend-tests
-    uses: ./.github/workflows/_infra_security.yaml

@@ -1,21 +1,16 @@
-<p align="center">
-  <img src="../frontend/public/brand/archive-portal.png" alt="Personal Workspace logo" width="160" />
-</p>
-
 # Personal Workspace
 
 [🇷🇺 Russian version](./README_RU.md)
 
 | Category | Technologies |
 | --- | --- |
-| Coverage | ![coverage-backend](./badges/coverage-backend.svg) ![coverage-frontend](./badges/coverage-frontend.svg) |
+| Coverage | ![coverage-backend](./badges/coverage-backend.svg) |
 | Backend | ![python](./badges/python.svg) ![litestar](./badges/litestar.svg) ![async](./badges/async.svg) ![pydantic](./badges/pydantic.svg) ![dishka](./badges/dishka.svg) ![taskiq](./badges/taskiq.svg) ![paseto](./badges/paseto.svg) ![argon2](./badges/argon2.svg) |
 | Database | ![postgresql](./badges/postgresql.svg) ![sqlalchemy](./badges/sqlalchemy.svg) ![alembic](./badges/alembic.svg) |
 | Cache | ![valkey](./badges/valkey.svg) |
-| Frontend | ![angular](./badges/angular.svg) ![typescript](./badges/typescript.svg) ![bootstrap](./badges/bootstrap.svg) |
-| Testing | ![pytest](./badges/pytest.svg) ![jest](./badges/jest.svg) ![lhci](./badges/lhci.svg) |
+| Testing | ![pytest](./badges/pytest.svg) |
 | DevOps | ![docker](./badges/docker.svg) ![nginx](./badges/nginx.svg) ![minio](./badges/minio.svg) ![docker-compose](./badges/docker-compose.svg) |
-| Quality | ![ruff](./badges/ruff.svg) ![mypy](./badges/mypy.svg) ![bandit](./badges/bandit.svg) ![pip-audit](./badges/pip-audit.svg) ![trivy](./badges/trivy.svg) ![hadolint](./badges/hadolint.svg) ![dockle](./badges/dockle.svg) ![vulture](./badges/vulture.svg) ![eslint](./badges/eslint.svg) ![prettier](./badges/prettier.svg) |
+| Quality | ![ruff](./badges/ruff.svg) ![mypy](./badges/mypy.svg) ![bandit](./badges/bandit.svg) ![pip-audit](./badges/pip-audit.svg) ![trivy](./badges/trivy.svg) ![hadolint](./badges/hadolint.svg) ![dockle](./badges/dockle.svg) ![vulture](./badges/vulture.svg) |
 
 Private personal workspace for resumes and the Knowledge database. `/login` is the only anonymous
 UI route; the environment-configured authenticated owner uses an encrypted session for the protected
@@ -27,8 +22,6 @@ multi-user model.
 
 - [Knowledge database](../docs/knowledge-database.md)
 - [Calendar](../docs/calendar.md)
-- [Production deployment](../docs/production-deploy.md)
-- [Security threat model](../docs/security-threat-model.md)
 - [WireGuard internal access](../docs/wireguard-internal-access.md)
 - [Roadmap](../docs/TODO.md)
 
@@ -37,16 +30,14 @@ multi-user model.
 ```text
 personal-workspace/
 ├── backend/        # Litestar API, async domain/application code, tests and query-plan gates
-├── frontend/       # Angular CSR application and Node static shell with per-request CSP nonce
 ├── infra/          # nginx edge, MinIO wrapper, deployment, TLS and security scripts
 ├── docs/           # domain, operations, security and roadmap documentation
 ├── docker-compose.yml
 └── .env.example
 ```
 
-nginx is the TLS edge. It proxies `/api/*` to Litestar and all browser navigation to the Node
-static shell. The shell serves Angular's browser build, caches versioned assets, injects the nginx
-CSP nonce into `index.html`, exposes `/healthz`, and returns the SPA shell only for HTML navigation.
+nginx is the TLS edge for the API and private operations endpoints. The shared platform frontend
+and integrated runtime are maintained outside this backend repository.
 
 ## Quick start
 
@@ -72,7 +63,6 @@ CSP nonce into `index.html`, exposes `/healthz`, and returns the SPA shell only 
 
 The local nginx edge redirects HTTP to HTTPS.
 
-- Frontend: `https://localhost`
 - API: `https://localhost/api`
 - Liveness: `https://localhost/api/healthcheck`
 - Readiness: `https://localhost/api/healthcheck/ready`
@@ -90,8 +80,6 @@ Use Make targets rather than invoking the underlying tools directly:
 make tests
 make security
 make query-plans-realistic
-make performance-lighthouse
 ```
 
-The query-plan gate exercises current Knowledge and Resume storage queries. Lighthouse evaluates
-the CSR login and authenticated workspace routes for performance, accessibility and best practices.
+The query-plan gate exercises current Knowledge and Resume storage queries.

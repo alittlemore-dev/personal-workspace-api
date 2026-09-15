@@ -29,7 +29,9 @@
 
 ```text
 personal-workspace/
-├── backend/        # Litestar API, асинхронный доменный/прикладной код, тесты и query-plan gates
+├── src/            # Litestar API и асинхронный доменный/прикладной код
+├── tests/          # Тесты и query-plan gates
+├── performance/    # Сценарии и отчёты query-plan
 ├── infra/          # nginx edge, обёртка MinIO, deploy, TLS и security-скрипты
 ├── docs/           # документация доменов, эксплуатации, безопасности и roadmap
 ├── docker-compose.yml

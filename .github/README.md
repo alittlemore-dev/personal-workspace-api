@@ -29,7 +29,9 @@ multi-user model.
 
 ```text
 personal-workspace/
-├── backend/        # Litestar API, async domain/application code, tests and query-plan gates
+├── src/            # Litestar API and async domain/application code
+├── tests/          # Tests and query-plan gates
+├── performance/    # Query-plan scenarios and reports
 ├── infra/          # nginx edge, MinIO wrapper, deployment, TLS and security scripts
 ├── docs/           # domain, operations, security and roadmap documentation
 ├── docker-compose.yml

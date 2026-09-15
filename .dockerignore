@@ -17,3 +17,9 @@ docs
 .claude
 CLAUDE.md
 node_modules
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+htmlcov

@@ -1,6 +1,6 @@
 # PostgreSQL Infrastructure Instructions
 
-These rules apply to SQLAlchemy models, PostgreSQL storages, and Alembic migrations under `backend/src/infra/postgresql/`.
+These rules apply to SQLAlchemy models, PostgreSQL storages, and Alembic migrations under `src/infra/postgresql/`.
 
 ## Data Models
 

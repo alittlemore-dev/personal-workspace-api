@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version-file: backend/pyproject.toml
+          python-version-file: pyproject.toml
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           cache-suffix: backend-query-plans
@@ -45,5 +45,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: query-plan-reports
-          path: backend/performance/reports/query-plans/
+          path: performance/reports/query-plans/
           if-no-files-found: error

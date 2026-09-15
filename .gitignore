@@ -34,7 +34,7 @@ db.sqlite3
 db.sqlite3-journal
 media/
 
-backend/performance/reports/query-plans/
+performance/reports/query-plans/
 
 # IDE
 .idea/

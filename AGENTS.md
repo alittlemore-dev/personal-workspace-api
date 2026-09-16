@@ -15,7 +15,7 @@ UI route.
 - Background tasks: TaskIQ + taskiq-redis over Valkey
 - File storage: MinIO through an aiobotocore S3-compatible adapter
 - Logging: structlog + ECS logging + Sentry SDK
-- Scope: backend service for shared platform clients and the integrated runtime
+- Scope: backend service published as a container image for the shared platform runtime
 
 ## General rules
 
@@ -32,7 +32,7 @@ UI route.
 - Verify changed behavior with focused tests and use a reproducing regression test for bug fixes
   where practical. Choose test order and scope to fit the change; do not require TDD ceremonies
   for documentation, configuration, generated output, or mechanical edits.
-- Validate infrastructure through its real Make-backed build, configuration, or runtime checks.
+- Validate the container and CI contract through the repository's real Make-backed checks.
   Add tests for otherwise unprotected high-risk invariants, not package versions, source text,
   exact shell commands, or other implementation trivia.
 - Preserve stable, accessible user flows: check relevant loading/error feedback, theme continuity,
@@ -110,7 +110,8 @@ UI route.
 # Backend Instructions
 
 These rules apply to all backend-owned code, configuration, tooling, documentation, and supporting
-files at the project root. Keep common infrastructure under `infra/`.
+files at the project root. Shared runtime and deployment infrastructure belongs to the sibling
+`infra` repository.
 
 ## Code Style
 

@@ -22,7 +22,6 @@ multi-user model.
 
 - [Knowledge database](../docs/knowledge-database.md)
 - [Calendar](../docs/calendar.md)
-- [WireGuard internal access](../docs/wireguard-internal-access.md)
 - [Roadmap](../docs/TODO.md)
 
 ## Project structure
@@ -32,47 +31,44 @@ personal-workspace/
 ├── src/            # Litestar API and async domain/application code
 ├── tests/          # Tests and query-plan gates
 ├── performance/    # Query-plan scenarios and reports
-├── infra/          # nginx edge, MinIO wrapper, deployment, TLS and security scripts
+├── scripts/        # Backend quality, test, and image helpers
 ├── docs/           # domain, operations, security and roadmap documentation
-├── docker-compose.yml
-└── .env.example
+├── docker-compose.test.yml
+└── Dockerfile
 ```
 
-nginx is the TLS edge for the API and private operations endpoints. The shared platform frontend
-and integrated runtime are maintained outside this backend repository.
+The shared platform frontend and integrated runtime are maintained by the sibling
+[infra repository](https://github.com/alittlemore-dev/infra).
 
 ## Quick start
 
-1. Clone the repository and create local configuration:
+Create local configuration, install dependencies, run the fast test gate, and build the service
+image:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+cp .env.example .env
+make install
+make tests-fast
+make build
+```
 
-2. Set every value in `.env`. `IMAGE_TAG` is required by Compose; local development may use an
-   explicit throwaway tag. Keep actual secrets out of Git.
-
-3. Provide local TLS certificate files under `infra/nginx/certs/` when using the HTTPS edge. The
-   nginx container needs read access to them. For production, use the documented Let’s Encrypt flow.
-
-4. Start the stack:
-
-   ```bash
-   make run
-   ```
+With sibling checkouts, start the integrated stack via `make -C ../infra dev-trust` once and then
+`make -C ../infra dev`.
 
 ## Endpoints
 
-The local nginx edge redirects HTTP to HTTPS.
+The shared local edge is created by the sibling infra repository.
 
-- API: `https://localhost/api`
-- Liveness: `https://localhost/api/healthcheck`
-- Readiness: `https://localhost/api/healthcheck/ready`
-- API documentation: `https://localhost/api/docs`
-- OpenAPI document: `https://localhost/api/docs/openapi.json`
+- API: `https://alittlemore.localhost/api/personal-workspace/`
+- Liveness: `https://alittlemore.localhost/api/personal-workspace/healthcheck`
+- Readiness: `https://alittlemore.localhost/api/personal-workspace/healthcheck/ready`
+- API documentation: `https://alittlemore.localhost/api/personal-workspace/docs`
+- OpenAPI document: `https://alittlemore.localhost/api/personal-workspace/docs/openapi.json`
 
-MinIO Console and Databasus are not public. nginx binds them only to `VPN_BIND_ADDRESS` on ports
-`18081` and `18082`; see [WireGuard internal access](../docs/wireguard-internal-access.md).
+See the infra repository's
+[WireGuard guide](https://github.com/alittlemore-dev/infra/blob/main/docs/wireguard-internal-access.md)
+and [production deployment guide](https://github.com/alittlemore-dev/infra/blob/main/docs/production-deploy.md)
+for the operational contract.
 
 ## Quality gates
 

@@ -22,7 +22,6 @@
 
 - [База знаний](../docs/knowledge-database.md)
 - [Календарь](../docs/calendar.md)
-- [Внутренний доступ WireGuard](../docs/wireguard-internal-access.md)
 - [План работ](../docs/TODO.md)
 
 ## Структура проекта
@@ -32,47 +31,43 @@ personal-workspace/
 ├── src/            # Litestar API и асинхронный доменный/прикладной код
 ├── tests/          # Тесты и query-plan gates
 ├── performance/    # Сценарии и отчёты query-plan
-├── infra/          # nginx edge, обёртка MinIO, deploy, TLS и security-скрипты
+├── scripts/        # Backend quality, test и image helpers
 ├── docs/           # документация доменов, эксплуатации, безопасности и roadmap
-├── docker-compose.yml
-└── .env.example
+├── docker-compose.test.yml
+└── Dockerfile
 ```
 
-nginx — TLS edge для API и внутренних операционных endpoints. Общий frontend и интегрированный
-runtime поддерживаются вне этого backend-репозитория.
+Общий frontend и интегрированный runtime поддерживаются соседним
+[infra-репозиторием](https://github.com/alittlemore-dev/infra).
 
 ## Быстрый запуск
 
-1. Склонировать репозиторий и создать локальную конфигурацию:
+Создайте локальную конфигурацию, установите зависимости, запустите быстрые тесты и соберите образ
+сервиса:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+cp .env.example .env
+make install
+make tests-fast
+make build
+```
 
-2. Заполнить все значения в `.env`. Compose требует `IMAGE_TAG`; для локальной среды укажите
-   явный временный tag. Реальные secrets не коммитить.
-
-3. При запуске через HTTPS edge положить локальные TLS-файлы в `infra/nginx/certs/`. Контейнер
-   nginx должен иметь к ним read-доступ. Для production используйте описанный Let’s Encrypt flow.
-
-4. Запустить стек:
-
-   ```bash
-   make run
-   ```
+При соседнем расположении checkout один раз выполните `make -C ../infra dev-trust`, затем
+запускайте общий стек через `make -C ../infra dev`.
 
 ## Endpoints
 
-Локальный nginx edge перенаправляет HTTP на HTTPS.
+Общий локальный edge создаётся соседним infra-репозиторием.
 
-- API: `https://localhost/api`
-- Liveness: `https://localhost/api/healthcheck`
-- Readiness: `https://localhost/api/healthcheck/ready`
-- Документация API: `https://localhost/api/docs`
-- OpenAPI-документ: `https://localhost/api/docs/openapi.json`
+- API: `https://alittlemore.localhost/api/personal-workspace/`
+- Liveness: `https://alittlemore.localhost/api/personal-workspace/healthcheck`
+- Readiness: `https://alittlemore.localhost/api/personal-workspace/healthcheck/ready`
+- Документация API: `https://alittlemore.localhost/api/personal-workspace/docs`
+- OpenAPI-документ: `https://alittlemore.localhost/api/personal-workspace/docs/openapi.json`
 
-MinIO Console и Databasus не публичны. nginx привязывает их только к `VPN_BIND_ADDRESS` на портах
-`18081` и `18082`; см. [Внутренний доступ WireGuard](../docs/wireguard-internal-access.md).
+Операционный контракт описан в документации infra-репозитория:
+[WireGuard](https://github.com/alittlemore-dev/infra/blob/main/docs/wireguard-internal-access.md)
+и [production deployment](https://github.com/alittlemore-dev/infra/blob/main/docs/production-deploy.md).
 
 ## Quality gates
 

@@ -169,10 +169,6 @@ class ApiValidationConstants:
     knowledge_relationship_note_max_length: int = 10_000
 
 
-class AuthConstants:
-    argon2id_hash_prefix: Literal["$argon2id$"] = "$argon2id$"
-
-
 class Constants:
     path: PathConstants = PathConstants()
     minio_buckets: MinioBucketNamesConstants = MinioBucketNamesConstants()
@@ -185,7 +181,6 @@ class Constants:
     resume_export: ResumeExportConstants = ResumeExportConstants()
     search: SearchConstants = SearchConstants()
     api_validation: ApiValidationConstants = ApiValidationConstants()
-    auth: AuthConstants = AuthConstants()
 
 
 constants = Constants()

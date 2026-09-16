@@ -2,8 +2,8 @@
 
 ## Project
 
-Private personal workspace with a knowledge database and resumes. `/login` is the only anonymous
-UI route.
+Private personal workspace with a knowledge database and resumes. Human authentication is owned
+outside this service; backend business authorization consumes the neutral `core.identity` boundary.
 
 ## Stack
 
@@ -43,6 +43,9 @@ UI route.
   anonymous routes when they need privileged data, privileged controls, or behavior that may diverge
   later; duplicate the transport handler instead and keep shared schemas/use cases below the HTTP
   boundary.
+- Do not add service-local login, refresh, logout, password hashing, session persistence, or token
+  keys. Keep business authorization expressed through `core.identity`; authentication adapters
+  belong at the external identity integration boundary.
 - Keep the workspace dashboard as a standalone cross-domain composition page; dashboard
   widgets and business logic remain owned by their source domains.
 - Do not add default values in real production code. API parameters, schemas, dataclasses, settings, helpers, services, and infrastructure-facing code should require callers or environment configuration to pass values explicitly. Filter dataclasses may define defaults for omitted filters, pagination, relationship-loading switches, and list-mode switches when the default means "do not apply this filter" or preserves the normal list behavior; tests, test helpers, and factories may keep defaults when they make test setup clearer.

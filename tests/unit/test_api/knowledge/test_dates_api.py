@@ -20,7 +20,7 @@ from entrypoints.litestar.api.knowledge.dates.endpoints import (
     KnowledgeDatesApiController,
 )
 from tests.test_cases import ApiTestCase
-from tests.unit.conftest import TEST_OWNER_USERNAME
+from tests.unit.conftest import TEST_USERNAME
 
 CURRENT_DATETIME = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
 
@@ -87,7 +87,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
                 search_query="anniversary",
                 tag_ids=("1" * 32, "2" * 32),
                 related_person_id="3" * 32,
-                author_username=TEST_OWNER_USERNAME,
+                author_username=TEST_USERNAME,
             ),
         )
 
@@ -106,7 +106,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
         assert call["params"] == KnowledgeDateCreateParams(
             display_name="Anniversary",
             date=KnowledgeDateValue(day=29, month=2, year=None),
-            author_username=TEST_OWNER_USERNAME,
+            author_username=TEST_USERNAME,
         )
         assert call["today"] == datetime(2026, 7, 27, tzinfo=UTC).date()
 
@@ -159,7 +159,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
             tag_ids=["2" * 32],
             person_ids=["3" * 32],
         )
-        assert call["author_username"] == TEST_OWNER_USERNAME
+        assert call["author_username"] == TEST_USERNAME
 
         payload["personIds"] = ["3" * 32, "3" * 32]
         duplicate = self.api.put_knowledge_date(date_id=1, data=payload)

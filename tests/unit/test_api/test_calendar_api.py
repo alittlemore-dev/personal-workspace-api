@@ -14,7 +14,7 @@ from core.calendar.schemas import (
 )
 from entrypoints.litestar.api.calendar.endpoints import CalendarApiController
 from tests.test_cases import ApiTestCase
-from tests.unit.conftest import TEST_OWNER_USERNAME
+from tests.unit.conftest import TEST_USERNAME
 
 
 def calendar_response() -> Calendar:
@@ -75,7 +75,7 @@ class TestCalendarApi(ApiTestCase):
         self.use_case.get_calendar.assert_awaited_once_with(
             reference_date=date(2026, 7, 31),
             window=CalendarWindow.CURRENT_AND_NEXT_MONTHS,
-            author_username=TEST_OWNER_USERNAME,
+            author_username=TEST_USERNAME,
         )
 
     @pytest.mark.parametrize(

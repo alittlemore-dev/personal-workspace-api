@@ -2,7 +2,7 @@ from ipaddress import IPv4Address
 from typing import Annotated, Literal
 
 from litestar.config.response_cache import CACHE_FOREVER
-from pydantic import Field, PositiveInt, SecretStr, StringConstraints
+from pydantic import Field, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core.files.types import Namespace
@@ -142,19 +142,6 @@ class I18nSettings(ProjectBaseSettings):
     default_language: LanguageEnum
 
 
-class OwnerSettings(ProjectBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="OWNER_")
-
-    username: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    password_hash: SecretStrExtended
-
-
-class AuthSettings(ProjectBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="AUTH_")
-
-    session_ttl_seconds: PositiveInt
-
-
 class TaskiqSettings(ProjectBaseSettings):
     model_config = SettingsConfigDict(env_prefix="TASKIQ_")
 
@@ -169,9 +156,7 @@ class Settings:
     files: FilesSettings
     i18n: I18nSettings
     minio: MinioSettings
-    owner: OwnerSettings
     sentry: SentrySettings
-    auth: AuthSettings
     taskiq: TaskiqSettings
     valkey: ValkeySettings
 
@@ -181,9 +166,7 @@ class Settings:
         self.files = FilesSettings()
         self.i18n = I18nSettings()
         self.minio = MinioSettings()
-        self.owner = OwnerSettings()
         self.sentry = SentrySettings()
-        self.auth = AuthSettings()
         self.taskiq = TaskiqSettings()
         self.valkey = ValkeySettings()
 

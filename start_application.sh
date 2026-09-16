@@ -22,11 +22,9 @@ load_secret_file() {
 
 load_runtime_secrets() {
     local secret_variable_names=(
-        "APP_SECRET_KEY"
         "DB_PASSWORD"
         "MINIO_ACCESS_KEY"
         "MINIO_SECRET_KEY"
-        "OWNER_PASSWORD_HASH"
         "SENTRY_DSN"
     )
     local variable_name

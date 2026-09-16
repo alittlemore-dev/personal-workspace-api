@@ -3,7 +3,7 @@ from typing import Any, cast
 import pytest
 from litestar.exceptions import NotAuthorizedException
 
-from core.auth.schemas import User
+from core.identity import UserIdentity
 from entrypoints.litestar.guards import require_authenticated_user
 
 
@@ -14,7 +14,7 @@ class FakeConnection:
 
 class TestAuthenticatedUserGuard:
     def test_allows_nonblank_authenticated_user(self) -> None:
-        connection = FakeConnection(identity=User(username="admin"))
+        connection = FakeConnection(identity=UserIdentity(username="admin"))
 
         require_authenticated_user(
             cast("Any", connection),
@@ -26,8 +26,8 @@ class TestAuthenticatedUserGuard:
         [
             None,
             object(),
-            User(username=""),
-            User(username="   "),
+            UserIdentity(username=""),
+            UserIdentity(username="   "),
         ],
     )
     def test_rejects_missing_unverified_or_blank_identity(self, identity: object | None) -> None:

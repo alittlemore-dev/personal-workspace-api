@@ -18,7 +18,7 @@ from core.knowledge.people.schemas import (
 )
 from entrypoints.litestar.api.knowledge.people.endpoints import PeopleApiController
 from tests.test_cases import ApiTestCase
-from tests.unit.conftest import TEST_OWNER_USERNAME
+from tests.unit.conftest import TEST_USERNAME
 
 CURRENT_DATETIME = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
 
@@ -106,7 +106,7 @@ class TestPeopleApi(ApiTestCase):
                 sort=PersonListSort.NAME_DESC,
                 search_query="Ivan",
                 tag_ids=("1" * 32, "2" * 32),
-                author_username=TEST_OWNER_USERNAME,
+                author_username=TEST_USERNAME,
             ),
         )
 
@@ -127,7 +127,7 @@ class TestPeopleApi(ApiTestCase):
                 sort=PersonListSort.UPDATED_NEWEST,
                 search_query=None,
                 tag_ids=(),
-                author_username=TEST_OWNER_USERNAME,
+                author_username=TEST_USERNAME,
             ),
         )
 
@@ -144,7 +144,7 @@ class TestPeopleApi(ApiTestCase):
             params=PersonQuickCreateParams(
                 first_name="Ivan",
                 last_name="Ivanov",
-                author_username=TEST_OWNER_USERNAME,
+                author_username=TEST_USERNAME,
             ),
         )
 
@@ -186,7 +186,7 @@ class TestPeopleApi(ApiTestCase):
         self.asserts.status(response=response, expected_status=codes.OK)
         call = self.use_case.update_person.await_args.kwargs
         assert call["person_id"] == "0" * 31 + "1"
-        assert call["author_username"] == TEST_OWNER_USERNAME
+        assert call["author_username"] == TEST_USERNAME
         assert isinstance(call["params"], PersonUpdateParams)
         assert call["params"].relationship_changes.delete_ids == ["4" * 32]
         assert call["params"].relationship_changes.create[0].related_person_id == "2" * 32
@@ -247,7 +247,7 @@ class TestPeopleApi(ApiTestCase):
         )
         self.use_case.get_person.assert_awaited_once_with(
             person_id=self.factory.core.hex_id(404),
-            author_username=TEST_OWNER_USERNAME,
+            author_username=TEST_USERNAME,
         )
 
     def test_delete_forwards_request_datetime(self) -> None:
@@ -258,7 +258,7 @@ class TestPeopleApi(ApiTestCase):
         self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
         call = self.use_case.delete_person.await_args.kwargs
         assert call["person_id"] == self.factory.core.hex_id(1)
-        assert call["author_username"] == TEST_OWNER_USERNAME
+        assert call["author_username"] == TEST_USERNAME
         assert isinstance(call["current_datetime"], datetime)
 
     def test_private_controller_is_hidden_and_uncached(self) -> None:

@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from core.i18n.enums import LanguageEnum
-from infra.config.settings import OwnerSettings, Settings
+from infra.config.settings import Settings
 
 
 class TestSettings:
@@ -71,35 +71,6 @@ class TestSettings:
 
     def test_i18n_default_language(self) -> None:
         assert self.settings.i18n.default_language == LanguageEnum.RU
-
-    @pytest.mark.parametrize(
-        ("provided_username", "expected_username"),
-        [
-            ("owner", "owner"),
-            ("  owner  ", "owner"),
-        ],
-    )
-    def test_owner_username_strips_surrounding_whitespace(
-        self,
-        provided_username: str,
-        expected_username: str,
-    ) -> None:
-        owner = OwnerSettings(
-            _env_file=None,
-            username=provided_username,
-            password_hash=self.settings.owner.password_hash,
-        )
-
-        assert owner.username == expected_username
-
-    @pytest.mark.parametrize("username", ["", "   "])
-    def test_owner_username_rejects_empty_or_whitespace_only_values(self, username: str) -> None:
-        with pytest.raises(ValidationError, match="username"):
-            OwnerSettings(
-                _env_file=None,
-                username=username,
-                password_hash=self.settings.owner.password_hash,
-            )
 
     def test_taskiq_file_orphan_prune_interval_is_required(
         self,

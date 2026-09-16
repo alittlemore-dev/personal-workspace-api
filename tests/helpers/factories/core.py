@@ -2,7 +2,6 @@ import hashlib
 from datetime import UTC, date, datetime
 from typing import Any
 
-from core.auth.schemas import LoginParams, OwnerCredentials
 from core.files.enums import FilePurpose
 from core.files.schemas import FileRead, StoredFile
 from core.files.types import Namespace
@@ -23,36 +22,10 @@ from core.resumes.schemas import (
     ResumeSkillGroup,
     ResumeSummary,
 )
-from core.schemas import Secret
 from core.types import SearchName
-
-TEST_OWNER_USERNAME = "test-owner"
-TEST_OWNER_PASSWORD = "test-owner-password"  # noqa: S105
-TEST_ARGON2_HASH_PREFIX = "$argon2id$v=19$m=65536,t=3,p=4$"
-TEST_ARGON2_HASH_SALT = "b73+a2Y9Ikr6PGBd1Wd6UA$"
-TEST_ARGON2_HASH_DIGEST = "Prf9ZD9DpmMOUsaylDIMg1TFVmY/g1p8t2FJgFaaKFk"
-TEST_OWNER_PASSWORD_HASH = (
-    f"{TEST_ARGON2_HASH_PREFIX}{TEST_ARGON2_HASH_SALT}{TEST_ARGON2_HASH_DIGEST}"
-)
 
 
 class CoreFactoryHelper:
-    @classmethod
-    def owner_credentials(
-        cls,
-        username: str = TEST_OWNER_USERNAME,
-        password_hash: str = TEST_OWNER_PASSWORD_HASH,
-    ) -> OwnerCredentials:
-        return OwnerCredentials(username=username, password_hash=Secret(password_hash))
-
-    @classmethod
-    def login_params(
-        cls,
-        username: str = TEST_OWNER_USERNAME,
-        password: str = TEST_OWNER_PASSWORD,
-    ) -> LoginParams:
-        return LoginParams(username=username, password=Secret(password))
-
     @classmethod
     def hex_id(cls, value: int | str = 1) -> str:
         if isinstance(value, str):

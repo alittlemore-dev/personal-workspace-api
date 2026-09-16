@@ -19,11 +19,6 @@ from litestar.types import Middleware
 from entrypoints.litestar.api.routers import api_router
 from entrypoints.litestar.cli.plugins import CLIPlugin
 from entrypoints.litestar.exception_handlers import get_litestar_exception_handlers
-from entrypoints.litestar.middlewares.auth import (
-    create_csrf_config,
-    create_session_auth,
-    set_private_cache_control,
-)
 from entrypoints.litestar.middlewares.logging import (
     LogExceptionMiddleware,
     PrivacySafeLoggingMiddleware,
@@ -144,7 +139,6 @@ def create_litestar_app(
     extra_middlewares: Sequence[Middleware],
 ) -> Litestar:
     loggers.configure_project_logging(debug=settings.app.debug)
-    session_auth = create_session_auth()
     app = Litestar(
         route_handlers=create_routers(),
         lifespan=lifespan,
@@ -157,9 +151,6 @@ def create_litestar_app(
             else None
         ),
         middleware=[*create_middlewares(container), *extra_middlewares],
-        csrf_config=create_csrf_config(),
-        before_send=[set_private_cache_control],
-        on_app_init=[session_auth.on_app_init],
         plugins=[*create_plugins(), *extra_plugins],
         openapi_config=create_openapi_config(),
     )

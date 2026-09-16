@@ -13,9 +13,6 @@ class TestOpenApiMetadata:
         paths = schema["paths"]
 
         assert set(paths) == {
-            "/api/auth/login",
-            "/api/auth/session",
-            "/api/auth/logout",
             "/api/i18n/languages",
             "/api/i18n/bundles/{language}",
         }

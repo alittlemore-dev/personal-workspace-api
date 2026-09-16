@@ -1,6 +1,5 @@
 from litestar import Router
 
-from entrypoints.litestar.api.auth.endpoints import api_router as auth_router
 from entrypoints.litestar.api.calendar.endpoints import api_router as calendar_router
 from entrypoints.litestar.api.files.endpoints import api_router as files_router
 from entrypoints.litestar.api.healthcheck.endpoints import api_router as healthcheck_router
@@ -29,7 +28,6 @@ protected_api_router = Router(
 api_router = Router(
     "/api",
     route_handlers=[
-        auth_router,
         healthcheck_router,
         i18n_router,
         protected_api_router,

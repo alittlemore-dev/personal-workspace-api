@@ -17,7 +17,7 @@ from core.resumes.schemas import (
     ResumeUpdateParams,
 )
 from tests.test_cases import ApiTestCase
-from tests.unit.conftest import TEST_OWNER_USERNAME
+from tests.unit.conftest import TEST_USERNAME
 
 
 def experience_payload() -> dict[str, object]:
@@ -66,7 +66,7 @@ class TestResumesApi(ApiTestCase):
                 page=2,
                 page_size=10,
                 search_query=None,
-                author_username=TEST_OWNER_USERNAME,
+                author_username=TEST_USERNAME,
             ),
         )
 
@@ -127,7 +127,7 @@ class TestResumesApi(ApiTestCase):
                 title="Target resume",
                 language=LanguageEnum.EN,
                 content=content,
-                author_username=TEST_OWNER_USERNAME,
+                author_username=TEST_USERNAME,
             ),
         )
 
@@ -269,7 +269,7 @@ class TestResumesApi(ApiTestCase):
             language=LanguageEnum.EN,
             content=content,
         )
-        assert call["author_username"] == TEST_OWNER_USERNAME
+        assert call["author_username"] == TEST_USERNAME
         assert isinstance(call["current_datetime"], datetime)
 
     def test_get_missing_resume_uses_stable_not_found_contract(self) -> None:
@@ -284,7 +284,7 @@ class TestResumesApi(ApiTestCase):
         )
         self.use_case.get_resume.assert_awaited_once_with(
             resume_id=self.factory.core.hex_id(404),
-            author_username=TEST_OWNER_USERNAME,
+            author_username=TEST_USERNAME,
         )
 
     def test_export_uses_unsaved_current_payload(self) -> None:
@@ -319,7 +319,7 @@ class TestResumesApi(ApiTestCase):
                 language=LanguageEnum.EN,
                 content=content,
             ),
-            author_username=TEST_OWNER_USERNAME,
+            author_username=TEST_USERNAME,
         )
 
     def test_export_supports_docx_and_rejects_unknown_format(self) -> None:
@@ -375,5 +375,5 @@ class TestResumesApi(ApiTestCase):
         self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
         self.use_case.delete_resume.assert_awaited_once_with(
             resume_id=self.factory.core.hex_id(3),
-            author_username=TEST_OWNER_USERNAME,
+            author_username=TEST_USERNAME,
         )

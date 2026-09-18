@@ -6,7 +6,7 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 ## Telegram Bot
 
-- [ ] Trusted users
+- [ ] Trusted users (Many TG users to One site user)
 - [ ] Notifications
   - [ ] Birthdays and dates
   - [ ] Events
@@ -41,7 +41,7 @@ unchecked entries remain active work unless a later product decision supersedes 
     - [ ] Expences
       - [ ] Dynamic by previous periods
       - [ ] Pie chart by categiries
-    - [ ] Periods
+    - [ ] Periods - no limits incuded. Limits applies and shows only on current month.
       - [ ] this month (only current month)
       - [ ] this year (only current year)
       - [ ] this week (only current week)
@@ -59,6 +59,16 @@ unchecked entries remain active work unless a later product decision supersedes 
   - [ ] General Color schema (affect markdown editor and preview too)
 - [ ] Layout
   - [ ] Workspace items opened or closed
+- [ ] Telegram bot integration
+  - [ ] Initial setup
+    - [ ] Telegram bot ON/OFF
+    - [ ] Generate token for bot trusted users (Invites to bot)
+    - [ ] Telegram bot token set
+  - [ ] Notifications
+    - [ ] Birthdays: ON/FF
+    - [ ] Dates: ON/OFF
+    - [ ] Events: ON/OFF
+  - [ ] multi-choice of available "Quick add" categories
 
 ## Resume
 
@@ -132,7 +142,6 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
   - [ ] Companies
   - [x] Dates
     - [ ] Related dates
-      - [ ] Fixed date: Month + day Example: Christmas — December 25
       - [ ] Nth day of the year. Example: Programmer's Day — 256th day of the year
       - [ ] Nth weekday of the month: First / Second / Third / Fourth / Fifth / Last. Example: Thanksgiving — fourth Thursday of November
       - [ ] Weekday relative to a fixed date

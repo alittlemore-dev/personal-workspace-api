@@ -6,6 +6,7 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 ## Telegram Bot
 
+- [ ] Trusted users
 - [ ] Notifications
   - [ ] Birthdays and dates
   - [ ] Events
@@ -69,6 +70,7 @@ unchecked entries remain active work unless a later product decision supersedes 
   - [x] Add workspace navigation and routes at `/resumes` and `/resumes/:id`.
   - [x] Add list, create with language selection, detail edit, language badge, selected-language preview, and delete UI.
   - [x] Keep resumes private: no public pages, sitemap entries, SEO, or themes in v1.
+  - [ ] Improve validation: min/max for all parts 
   - [x] Fix resume multilines fields: text with \\n to array.
   - [ ] AI
     - [ ] Advices of resume improvement
@@ -129,7 +131,83 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
     - [ ] Books to reread page
   - [ ] Companies
   - [x] Dates
+    - [ ] Related dates
+      - [ ] Fixed date: Month + day Example: Christmas — December 25
+      - [ ] Nth day of the year. Example: Programmer's Day — 256th day of the year
+      - [ ] Nth weekday of the month: First / Second / Third / Fourth / Fifth / Last. Example: Thanksgiving — fourth Thursday of November
+      - [ ] Weekday relative to a fixed date
+        - [ ] First weekday before date
+        - [ ] First weekday after date
+        - [ ] Nearest weekday to date
+        - [ ] Example: Monday before May 25
+      - [ ] Relative to another date
+        - [ ] N days/weeks/months before another date
+        - [ ] N days/weeks/months after another date
+        - [ ] First/Last/Nth weekday before/after another date
+        - [ ] Example: Good Friday — 2 days before Easter
+        - [ ] Example: Maslenitsa — relative to Easter
+      - [ ] Easter
+        - [ ] Western / Gregorian Easter
+        - [ ] Orthodox / Julian Easter
+      - [ ] Date in another calendar
+        - [ ] Select calendar
+          - [ ] Gregorian
+          - [ ] Julian
+          - [ ] Hebrew
+          - [ ] Islamic
+          - [ ] Chinese
+          - [ ] Other calendars
+        - [ ] Select calendar type in date creation form
+        - [ ] Convert result to chosen calendar
+      - [ ] Lunar / lunisolar calendar date
+        - [ ] Select calendar/calculation system
+          - [ ] Islamic calendar
+          - [ ] Hebrew calendar
+          - [ ] Chinese calendar
+          - [ ] Other lunar/lunisolar calendars
+        - [ ] Month + day according to selected calendar
+        - [ ] Example: Eid al-Fitr — 1 Shawwal
+        - [ ] Example: Chinese New Year — first day of first Chinese lunar month
+      - [ ] Astronomical event
+        - [ ] Equinox
+        - [ ] Solstice
+        - [ ] New moon
+        - [ ] Full moon
+        - [ ] Other astronomical event
+        - [ ] Optional timezone/location for determining local date
+      - [ ] Astronomical condition relative to date
+        - [ ] First full moon after date
+        - [ ] First new moon after date
+        - [ ] First/Last/Nth weekday after astronomical event
+      - [ ] Last/First day of month
+        - [ ] First day of month
+        - [ ] Last day of month
+        - [ ] Example: last day of February automatically handles leap years
+      - [ ] Conditional by year
+        - [ ] Every N years
+        - [ ] Starting from specific year
+        - [ ] Only before/after specific year
+        - [ ] Only within year range
+      - [ ] Leap year condition
+        - [ ] Only in leap years
+        - [ ] Only in non-leap years
+      - [ ] Multi-day event
+        - [ ] Duration in days
+        - [ ] Start date calculated by any supported rule
+        - [ ] Example: holiday/festival lasting 7 days
+      - [ ] Observed / substitute date
+        - [ ] If Saturday → previous Friday / next Monday
+        - [ ] If Sunday → next Monday
+        - [ ] If weekend → next working day
+        - [ ] Custom weekday replacement rules
+        - [ ] Keep original date + create observed date or replace original date
+      - [ ] Date overrides / exceptions
+        - [ ] Override calculated date for specific year
+        - [ ] Disable event for specific year
+        - [ ] Add additional date for specific year
+        - [ ] Example: normally calculated date, but manually set different date in 2028
   - [x] People
+    - [ ] Show/Hide (and Notify/Not) persons birthdays in calendar
   - [ ] Places
   - [ ] Projects
   - [ ] Recipes

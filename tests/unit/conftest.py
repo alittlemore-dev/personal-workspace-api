@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
+from backend_sdk import Principal, RoleEnum
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.litestar import LitestarProvider, setup_dishka
 from litestar import Litestar
@@ -11,7 +12,6 @@ from litestar.middleware import DefineMiddleware
 from litestar.testing import TestClient
 from litestar.types import Middleware
 
-from core.identity import UserIdentity
 from entrypoints.litestar.initializers.main import create_litestar_app
 from infra.ioc.prodivers.database_provider import DatabaseProvider
 from tests.helpers.identity import TestIdentityMiddleware
@@ -66,7 +66,7 @@ def app(container: AsyncContainer) -> Litestar:
         extra_middlewares=[
             DefineMiddleware(
                 TestIdentityMiddleware,
-                user=UserIdentity(username=TEST_USERNAME),
+                user=Principal(username=TEST_USERNAME, role=RoleEnum.OWNER),
             ),
         ],
     )

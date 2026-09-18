@@ -17,6 +17,7 @@ from infra.config.settings import settings
 class I18nApiController(Controller):
     path = "/i18n"
     tags = ["i18n"]
+    opt = {"auth_public": True}
 
     @get(
         "/languages",

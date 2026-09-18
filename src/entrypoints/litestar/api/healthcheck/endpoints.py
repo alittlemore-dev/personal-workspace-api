@@ -10,6 +10,7 @@ from infra.healthcheck import ReadinessChecker
 
 class HealthcheckController(Controller):
     path = "/healthcheck"
+    opt = {"auth_public": True}
 
     @get(
         "",

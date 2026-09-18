@@ -2,7 +2,7 @@ from ipaddress import IPv4Address
 from typing import Annotated, Literal
 
 from litestar.config.response_cache import CACHE_FOREVER
-from pydantic import Field, PositiveInt, SecretStr
+from pydantic import Field, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core.files.types import Namespace
@@ -80,6 +80,15 @@ class AppSettings(ProjectBaseSettings):
         return 0
 
 
+class AuthSettings(ProjectBaseSettings):
+    model_config = SettingsConfigDict(env_prefix="AUTH_")
+
+    verify_url: str
+    timeout_seconds: PositiveFloat
+    cache_ttl_seconds: NonNegativeFloat
+    max_cache_entries: PositiveInt
+
+
 class MinioSettings(ProjectBaseSettings):
     model_config = SettingsConfigDict(env_prefix="MINIO_")
 
@@ -152,6 +161,7 @@ class TaskiqSettings(ProjectBaseSettings):
 
 class Settings:
     app: AppSettings
+    auth: AuthSettings
     database: DatabaseSettings
     files: FilesSettings
     i18n: I18nSettings
@@ -162,6 +172,7 @@ class Settings:
 
     def __init__(self) -> None:
         self.app = AppSettings()
+        self.auth = AuthSettings()
         self.database = DatabaseSettings()
         self.files = FilesSettings()
         self.i18n = I18nSettings()

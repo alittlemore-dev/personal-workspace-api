@@ -1,12 +1,11 @@
+from backend_sdk import Principal
 from litestar.types import ASGIApp, Receive, Scope, Send
-
-from core.identity import UserIdentity
 
 
 class TestIdentityMiddleware:
     __test__ = False
 
-    def __init__(self, app: ASGIApp, user: UserIdentity) -> None:
+    def __init__(self, app: ASGIApp, user: Principal) -> None:
         self.app = app
         self.user = user
 

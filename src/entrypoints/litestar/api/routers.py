@@ -1,3 +1,5 @@
+from backend_sdk import RoleEnum
+from backend_sdk.integrations.litestar import RequireRole
 from litestar import Router
 
 from entrypoints.litestar.api.calendar.endpoints import api_router as calendar_router
@@ -8,7 +10,6 @@ from entrypoints.litestar.api.knowledge.router import api_router as knowledge_ro
 from entrypoints.litestar.api.resumes.endpoints import api_router as resumes_router
 from entrypoints.litestar.api.tools.endpoints import api_router as tools_router
 from entrypoints.litestar.api.wiki_links.endpoints import api_router as wiki_links_router
-from entrypoints.litestar.guards import require_authenticated_user
 
 protected_api_router = Router(
     "",
@@ -22,7 +23,7 @@ protected_api_router = Router(
     ],
     tags=["protected api"],
     include_in_schema=False,
-    guards=[require_authenticated_user],
+    guards=[RequireRole(RoleEnum.USER)],
 )
 
 api_router = Router(

@@ -53,10 +53,6 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 ## Per-user settings
 
-- [ ] One page with all settings
-- [ ] Themes
-  - [ ] Light/Dark
-  - [ ] General Color schema (affect markdown editor and preview too)
 - [ ] Layout
   - [ ] Workspace items opened or closed
 - [ ] Telegram bot integration

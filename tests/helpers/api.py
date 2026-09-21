@@ -21,12 +21,6 @@ class APIHelper:
     def get_health_ready(self) -> Response:
         return self.client.get("/api/healthcheck/ready")
 
-    def get_i18n_languages(self) -> Response:
-        return self.client.get("/api/i18n/languages")
-
-    def get_i18n_bundle(self, language: str) -> Response:
-        return self.client.get(f"/api/i18n/bundles/{language}")
-
     def get_people(
         self,
         *,

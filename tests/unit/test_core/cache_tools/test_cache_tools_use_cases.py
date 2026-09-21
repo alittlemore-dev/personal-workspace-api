@@ -22,7 +22,7 @@ from core.cache_tools.use_cases import CacheToolsUseCase, ManualCacheWarmUseCase
 from core.generators import HexUuidIdGenerator
 
 CURRENT_DATETIME = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
-DOMAINS = (CacheDomainEnum.I18N,)
+DOMAINS = (CacheDomainEnum.HEALTHCHECK,)
 
 
 class TestCacheToolsUseCase:
@@ -49,7 +49,7 @@ class TestCacheToolsUseCase:
 
     async def test_get_status_reads_every_current_domain_and_latest_operation(self) -> None:
         domain_status = CacheDomainStatus(
-            domain=CacheDomainEnum.I18N,
+            domain=CacheDomainEnum.HEALTHCHECK,
             key_count=3,
             minimum_remaining_ttl_seconds=120,
             non_expiring_key_count=1,
@@ -68,7 +68,7 @@ class TestCacheToolsUseCase:
         assert result.domains == (domain_status,)
         assert result.last_manual_warm_operation == latest
         assert self.status_storage.get_domain_status.await_args_list == [
-            call(domain=CacheDomainEnum.I18N),
+            call(domain=CacheDomainEnum.HEALTHCHECK),
         ]
 
     async def test_disabled_status_does_not_read_response_cache(self) -> None:
@@ -89,7 +89,7 @@ class TestCacheToolsUseCase:
     async def test_clear_invalidates_only_current_domains_and_refreshes_status(self) -> None:
         self.operation_storage.get_latest.return_value = None
         self.status_storage.get_domain_status.return_value = CacheDomainStatus(
-            domain=CacheDomainEnum.I18N,
+            domain=CacheDomainEnum.HEALTHCHECK,
             key_count=0,
             minimum_remaining_ttl_seconds=None,
             non_expiring_key_count=0,

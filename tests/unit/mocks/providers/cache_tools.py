@@ -2,7 +2,6 @@ from unittest.mock import Mock
 
 from dishka import Provider, Scope, provide
 
-from core.cache_tools.enums import CacheDomainEnum
 from core.cache_tools.schemas import CacheToolsPolicy
 from core.cache_tools.use_cases import CacheToolsUseCase
 
@@ -14,7 +13,7 @@ class MockCacheToolsProvider(Provider):
             enabled=True,
             configured_ttl_seconds=86_400,
             scheduled_warm_interval_seconds=3_600,
-            domains=tuple(CacheDomainEnum),
+            domains=(),
         )
 
     @provide(scope=Scope.APP)

@@ -12,10 +12,7 @@ class TestOpenApiMetadata:
         schema = app.openapi_schema.to_schema()
         paths = schema["paths"]
 
-        assert set(paths) == {
-            "/api/i18n/languages",
-            "/api/i18n/bundles/{language}",
-        }
+        assert paths == {}
 
     def test_visible_parameters_have_descriptions_and_examples(self, app: Litestar) -> None:
         schema = app.openapi_schema.to_schema()

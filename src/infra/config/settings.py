@@ -6,7 +6,6 @@ from pydantic import Field, NonNegativeFloat, PositiveFloat, PositiveInt, Secret
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core.files.types import Namespace
-from core.i18n.enums import LanguageEnum
 from core.schemas import Secret
 from infra.config.constants import constants
 
@@ -145,12 +144,6 @@ class ValkeySettings(ProjectBaseSettings):
         return self.get_url(db=constants.valkey.databases.response_cache)
 
 
-class I18nSettings(ProjectBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="I18N_")
-
-    default_language: LanguageEnum
-
-
 class TaskiqSettings(ProjectBaseSettings):
     model_config = SettingsConfigDict(env_prefix="TASKIQ_")
 
@@ -164,7 +157,6 @@ class Settings:
     auth: AuthSettings
     database: DatabaseSettings
     files: FilesSettings
-    i18n: I18nSettings
     minio: MinioSettings
     sentry: SentrySettings
     taskiq: TaskiqSettings
@@ -175,7 +167,6 @@ class Settings:
         self.auth = AuthSettings()
         self.database = DatabaseSettings()
         self.files = FilesSettings()
-        self.i18n = I18nSettings()
         self.minio = MinioSettings()
         self.sentry = SentrySettings()
         self.taskiq = TaskiqSettings()

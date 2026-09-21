@@ -3,10 +3,9 @@ from datetime import UTC, datetime
 import pytest_asyncio
 from httpx import codes
 
-from core.cache_tools.enums import CacheDomainEnum, CacheWarmOperationStatusEnum
+from core.cache_tools.enums import CacheWarmOperationStatusEnum
 from core.cache_tools.exceptions import CacheWarmOperationNotFoundError
 from core.cache_tools.schemas import (
-    CacheDomainStatus,
     CacheToolsStatus,
     CacheWarmOperation,
     CacheWarmSummary,
@@ -22,14 +21,7 @@ def cache_status() -> CacheToolsStatus:
         enabled=True,
         configured_ttl_seconds=86_400,
         scheduled_warm_interval_seconds=3_600,
-        domains=(
-            CacheDomainStatus(
-                domain=CacheDomainEnum.I18N,
-                key_count=3,
-                minimum_remaining_ttl_seconds=120,
-                non_expiring_key_count=1,
-            ),
-        ),
+        domains=(),
         last_manual_warm_operation=CacheWarmOperation(
             operation_id="previous-operation",
             status=CacheWarmOperationStatusEnum.SUCCEEDED,
@@ -45,20 +37,13 @@ class TestToolsCacheApi(ApiTestCase):
         self.use_case = await self.container.get_cache_tools_use_case()
         self.policy = await self.container.get_cache_tools_policy()
 
-    def test_get_cache_status_exposes_only_current_domain(self) -> None:
+    def test_get_cache_status_has_no_product_domains(self) -> None:
         self.use_case.get_status.return_value = cache_status()
 
         response = self.api.get_tools_cache()
 
         self.asserts.status(response=response, expected_status=codes.OK)
-        assert response.json()["domains"] == [
-            {
-                "domain": "i18n",
-                "keyCount": 3,
-                "minimumRemainingTtlSeconds": 120,
-                "nonExpiringKeyCount": 1,
-            },
-        ]
+        assert response.json()["domains"] == []
         self.use_case.get_status.assert_awaited_once_with(policy=self.policy)
 
     def test_clear_returns_refreshed_status_without_warming(self) -> None:

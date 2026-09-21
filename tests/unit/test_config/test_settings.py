@@ -3,7 +3,6 @@ from collections.abc import Generator
 import pytest
 from pydantic import ValidationError
 
-from core.i18n.enums import LanguageEnum
 from infra.config.settings import Settings
 
 
@@ -68,9 +67,6 @@ class TestSettings:
             self.settings.valkey.url_for_http_cache.get_secret_value()
             == "valkey://localhost:6379/0"
         )
-
-    def test_i18n_default_language(self) -> None:
-        assert self.settings.i18n.default_language == LanguageEnum.RU
 
     def test_taskiq_file_orphan_prune_interval_is_required(
         self,

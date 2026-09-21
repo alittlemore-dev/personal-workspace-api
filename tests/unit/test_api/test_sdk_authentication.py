@@ -30,7 +30,7 @@ def build_sdk_auth_app(
 
 
 class TestSdkAuthentication:
-    def test_allows_anonymous_health_and_i18n_requests(self, container: AsyncContainer) -> None:
+    def test_allows_anonymous_health_requests(self, container: AsyncContainer) -> None:
         auth_client = FakeAuthenticationClient()
         auth_client.set_unavailable()
 
@@ -39,8 +39,6 @@ class TestSdkAuthentication:
 
             assert api.get_health().status_code == codes.OK
             assert api.get_health_ready().status_code == codes.OK
-            assert api.get_i18n_languages().status_code == codes.OK
-            assert api.get_i18n_bundle(language="en").status_code == codes.OK
 
     def test_rejects_private_request_without_token(self, container: AsyncContainer) -> None:
         auth_client = FakeAuthenticationClient()

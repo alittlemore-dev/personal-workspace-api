@@ -14,12 +14,12 @@ from infra.valkey.storages import (
 
 
 class TestValkeyResponseCacheStatusStorage:
-    async def test_counts_unique_i18n_keys_and_ttl_states_across_scan_pages(self) -> None:
+    async def test_counts_unique_healthcheck_keys_and_ttl_states_across_scan_pages(self) -> None:
         valkey = Mock(spec=Valkey)
         valkey.scan = AsyncMock(
             side_effect=[
-                (7, [b"LITESTAR_i18n:first", b"LITESTAR_i18n:second"]),
-                (0, [b"LITESTAR_i18n:second", b"LITESTAR_i18n:third"]),
+                (7, [b"LITESTAR_healthcheck:first", b"LITESTAR_healthcheck:second"]),
+                (0, [b"LITESTAR_healthcheck:second", b"LITESTAR_healthcheck:third"]),
             ],
         )
         first_pipeline = Mock()
@@ -31,19 +31,19 @@ class TestValkeyResponseCacheStatusStorage:
         valkey.pipeline.side_effect = [first_pipeline, second_pipeline]
         storage = ValkeyResponseCacheStatusStorage(
             valkey=valkey,
-            namespaces={CacheDomainEnum.I18N: "LITESTAR_i18n"},
+            namespaces={CacheDomainEnum.HEALTHCHECK: "LITESTAR_healthcheck"},
             scan_batch_size=200,
         )
 
-        result = await storage.get_domain_status(domain=CacheDomainEnum.I18N)
+        result = await storage.get_domain_status(domain=CacheDomainEnum.HEALTHCHECK)
 
-        assert result.domain is CacheDomainEnum.I18N
+        assert result.domain is CacheDomainEnum.HEALTHCHECK
         assert result.key_count == 3
         assert result.minimum_remaining_ttl_seconds == 30
         assert result.non_expiring_key_count == 1
         assert valkey.scan.await_args_list[0].kwargs == {
             "cursor": 0,
-            "match": "LITESTAR_i18n:*",
+            "match": "LITESTAR_healthcheck:*",
             "count": 200,
         }
 
@@ -52,11 +52,11 @@ class TestValkeyResponseCacheStatusStorage:
         valkey.scan = AsyncMock(return_value=(0, []))
         storage = ValkeyResponseCacheStatusStorage(
             valkey=valkey,
-            namespaces={CacheDomainEnum.I18N: "LITESTAR_i18n"},
+            namespaces={CacheDomainEnum.HEALTHCHECK: "LITESTAR_healthcheck"},
             scan_batch_size=200,
         )
 
-        result = await storage.get_domain_status(domain=CacheDomainEnum.I18N)
+        result = await storage.get_domain_status(domain=CacheDomainEnum.HEALTHCHECK)
 
         assert result.key_count == 0
         assert result.minimum_remaining_ttl_seconds is None

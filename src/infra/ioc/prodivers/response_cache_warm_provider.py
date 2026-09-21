@@ -5,19 +5,16 @@ from dishka import Provider, Scope, provide
 from litestar.stores.valkey import ValkeyStore
 from valkey.asyncio import Valkey
 
-from core.cache_tools.enums import CacheDomainEnum
 from core.cache_tools.schemas import CacheToolsPolicy
 from core.cache_tools.storages import CacheWarmOperationStorage, ResponseCacheStatusStorage
 from core.cache_tools.use_cases import CacheToolsUseCase, ManualCacheWarmUseCase
 from core.generators import HexUuidIdGenerator
 from entrypoints.litestar.response_cache import (
-    ResponseCacheDomain,
     ResponseCacheDomainStore,
 )
 from entrypoints.taskiq.cache_warm.dispatcher import TaskiqCacheWarmDispatcher
 from entrypoints.taskiq.cache_warm.service import ResponseCacheWarmService
 from entrypoints.taskiq.cache_warm.targets import (
-    I18nCacheWarmTargetCollector,
     ResponseCacheWarmTargetCollector,
 )
 from entrypoints.taskiq.cache_warm.writer import ResponseCacheWarmWriter
@@ -32,7 +29,6 @@ from infra.valkey.storages import (
 class ResponseCacheWarmProvider(Provider):
     scope = Scope.REQUEST
 
-    i18n_cache_warm_target_collector = provide(I18nCacheWarmTargetCollector)
     response_cache_warm_target_collector = provide(ResponseCacheWarmTargetCollector)
     response_cache_warm_writer = provide(ResponseCacheWarmWriter)
 
@@ -42,7 +38,7 @@ class ResponseCacheWarmProvider(Provider):
             enabled=settings.app.use_cache,
             configured_ttl_seconds=constants.response_cache.default_ttl_seconds,
             scheduled_warm_interval_seconds=settings.taskiq.cache_warm_interval_seconds,
-            domains=tuple(CacheDomainEnum),
+            domains=(),
         )
 
     @provide
@@ -69,7 +65,7 @@ class ResponseCacheWarmProvider(Provider):
             target_collector=target_collector,
             writer=writer,
             use_cache=settings.app.use_cache,
-            supported_domains=(ResponseCacheDomain.I18N,),
+            supported_domains=(),
         )
 
     @provide
@@ -85,10 +81,7 @@ class ResponseCacheWarmProvider(Provider):
         try:
             yield ValkeyResponseCacheStatusStorage(
                 valkey=valkey,
-                namespaces={
-                    domain: f"{constants.valkey.namespaces.framework}_{domain.value}"
-                    for domain in CacheDomainEnum
-                },
+                namespaces={},
                 scan_batch_size=constants.response_cache.status_scan_batch_size,
             )
         finally:

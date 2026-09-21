@@ -8,7 +8,6 @@ from litestar.stores.base import Store
 
 from core.cache_tools.enums import CacheDomainEnum
 from entrypoints.litestar.api.healthcheck.endpoints import HealthcheckController
-from entrypoints.litestar.api.i18n.endpoints import I18nApiController
 from entrypoints.litestar.cli.commands.cache import invalidate_cache_command
 from entrypoints.litestar.response_cache import (
     ResponseCacheDomain,
@@ -73,7 +72,7 @@ class FakeQueryParams:
 
 
 class FakeUrl:
-    path = "/api/i18n/bundles/ru"
+    path = "/api/healthcheck"
 
 
 class FakeRequest:
@@ -84,31 +83,28 @@ class FakeRequest:
 
 class TestResponseCacheDomainStore:
     async def test_routes_values_to_the_selected_current_domain(self) -> None:
-        health_store = FakeStore()
-        i18n_store = FakeStore()
+        healthcheck_store = FakeStore()
         store = ResponseCacheDomainStore(
             stores={
-                ResponseCacheDomain.HEALTHCHECK: cast("Store", health_store),
-                ResponseCacheDomain.I18N: cast("Store", i18n_store),
+                ResponseCacheDomain.HEALTHCHECK: cast("Store", healthcheck_store),
             },
         )
 
-        await store.set("i18n:GET/api/i18n/languages", b"i18n")
+        await store.set("healthcheck:GET/api/healthcheck", b"healthcheck")
 
-        assert await i18n_store.get("GET/api/i18n/languages") == b"i18n"
-        assert health_store.values == {}
-        assert await store.get("i18n:GET/api/i18n/languages") == b"i18n"
+        assert await healthcheck_store.get("GET/api/healthcheck") == b"healthcheck"
+        assert await store.get("healthcheck:GET/api/healthcheck") == b"healthcheck"
 
     async def test_clear_domains_accepts_only_current_cache_enum(self) -> None:
-        i18n_store = FakeStore(values={"GET/api/i18n/languages": b"i18n"})
+        healthcheck_store = FakeStore(values={"GET/api/healthcheck": b"healthcheck"})
         store = ResponseCacheDomainStore(
-            stores={ResponseCacheDomain.I18N: cast("Store", i18n_store)},
+            stores={ResponseCacheDomain.HEALTHCHECK: cast("Store", healthcheck_store)},
         )
 
-        await store.clear_domains(domains=(CacheDomainEnum.I18N,))
+        await store.clear_domains(domains=(CacheDomainEnum.HEALTHCHECK,))
 
-        assert i18n_store.values == {}
-        assert i18n_store.delete_all_count == 1
+        assert healthcheck_store.values == {}
+        assert healthcheck_store.delete_all_count == 1
 
     @pytest.mark.parametrize("key", ["missing-prefix", "unknown:GET/api/value"])
     async def test_rejects_malformed_or_unknown_domain_keys(self, key: str) -> None:
@@ -123,12 +119,10 @@ class TestResponseCacheCommands:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        health_store = FakeStore(values={"health": b"ok"})
-        i18n_store = FakeStore(values={"bundle": b"ru"})
+        healthcheck_store = FakeStore(values={"health": b"ok"})
         domain_store = ResponseCacheDomainStore(
             stores={
-                ResponseCacheDomain.HEALTHCHECK: cast("Store", health_store),
-                ResponseCacheDomain.I18N: cast("Store", i18n_store),
+                ResponseCacheDomain.HEALTHCHECK: cast("Store", healthcheck_store),
             },
         )
         app = FakeApp(store=cast("Store", domain_store))
@@ -137,8 +131,7 @@ class TestResponseCacheCommands:
         await invalidate_cache_command(app=cast("Any", app))
 
         assert app.stores.requested_names == [constants.response_cache.store_name]
-        assert health_store.delete_all_count == 1
-        assert i18n_store.delete_all_count == 1
+        assert healthcheck_store.delete_all_count == 1
 
     async def test_mutation_invalidates_then_enqueues_warm_only_after_commit(
         self,
@@ -171,7 +164,7 @@ class TestResponseCacheCommands:
 
         await invalidate_response_cache_domain_for_mutation(
             request=cast("Any", object()),
-            domain=ResponseCacheDomain.I18N,
+            domain=ResponseCacheDomain.HEALTHCHECK,
             post_commit_actions=post_commit_actions,
         )
 
@@ -179,7 +172,7 @@ class TestResponseCacheCommands:
 
         await post_commit_actions.run()
 
-        assert events == ["invalidate:i18n", "enqueue:i18n"]
+        assert events == ["invalidate:healthcheck", "enqueue:healthcheck"]
 
     async def test_disabled_cache_does_not_schedule_post_commit_work(
         self,
@@ -190,7 +183,7 @@ class TestResponseCacheCommands:
 
         await invalidate_response_cache_domain_for_mutation(
             request=cast("Any", object()),
-            domain=ResponseCacheDomain.I18N,
+            domain=ResponseCacheDomain.HEALTHCHECK,
             post_commit_actions=post_commit_actions,
         )
 
@@ -198,17 +191,6 @@ class TestResponseCacheCommands:
 
 
 class TestResponseCacheRouteConfiguration:
-    def test_i18n_handlers_use_i18n_domain_cache(self) -> None:
-        for handler in (
-            I18nApiController.list_languages,
-            I18nApiController.get_bundle,
-        ):
-            assert handler.cache == settings.app.get_cache_duration(
-                constants.response_cache.default_ttl_seconds,
-            )
-            assert handler.cache_key_builder is not None
-            assert handler.cache_key_builder(cast("Any", FakeRequest())).startswith("i18n:")
-
     def test_health_and_readiness_have_distinct_cache_policies(self) -> None:
         assert HealthcheckController.health.cache == settings.app.get_cache_duration(1)
         assert HealthcheckController.health.cache_key_builder is not None

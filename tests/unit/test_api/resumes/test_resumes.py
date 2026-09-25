@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -20,7 +21,7 @@ from tests.test_cases import ApiTestCase
 from tests.unit.conftest import TEST_USERNAME
 
 
-def experience_payload() -> dict[str, object]:
+def experience_payload() -> dict[str, Any]:
     return {
         "company": "Company",
         "position": "Engineer",
@@ -163,6 +164,7 @@ class TestResumesApi(ApiTestCase):
             ("role", "   "),
             ("email", "not-an-email"),
             ("websiteUrl", "mailto:me@example.com"),
+            ("phone", "invalid-phone"),
         ],
     )
     def test_create_rejects_invalid_profile_fields(self, field: str, value: str) -> None:
@@ -272,11 +274,11 @@ class TestResumesApi(ApiTestCase):
         assert call["author_username"] == TEST_USERNAME
         assert isinstance(call["current_datetime"], datetime)
 
-    def test_update_accepts_full_length_experience_and_project_highlights(self) -> None:
+    def test_update_accepts_highlights_at_new_limit(self) -> None:
         self.use_case.update_resume.return_value = self.factory.core.resume(resume_id=3)
         content = self.factory.api.resume_content(experience=[experience_payload()])
-        content["experience"][0]["highlights"] = ["x" * 340]
-        content["experience"][0]["projects"][0]["highlights"] = ["y" * 340]
+        content["experience"][0]["highlights"] = ["x" * 300]
+        content["experience"][0]["projects"][0]["highlights"] = ["y" * 300]
 
         response = self.api.put_update_resume(
             resume_id=3,
@@ -285,8 +287,8 @@ class TestResumesApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.OK)
         params = self.use_case.update_resume.await_args.kwargs["params"]
-        assert params.content.experience[0].highlights == ["x" * 340]
-        assert params.content.experience[0].projects[0].highlights == ["y" * 340]
+        assert params.content.experience[0].highlights == ["x" * 300]
+        assert params.content.experience[0].projects[0].highlights == ["y" * 300]
 
     def test_get_missing_resume_uses_stable_not_found_contract(self) -> None:
         self.use_case.get_resume.side_effect = ResumeNotFoundError()

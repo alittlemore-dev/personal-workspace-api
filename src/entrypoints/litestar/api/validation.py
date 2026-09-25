@@ -117,6 +117,7 @@ OptionalEmailString = Annotated[
 ResumeLongText = Annotated[
     str,
     Field(max_length=constants.api_validation.resume_long_text_max_length),
+    AfterValidator(str.strip),
 ]
 RequiredResumeLongText = Annotated[
     str,

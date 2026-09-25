@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated, Self, cast
 
-from pydantic import Field
+from pydantic import AfterValidator, Field, model_validator
 
 from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
@@ -23,6 +23,17 @@ from core.resumes.schemas import (
     ResumeSummary,
     ResumeUpdateParams,
 )
+from entrypoints.litestar.api.resumes.limits import ResumeLimits
+from entrypoints.litestar.api.resumes.validators import (
+    ResumeOptionalShortText,
+    validate_certification_dates,
+    validate_education_dates,
+    validate_experience_content,
+    validate_project_content,
+    validate_resume_phone,
+    validate_resume_totals,
+    validate_unique_skill_items,
+)
 from entrypoints.litestar.api.schemas import CamelCaseSchema
 from entrypoints.litestar.api.validation import (
     BlankableEmailString,
@@ -30,20 +41,21 @@ from entrypoints.litestar.api.validation import (
     RequiredResumeLongText,
     RequiredShortText,
     ResumeLongText,
-    ShortText,
 )
 
 
 class ResumeProfileSchema(CamelCaseSchema):
     full_name: Annotated[RequiredShortText, Field(title="Full name")]
     role: Annotated[RequiredShortText, Field(title="Role")]
-    location: Annotated[ShortText, Field(title="Location")]
+    location: Annotated[ResumeOptionalShortText, Field(title="Location")]
     email: Annotated[BlankableEmailString, Field(title="Email")]
-    phone: Annotated[str, Field(title="Phone", max_length=64)]
+    phone: Annotated[
+        str, Field(title="Phone", max_length=64), AfterValidator(validate_resume_phone)
+    ]
     website_url: Annotated[BlankableHttpUrlString, Field(title="Website URL")]
     linkedin_url: Annotated[BlankableHttpUrlString, Field(title="LinkedIn URL")]
     github_url: Annotated[BlankableHttpUrlString, Field(title="GitHub URL")]
-    telegram: Annotated[ShortText, Field(title="Telegram")]
+    telegram: Annotated[ResumeOptionalShortText, Field(title="Telegram")]
 
     def to_domain_schema(self) -> ResumeProfile:
         return ResumeProfile(
@@ -77,7 +89,7 @@ class ResumeProfileSchema(CamelCaseSchema):
 
 
 class ResumeSummarySchema(CamelCaseSchema):
-    text: Annotated[ResumeLongText, Field(title="Summary")]
+    text: Annotated[ResumeLongText, Field(title="Summary", max_length=ResumeLimits.summary)]
 
     def to_domain_schema(self) -> ResumeSummary:
         return ResumeSummary(text=self.text)
@@ -89,7 +101,12 @@ class ResumeSummarySchema(CamelCaseSchema):
 
 class ResumeSkillGroupSchema(CamelCaseSchema):
     category: Annotated[RequiredShortText, Field(title="Skill category")]
-    items: Annotated[list[RequiredShortText], Field(title="Skill items")]
+    items: Annotated[
+        list[RequiredShortText],
+        Field(title="Skill items", min_length=1, max_length=ResumeLimits.skills_per_group),
+    ]
+
+    validate_unique_items = model_validator(mode="after")(validate_unique_skill_items)
 
     def to_domain_schema(self) -> ResumeSkillGroup:
         return ResumeSkillGroup(
@@ -111,10 +128,21 @@ class ResumeSkillGroupSchema(CamelCaseSchema):
 class ResumeProjectItemSchema(CamelCaseSchema):
     name: Annotated[RequiredShortText, Field(title="Project name")]
     role: Annotated[RequiredShortText, Field(title="Project role")]
-    description: Annotated[ResumeLongText, Field(title="Project description")]
-    highlights: Annotated[list[RequiredResumeLongText], Field(title="Highlights")]
-    technologies: Annotated[list[RequiredShortText], Field(title="Technologies")]
+    description: Annotated[
+        ResumeLongText,
+        Field(title="Project description", max_length=ResumeLimits.project_description),
+    ]
+    highlights: Annotated[
+        list[Annotated[RequiredResumeLongText, Field(max_length=ResumeLimits.highlight)]],
+        Field(title="Highlights", max_length=ResumeLimits.project_highlights),
+    ]
+    technologies: Annotated[
+        list[RequiredShortText],
+        Field(title="Technologies", max_length=ResumeLimits.project_technologies),
+    ]
     url: Annotated[BlankableHttpUrlString, Field(title="Project URL")]
+
+    validate_content = model_validator(mode="after")(validate_project_content)
 
     def to_domain_schema(self) -> ResumeProjectItem:
         return ResumeProjectItem(
@@ -144,14 +172,28 @@ class ResumeProjectItemSchema(CamelCaseSchema):
 class ResumeExperienceItemSchema(CamelCaseSchema):
     company: Annotated[RequiredShortText, Field(title="Company")]
     position: Annotated[RequiredShortText, Field(title="Position")]
-    location: Annotated[ShortText, Field(title="Location")]
+    location: Annotated[ResumeOptionalShortText, Field(title="Location")]
     start_date: Annotated[date, Field(title="Start date")]
     end_date: Annotated[date | None, Field(title="End date")]
     current_status: Annotated[ResumeCurrentStatusEnum, Field(title="Current status")]
-    summary: Annotated[ResumeLongText, Field(title="Experience summary")]
-    highlights: Annotated[list[RequiredResumeLongText], Field(title="Highlights")]
-    technologies: Annotated[list[RequiredShortText], Field(title="Technologies")]
-    projects: Annotated[list[ResumeProjectItemSchema], Field(title="Experience projects")]
+    summary: Annotated[
+        ResumeLongText,
+        Field(title="Experience summary", max_length=ResumeLimits.experience_summary),
+    ]
+    highlights: Annotated[
+        list[Annotated[RequiredResumeLongText, Field(max_length=ResumeLimits.highlight)]],
+        Field(title="Highlights", max_length=ResumeLimits.experience_highlights),
+    ]
+    technologies: Annotated[
+        list[RequiredShortText],
+        Field(title="Technologies", max_length=ResumeLimits.experience_technologies),
+    ]
+    projects: Annotated[
+        list[ResumeProjectItemSchema],
+        Field(title="Experience projects", max_length=ResumeLimits.projects_per_experience),
+    ]
+
+    validate_content = model_validator(mode="after")(validate_experience_content)
 
     def to_domain_schema(self) -> ResumeExperienceItem:
         return ResumeExperienceItem(
@@ -195,8 +237,13 @@ class ResumeEducationItemSchema(CamelCaseSchema):
     field: Annotated[RequiredShortText, Field(title="Field")]
     location: Annotated[RequiredShortText, Field(title="Location")]
     start_date: Annotated[date, Field(title="Start date")]
-    end_date: Annotated[date, Field(title="End date")]
-    description: Annotated[ResumeLongText, Field(title="Description")]
+    end_date: Annotated[date | None, Field(title="End date")]
+    description: Annotated[
+        ResumeLongText,
+        Field(title="Description", max_length=ResumeLimits.education_description),
+    ]
+
+    validate_dates = model_validator(mode="after")(validate_education_dates)
 
     def to_domain_schema(self) -> ResumeEducationItem:
         return ResumeEducationItem(
@@ -219,7 +266,7 @@ class ResumeEducationItemSchema(CamelCaseSchema):
                 field=schema.field,
                 location=schema.location,
                 start_date=cast("date", schema.start_date),
-                end_date=cast("date", schema.end_date),
+                end_date=schema.end_date,
                 description=schema.description,
             ),
         )
@@ -248,10 +295,12 @@ class ResumeLanguageItemSchema(CamelCaseSchema):
 
 class ResumeCertificationItemSchema(CamelCaseSchema):
     name: Annotated[RequiredShortText, Field(title="Certification")]
-    issuer: Annotated[ShortText, Field(title="Issuer")]
+    issuer: Annotated[ResumeOptionalShortText, Field(title="Issuer")]
     issued_on: Annotated[date | None, Field(title="Issued on")]
     expires_on: Annotated[date | None, Field(title="Expires on")]
     credential_url: Annotated[BlankableHttpUrlString, Field(title="Credential URL")]
+
+    validate_dates = model_validator(mode="after")(validate_certification_dates)
 
     def to_domain_schema(self) -> ResumeCertificationItem:
         return ResumeCertificationItem(
@@ -278,7 +327,10 @@ class ResumeCertificationItemSchema(CamelCaseSchema):
 
 class ResumeAdditionalSectionItemSchema(CamelCaseSchema):
     title: Annotated[RequiredShortText, Field(title="Title")]
-    description: Annotated[ResumeLongText, Field(title="Description")]
+    description: Annotated[
+        ResumeLongText,
+        Field(title="Description", max_length=ResumeLimits.additional_description),
+    ]
     url: Annotated[BlankableHttpUrlString, Field(title="URL")]
 
     def to_domain_schema(self) -> ResumeAdditionalSectionItem:
@@ -304,7 +356,11 @@ class ResumeAdditionalSectionSchema(CamelCaseSchema):
     title: Annotated[RequiredShortText, Field(title="Section title")]
     items: Annotated[
         list[ResumeAdditionalSectionItemSchema],
-        Field(title="Section items", min_length=1),
+        Field(
+            title="Section items",
+            min_length=1,
+            max_length=ResumeLimits.additional_items_per_section,
+        ),
     ]
 
     def to_domain_schema(self) -> ResumeAdditionalSection:
@@ -330,15 +386,29 @@ class ResumeAdditionalSectionSchema(CamelCaseSchema):
 class ResumeContentSchema(CamelCaseSchema):
     profile: Annotated[ResumeProfileSchema, Field(title="Profile")]
     summary: Annotated[ResumeSummarySchema, Field(title="Summary")]
-    skills: Annotated[list[ResumeSkillGroupSchema], Field(title="Skills")]
-    experience: Annotated[list[ResumeExperienceItemSchema], Field(title="Experience")]
-    education: Annotated[list[ResumeEducationItemSchema], Field(title="Education")]
-    languages: Annotated[list[ResumeLanguageItemSchema], Field(title="Languages")]
-    certifications: Annotated[list[ResumeCertificationItemSchema], Field(title="Certifications")]
+    skills: Annotated[
+        list[ResumeSkillGroupSchema], Field(title="Skills", max_length=ResumeLimits.skill_groups)
+    ]
+    experience: Annotated[
+        list[ResumeExperienceItemSchema],
+        Field(title="Experience", max_length=ResumeLimits.experience),
+    ]
+    education: Annotated[
+        list[ResumeEducationItemSchema], Field(title="Education", max_length=ResumeLimits.education)
+    ]
+    languages: Annotated[
+        list[ResumeLanguageItemSchema], Field(title="Languages", max_length=ResumeLimits.languages)
+    ]
+    certifications: Annotated[
+        list[ResumeCertificationItemSchema],
+        Field(title="Certifications", max_length=ResumeLimits.certifications),
+    ]
     additional_sections: Annotated[
         list[ResumeAdditionalSectionSchema],
-        Field(title="Additional sections"),
+        Field(title="Additional sections", max_length=ResumeLimits.additional_sections),
     ]
+
+    validate_totals = model_validator(mode="after")(validate_resume_totals)
 
     def to_domain_schema(self) -> ResumeContent:
         return ResumeContent(

@@ -1,6 +1,10 @@
+from contextlib import suppress
+from io import BytesIO
 from typing import Self
 
 from litestar import Response
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from core.resumes.enums import ResumeExportFormatEnum
 from core.resumes.schemas import ResumeExport
@@ -21,12 +25,19 @@ class ResumeExportResponse(Response[bytes]):
             media_type = constants.resume_export.docx_media_type
             extension = constants.resume_export.docx_extension
 
+        headers: dict[str, str] = {
+            constants.resume_export.content_disposition_header_name: (
+                f'attachment; filename="resume-{resume_id}.{extension}"'
+            ),
+        }
+        if document.format == ResumeExportFormatEnum.PDF:
+            with suppress(PdfReadError):
+                headers["X-Resume-Page-Count"] = str(
+                    len(PdfReader(BytesIO(document.content)).pages)
+                )
+
         return cls(
             content=document.content,
             media_type=media_type,
-            headers={
-                constants.resume_export.content_disposition_header_name: (
-                    f'attachment; filename="resume-{resume_id}.{extension}"'
-                ),
-            },
+            headers=headers,
         )

@@ -11,6 +11,8 @@ unchecked entries remain active work unless a later product decision supersedes 
   - [ ] Birthdays and dates
   - [ ] Events
 - [ ] Quick add (only with buttons)
+  - [ ] TODOs
+  - [ ] Finance tracker
   - [ ] Scrap links
     - [ ] Recipes category
     - [ ] Places category
@@ -24,10 +26,6 @@ unchecked entries remain active work unless a later product decision supersedes 
   - [ ] Initial balance amount
   - [ ] Set limits to expences (no solid limits, only soft notifications about limits overdraft)
   - [ ] Shows limits overdraft 
-- [ ] Telegram bot integration
-  - [ ] Quick add
-- [ ] Per-user settings
-  - [ ] Workspace statistic chosen period
 - [ ] Workspace
   - [ ] Statistic
     - [ ] Main page
@@ -55,6 +53,8 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 - [ ] Layout
   - [ ] Workspace items opened or closed
+- [ ] Finance tracker
+  - [ ] Workspace statistic chosen period
 - [ ] Telegram bot integration
   - [ ] Initial setup
     - [ ] Telegram bot ON/OFF
@@ -116,8 +116,6 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 - [ ] CRUD for TODOs
 - [ ] separated TODO lists
-- [ ] Telegram bot integration
-  - [ ] Quick add
 
 ## Knowledge database
 

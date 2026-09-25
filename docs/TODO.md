@@ -83,6 +83,8 @@ unchecked entries remain active work unless a later product decision supersedes 
     - [ ] Analyze vacancy requirements and match against resume
     - [ ] Generate cover letter
   - [ ] New blocks and fields
+    - [ ] Companies
+      - [ ] website
     - [ ] Projects
       - [ ] Team size
       - [ ] Scale
@@ -91,6 +93,10 @@ unchecked entries remain active work unless a later product decision supersedes 
     - [ ] Blocks order (Title, Photo, Summary, Experience, etc.)
     - [ ] Blocks visibility
     - [ ] Themes
+      - [x] Simple
+      - [x] Accent
+      - [ ] Modern
+      - [ ] Two columns
   - [ ] Preview
     - [ ] Show real DOCS/PDF preview
   - [x] Resume export
@@ -98,7 +104,6 @@ unchecked entries remain active work unless a later product decision supersedes 
     - [x] To DOCX
     - [x] Step-by-step maximize resume export ATS score.
     - [x] Fix readability of exported resume
-    - [ ] Apply customization to exported resume
 
 ## Calendar
 

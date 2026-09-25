@@ -1,11 +1,16 @@
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
-from core.resumes.enums import ResumeThemeEnum
+from docxtpl import DocxTemplate
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from markupsafe import Markup
+from xhtml2pdf import pisa
+
+from core.resumes.enums import ResumeExportFormatEnum
 from core.resumes.exporters import ResumeDocumentExporter
 from core.resumes.schemas import ResumeExport, ResumeExportParams
-from infra.resume_export.renderers.accent import AccentResumeRenderer
-from infra.resume_export.renderers.simple import SimpleResumeRenderer
+from infra.resume_export.context import ResumeTemplateContext
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -16,14 +21,65 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
     font_bold_name: str
 
     def export_resume(self, *, params: ResumeExportParams) -> ResumeExport:
-        renderer_type = {
-            ResumeThemeEnum.SIMPLE: SimpleResumeRenderer,
-            ResumeThemeEnum.ACCENT: AccentResumeRenderer,
-        }[params.theme]
-        renderer = renderer_type(
-            font_regular_path=self.font_regular_path,
-            font_bold_path=self.font_bold_path,
+        context = ResumeTemplateContext.from_params(params=params).as_dict()
+        if params.format == ResumeExportFormatEnum.PDF:
+            return ResumeExport(
+                format=params.format,
+                content=self._render_pdf(params=params, context=context),
+            )
+        if params.format == ResumeExportFormatEnum.DOCX:
+            return ResumeExport(
+                format=params.format,
+                content=self._render_docx(params=params, context=context),
+            )
+        message = f"Unsupported resume export format: {params.format}"
+        raise ValueError(message)
+
+    def _render_pdf(self, *, params: ResumeExportParams, context: dict[str, object]) -> bytes:
+        templates_dir = Path(__file__).parent / "templates"
+        environment = Environment(
+            loader=FileSystemLoader(templates_dir),
+            autoescape=True,
+            undefined=StrictUndefined,
+        )
+        environment.filters["linebreaks"] = self._linebreaks
+        template = environment.get_template(f"{params.theme.value}/pdf.html.j2")
+        html = template.render(
+            **context,
             font_regular_name=self.font_regular_name,
             font_bold_name=self.font_bold_name,
         )
-        return renderer.export_resume(params=params)
+        output = BytesIO()
+
+        result = pisa.CreatePDF(
+            html,
+            dest=output,
+            encoding="utf-8",
+            link_callback=self._resolve_resource,
+            context_meta={"title": params.title, "author": params.content.profile.full_name},
+            raise_exception=True,
+        )
+        if result.err:
+            message = f"Failed to render {params.theme.value} PDF resume"
+            raise ValueError(message)
+        return output.getvalue()
+
+    def _render_docx(self, *, params: ResumeExportParams, context: dict[str, object]) -> bytes:
+        template_path = Path(__file__).parent / "templates" / params.theme.value / "resume.docx"
+        template = DocxTemplate(template_path)
+        environment = Environment(undefined=StrictUndefined, autoescape=True)
+        template.render(context, jinja_env=environment, autoescape=True)
+        output = BytesIO()
+        template.save(output)
+        return output.getvalue()
+
+    def _linebreaks(self, value: str) -> Markup:
+        return Markup.escape(value).replace("\n", Markup("<br/>"))
+
+    def _resolve_resource(self, uri: str, _basepath: str | None) -> str:
+        if uri == "resume-font-regular":
+            return str(self.font_regular_path)
+        if uri == "resume-font-bold":
+            return str(self.font_bold_path)
+        message = f"Unexpected resume template resource: {uri}"
+        raise ValueError(message)

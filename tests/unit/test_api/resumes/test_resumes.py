@@ -272,6 +272,22 @@ class TestResumesApi(ApiTestCase):
         assert call["author_username"] == TEST_USERNAME
         assert isinstance(call["current_datetime"], datetime)
 
+    def test_update_accepts_full_length_experience_and_project_highlights(self) -> None:
+        self.use_case.update_resume.return_value = self.factory.core.resume(resume_id=3)
+        content = self.factory.api.resume_content(experience=[experience_payload()])
+        content["experience"][0]["highlights"] = ["x" * 340]
+        content["experience"][0]["projects"][0]["highlights"] = ["y" * 340]
+
+        response = self.api.put_update_resume(
+            resume_id=3,
+            data=self.factory.api.resume_request(content=content),
+        )
+
+        self.asserts.status(response=response, expected_status=codes.OK)
+        params = self.use_case.update_resume.await_args.kwargs["params"]
+        assert params.content.experience[0].highlights == ["x" * 340]
+        assert params.content.experience[0].projects[0].highlights == ["y" * 340]
+
     def test_get_missing_resume_uses_stable_not_found_contract(self) -> None:
         self.use_case.get_resume.side_effect = ResumeNotFoundError()
 

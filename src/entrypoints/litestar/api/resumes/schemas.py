@@ -27,6 +27,7 @@ from entrypoints.litestar.api.schemas import CamelCaseSchema
 from entrypoints.litestar.api.validation import (
     BlankableEmailString,
     BlankableHttpUrlString,
+    RequiredResumeLongText,
     RequiredShortText,
     ResumeLongText,
     ShortText,
@@ -111,7 +112,7 @@ class ResumeProjectItemSchema(CamelCaseSchema):
     name: Annotated[RequiredShortText, Field(title="Project name")]
     role: Annotated[RequiredShortText, Field(title="Project role")]
     description: Annotated[ResumeLongText, Field(title="Project description")]
-    highlights: Annotated[list[RequiredShortText], Field(title="Highlights")]
+    highlights: Annotated[list[RequiredResumeLongText], Field(title="Highlights")]
     technologies: Annotated[list[RequiredShortText], Field(title="Technologies")]
     url: Annotated[BlankableHttpUrlString, Field(title="Project URL")]
 
@@ -148,7 +149,7 @@ class ResumeExperienceItemSchema(CamelCaseSchema):
     end_date: Annotated[date | None, Field(title="End date")]
     current_status: Annotated[ResumeCurrentStatusEnum, Field(title="Current status")]
     summary: Annotated[ResumeLongText, Field(title="Experience summary")]
-    highlights: Annotated[list[RequiredShortText], Field(title="Highlights")]
+    highlights: Annotated[list[RequiredResumeLongText], Field(title="Highlights")]
     technologies: Annotated[list[RequiredShortText], Field(title="Technologies")]
     projects: Annotated[list[ResumeProjectItemSchema], Field(title="Experience projects")]
 

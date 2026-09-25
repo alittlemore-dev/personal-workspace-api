@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <style>{% include "accent/pdf.css" %}</style>
+</head>
+<body>
+  <div id="footer_content">
+    <table><tr><td>{{ labels.footer }}</td><td align="right">{{ labels.page }} <pdf:pagenumber>
+    </td></tr></table>
+  </div>
+
+  <p class="name">{{ display_name }}</p>
+  {% if content.profile.role %}<p class="role">{{ content.profile.role }}</p>{% endif %}
+  {% if content.profile.location %}<p class="location">{{ content.profile.location }}</p>{% endif %}
+
+  {% if contacts %}
+  <p class="section">{{ labels.contacts }}</p>
+  <table class="contacts">
+    {% for pair in contacts | batch(2) %}
+    <tr>
+      {% for contact in pair %}<td>{{ contact.label }}: {{ contact.value }}</td>{% endfor %}
+      {% if pair | length == 1 %}<td></td>{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if content.summary.text %}
+  <p class="section">{{ labels.summary }}</p>
+  <p>{{ content.summary.text | linebreaks }}</p>
+  {% endif %}
+
+  {% if content.skills %}
+  <p class="section">{{ labels.skills }}</p>
+  {% for group in content.skills %}<p>{{ group.category }}: {{ group.items | join(", ") }}</p>{% endfor %}
+  {% endif %}
+
+  {% if educations %}
+  <p class="section">{{ labels.education }}</p>
+  {% for education in educations %}
+  <p class="education-name">{{ education.item.institution }}</p>
+  {% if education.details %}<p>{{ education.details }}</p>{% endif %}
+  {% if education.location_period %}<p class="muted">{{ education.location_period }}</p>{% endif %}
+  {% if education.item.description %}<p>{{ education.item.description | linebreaks }}</p>{% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if not educations %}
+  {% for section in content.additional_sections if section.title == labels.education %}
+  <p class="section">{{ section.title }}</p>
+  {% for item in section.items %}
+  <p class="additional-title">{{ item.title }}</p>
+  {% if item.description %}<p>{{ item.description | linebreaks }}</p>{% endif %}
+  {% if item.url %}<p class="link">{{ item.url }}</p>{% endif %}
+  {% endfor %}
+  {% endfor %}
+  {% endif %}
+
+  {% if content.languages %}
+  <p class="muted">{{ labels.languages }}: {% for language_item in content.languages %}{{ language_item.name }} — {{ language_item.proficiency }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  {% endif %}
+
+  {% if experiences %}
+  <p class="section">{{ labels.experience }}</p>
+  {% for experience in experiences %}
+  <table class="company">
+    <tr><td class="company-name">{{ experience.item.company }}</td><td class="company-period">{{ experience.period }}</td></tr>
+    <tr><td colspan="2" class="company-meta">{{ experience.position_location }}</td></tr>
+    {% if experience.item.summary %}<tr><td colspan="2" class="company-summary">{{ experience.item.summary | linebreaks }}</td></tr>{% endif %}
+  </table>
+  {% for highlight in experience.item.highlights %}<p class="bullet">&bull; {{ highlight | linebreaks }}</p>{% endfor %}
+  {% if experience.item.technologies %}<p class="band">{{ labels.technologies }}: {{ experience.item.technologies | join(", ") }}</p>{% endif %}
+  {% for project in experience.item.projects %}
+  <table class="project"><tr><td>{{ labels.project }}: {{ project.name }}{% if project.role and project.role != experience.item.position %} | {{ project.role }}{% endif %}</td></tr></table>
+  {% for highlight in project.highlights %}<p class="bullet">&bull; {{ highlight | linebreaks }}</p>{% endfor %}
+  {% if project.description %}<p class="band">{{ project.description | linebreaks }}</p>{% endif %}
+  {% if project.technologies %}<p class="band">{{ labels.technologies }}: {{ project.technologies | join(", ") }}</p>{% endif %}
+  {% if project.url %}<p class="link">{{ project.url }}</p>{% endif %}
+  {% endfor %}
+  {% endfor %}
+  {% endif %}
+
+  {% if certifications %}
+  <p class="section">{{ labels.certifications }}</p>
+  {% for certification in certifications %}
+  <p class="certification-name">{{ certification.item.name }} | {{ certification.item.issuer }}</p>
+  {% if certification.dates %}<p class="muted">{{ certification.dates }}</p>{% endif %}
+  {% if certification.item.credential_url %}<p class="link">{{ certification.item.credential_url }}</p>{% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% for section in content.additional_sections if section.title != labels.education or educations %}
+  <p class="section">{{ section.title }}</p>
+  {% for item in section.items %}
+  <p class="additional-title">{{ item.title }}</p>
+  {% if item.description %}<p>{{ item.description | linebreaks }}</p>{% endif %}
+  {% if item.url %}<p class="link">{{ item.url }}</p>{% endif %}
+  {% endfor %}
+  {% endfor %}
+</body>
+</html>

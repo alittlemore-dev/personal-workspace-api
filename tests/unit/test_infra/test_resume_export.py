@@ -1,13 +1,20 @@
 import io
 import re
+from dataclasses import replace
 from datetime import date
 from zipfile import ZipFile
 
+from docx import Document
 from pypdf import PdfReader
 
 from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
-from core.resumes.schemas import ResumeExperienceItem, ResumeExportParams
+from core.resumes.schemas import (
+    ResumeAdditionalSection,
+    ResumeAdditionalSectionItem,
+    ResumeExperienceItem,
+    ResumeExportParams,
+)
 from infra.config.constants import constants
 from infra.resume_export.document_exporter import ResumeDocumentExporterImpl
 from tests.test_cases import TestCase
@@ -262,6 +269,7 @@ class TestResumeDocumentExporter(TestCase):
 
         with ZipFile(io.BytesIO(document.content)) as archive:
             document_xml = archive.read("word/document.xml").decode()
+            styles_xml = archive.read("word/styles.xml").decode()
             footer_xml = archive.read("word/footer1.xml").decode()
         text = self._extract_word_text(document_xml=document_xml)
         assert "Builds reliable backend systems." in text
@@ -269,8 +277,59 @@ class TestResumeDocumentExporter(TestCase):
         assert "Creator" in text
         assert "Sep 2014 - Jun 2018" in text
         assert "Issued: Jan 2025" in text
-        assert 'w:fill="F1F7FC"' in document_xml
+        assert 'w:val="ResumeCompany"' in document_xml
+        assert 'w:fill="F1F7FC"' in styles_xml
         assert "PAGE" in footer_xml
+        word = Document(io.BytesIO(document.content))
+        assert len(word.tables) == 1
+        assert len(word.tables[0].rows) == 3
+        assert word.tables[0].cell(0, 0).text == "Phone: +79990000000"
+        assert word.tables[0].cell(0, 1).text == "Email: dmitriy@example.com"
+        assert word.tables[0].cell(2, 0).text == "GitHub: https://github.com/dmitriy"
+
+    def test_accent_exports_show_imported_education_before_experience(self) -> None:
+        content = replace(
+            self.factory.core.resume_full_content(summary="Systems & <architecture>"),
+            education=[],
+            additional_sections=[
+                ResumeAdditionalSection(
+                    title="Education",
+                    items=[
+                        ResumeAdditionalSectionItem(
+                            title="University & Institute",
+                            description="Computer science <honors>",
+                            url="",
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        for export_format in (ResumeExportFormatEnum.PDF, ResumeExportFormatEnum.DOCX):
+            document = self._exporter().export_resume(
+                params=ResumeExportParams(
+                    format=export_format,
+                    theme=ResumeThemeEnum.ACCENT,
+                    title="Backend resume",
+                    language=LanguageEnum.EN,
+                    content=content,
+                ),
+            )
+            if export_format == ResumeExportFormatEnum.PDF:
+                text = self._extract_pdf_text(content=document.content)
+            else:
+                word = Document(io.BytesIO(document.content))
+                text = "\n".join(paragraph.text for paragraph in word.paragraphs)
+            self._assert_text_order(
+                text=text.casefold(),
+                expected_parts=[
+                    "systems & <architecture>",
+                    "education",
+                    "university & institute",
+                    "computer science <honors>",
+                    "work experience",
+                ],
+            )
 
     def _exporter(self) -> ResumeDocumentExporterImpl:
         return ResumeDocumentExporterImpl(

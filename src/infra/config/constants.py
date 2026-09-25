@@ -127,33 +127,6 @@ class ResumeExportConstants:
     ] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     pdf_extension: Literal["pdf"] = "pdf"
     docx_extension: Literal["docx"] = "docx"
-    pdf_horizontal_margin_mm: int = 17
-    pdf_vertical_margin_mm: int = 14
-    pdf_title_font_size: int = 16
-    pdf_role_font_size: int = 10
-    pdf_contact_font_size: int = 8
-    pdf_section_font_size: int = 10
-    pdf_item_title_font_size: int = 9
-    pdf_body_font_size: int = 8
-    pdf_title_leading: int = 19
-    pdf_role_leading: int = 13
-    pdf_contact_leading: int = 10
-    pdf_section_leading: int = 12
-    pdf_body_leading: int = 11
-    word_font_name: Literal["Arial"] = "Arial"
-    word_margin_inches: float = 0.55
-    word_title_font_size_pt: int = 16
-    word_role_font_size_pt: int = 10
-    word_contact_font_size_pt: int = 8
-    word_section_font_size_pt: int = 10
-    word_item_title_font_size_pt: int = 9
-    word_body_font_size_pt: int = 9
-    word_name_style_id: Literal["ResumeName"] = "ResumeName"
-    word_role_style_id: Literal["ResumeRole"] = "ResumeRole"
-    word_contact_style_id: Literal["ResumeContact"] = "ResumeContact"
-    word_section_style_id: Literal["ResumeSection"] = "ResumeSection"
-    word_item_title_style_id: Literal["ResumeItemTitle"] = "ResumeItemTitle"
-    word_body_style_id: Literal["ResumeBody"] = "ResumeBody"
 
 
 class SearchConstants:

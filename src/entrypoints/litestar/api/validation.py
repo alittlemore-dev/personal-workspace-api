@@ -118,6 +118,14 @@ ResumeLongText = Annotated[
     str,
     Field(max_length=constants.api_validation.resume_long_text_max_length),
 ]
+RequiredResumeLongText = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=constants.api_validation.resume_long_text_max_length,
+    ),
+    AfterValidator(trim_required),
+]
 KnowledgeDescriptionText = Annotated[
     str,
     Field(max_length=constants.api_validation.knowledge_description_max_length),

@@ -1,0 +1,64 @@
+@page {
+  size: a4 portrait;
+  margin: 14mm 17mm;
+}
+
+@font-face {
+  font-family: "{{ font_regular_name }}";
+  src: url("resume-font-regular");
+}
+
+@font-face {
+  font-family: "{{ font_bold_name }}";
+  src: url("resume-font-bold");
+}
+
+body {
+  font-family: "{{ font_regular_name }}";
+  color: #111111;
+  font-size: 8pt;
+  line-height: 11pt;
+}
+
+p {
+  margin: 0 0 1pt 0;
+}
+
+.name {
+  font-family: "{{ font_bold_name }}";
+  font-size: 16pt;
+  line-height: 19pt;
+  margin-bottom: 1pt;
+}
+
+.role {
+  font-size: 10pt;
+  line-height: 13pt;
+  margin-bottom: 2pt;
+}
+
+.contacts {
+  font-size: 8pt;
+  line-height: 10pt;
+  margin-bottom: 6pt;
+}
+
+.section {
+  font-family: "{{ font_bold_name }}";
+  font-size: 10pt;
+  line-height: 12pt;
+  margin: 6pt 0 2pt;
+  -pdf-keep-with-next: true;
+}
+
+.item-title {
+  font-family: "{{ font_bold_name }}";
+  font-size: 9pt;
+  line-height: 11pt;
+  margin: 2pt 0 1pt;
+  -pdf-keep-with-next: true;
+}
+
+.bullet {
+  margin-left: 8pt;
+}

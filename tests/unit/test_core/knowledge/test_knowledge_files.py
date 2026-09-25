@@ -479,6 +479,94 @@ class TestKnowledgeFilesUseCase(TestCase):
             created_at=NOW,
             updated_at=NOW,
         )
+        self.photo = replace(
+            self.file,
+            kind=KnowledgeFileKind.PERSON_PHOTO,
+            processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
+            relative_path="person-photos/photo.webp",
+        )
+        self.rollback_registrar = Mock(spec=KnowledgeFileRollbackRegistrar)
+
+    async def test_replace_person_photo_returns_old_object_for_post_commit_cleanup(self) -> None:
+        new_photo = replace(self.photo, id="3" * 32, relative_path="person-photos/new.webp")
+        params = KnowledgeFileUploadParams(
+            id=new_photo.id,
+            item_id=self.item.id,
+            author_username="owner",
+            kind=KnowledgeFileKind.PERSON_PHOTO,
+            name="Photo",
+            original_name="photo.png",
+            mime_type="image/png",
+            content=b"png",
+        )
+        self.item_storage.get_item.return_value = self.item
+        self.file_storage.list_item_files.return_value = [self.file, self.photo]
+        self.file_service.delete_file.return_value = self.photo
+        self.file_service.create_file.return_value = new_photo
+
+        result = await self.use_case.replace_person_photo(
+            params=params,
+            rollback_registrar=self.rollback_registrar,
+            current_datetime=NOW,
+        )
+
+        assert result == KnowledgeFileMutationResult(
+            file=new_photo,
+            object_names_to_delete=("person-photos/photo.webp",),
+        )
+        self.file_service.delete_file.assert_awaited_once_with(file=self.photo)
+        assert self.file_service.create_file.await_args.kwargs["processing"] == (
+            KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE
+        )
+        assert self.file_service.create_file.await_args.kwargs["rollback_registrar"] == (
+            self.rollback_registrar
+        )
+        self.item_storage.touch_items.assert_awaited_once()
+
+    async def test_delete_person_photo_returns_unshared_object_for_cleanup(self) -> None:
+        self.item_storage.get_item.return_value = self.item
+        self.file_storage.list_item_files.return_value = [self.photo]
+        self.file_service.delete_file.return_value = self.photo
+
+        result = await self.use_case.delete_person_photo(
+            person_id=self.item.id,
+            author_username="owner",
+            current_datetime=NOW,
+        )
+
+        assert result == KnowledgeFileMutationResult(
+            file=None,
+            object_names_to_delete=("person-photos/photo.webp",),
+        )
+        self.item_storage.touch_items.assert_awaited_once()
+
+    async def test_delete_person_photo_preserves_shared_object(self) -> None:
+        self.item_storage.get_item.return_value = self.item
+        self.file_storage.list_item_files.return_value = [self.photo]
+        self.file_service.delete_file.return_value = None
+
+        result = await self.use_case.delete_person_photo(
+            person_id=self.item.id,
+            author_username="owner",
+            current_datetime=NOW,
+        )
+
+        assert result.object_names_to_delete == ()
+        self.file_service.delete_file.assert_awaited_once_with(file=self.photo)
+
+    async def test_delete_person_photo_rejects_missing_photo_without_mutation(self) -> None:
+        self.item_storage.get_item.return_value = self.item
+        self.file_storage.list_item_files.return_value = [self.file]
+
+        with pytest.raises(KnowledgeFileNotFoundError):
+            await self.use_case.delete_person_photo(
+                person_id=self.item.id,
+                author_username="owner",
+                current_datetime=NOW,
+            )
+
+        self.file_service.delete_file.assert_not_awaited()
+        self.item_storage.touch_items.assert_not_awaited()
 
     async def test_rename_rejects_foreign_nested_file_as_not_found(self) -> None:
         self.item_storage.get_item_for_author.return_value = self.item

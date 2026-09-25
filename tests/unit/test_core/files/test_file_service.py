@@ -56,7 +56,8 @@ def stored_file(
 
 
 class TestFileService:
-    def setup_method(self) -> None:
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
         self.file_client = Mock(spec=FileClient)
         self.file_storage = Mock(spec=FileStorage)
         self.file_name_generator = Mock(spec=FileNameGenerator)
@@ -85,6 +86,7 @@ class TestFileService:
                 ),
             ),
         )
+        self.file = stored_file()
 
     async def test_upload_validates_processes_and_persists_namespaced_metadata(self) -> None:
         persisted = stored_file()
@@ -199,6 +201,42 @@ class TestFileService:
             file_ids=frozenset({"file-id"}),
         )
         self.file_client.delete_file.assert_not_awaited()
+
+    async def test_delete_unused_file_removes_object_and_metadata(self) -> None:
+        self.file_storage.file_has_usages.return_value = False
+        self.file_storage.get_file.return_value = self.file
+
+        await self.service.delete_file(file_id=self.file.id)
+
+        self.file_client.delete_file.assert_awaited_once_with(
+            object_name=self.file.relative_path,
+            namespace=NAMESPACE,
+        )
+        self.file_storage.delete_file.assert_awaited_once_with(
+            namespace=NAMESPACE,
+            file_id=self.file.id,
+        )
+
+    async def test_sync_file_usages_attaches_and_orphans_changed_files(self) -> None:
+        await self.service.sync_file_usages(
+            attached_file_ids=frozenset({"attached"}),
+            detached_file_ids=frozenset({"detached"}),
+            orphaned_at=NOW,
+        )
+
+        self.file_storage.lock_files.assert_awaited_once_with(
+            namespace=NAMESPACE,
+            file_ids=frozenset({"attached", "detached"}),
+        )
+        self.file_storage.set_files_attached.assert_awaited_once_with(
+            namespace=NAMESPACE,
+            file_ids=frozenset({"attached"}),
+        )
+        self.file_storage.set_files_orphaned_if_unused.assert_awaited_once_with(
+            namespace=NAMESPACE,
+            file_ids=frozenset({"detached"}),
+            orphaned_at=NOW,
+        )
 
     async def test_update_and_list_preserve_namespace_boundary(self) -> None:
         file = stored_file()

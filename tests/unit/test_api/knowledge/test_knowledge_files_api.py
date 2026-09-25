@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, datetime
 from functools import partial
 from unittest.mock import patch
@@ -32,6 +33,13 @@ class TestKnowledgeFilesApi(ApiTestCase):
         self.use_case = await self.container.get_knowledge_files_use_case()
         self.cleaner = await self.container.get_knowledge_file_object_cleaner()
         self.rollback_registrar = await self.container.get_knowledge_file_rollback_registrar()
+        self.photo = self.file(
+            kind=KnowledgeFileKind.PERSON_PHOTO,
+            processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
+            relative_path="person-photos/photo.webp",
+            mime_type="image/webp",
+            original_name="photo.png",
+        )
 
     def file(
         self,
@@ -186,6 +194,55 @@ class TestKnowledgeFilesApi(ApiTestCase):
         assert body["contentPath"] == f"/api/knowledge/files/{file.id}/content"
         assert "relativePath" not in body
         assert "url" not in body
+
+    def test_photo_replacement_schedules_old_object_cleanup_after_commit(self) -> None:
+        file = replace(self.photo, relative_path="person-photos/new.webp")
+        self.use_case.replace_person_photo.return_value = KnowledgeFileMutationResult(
+            file=file,
+            object_names_to_delete=("person-photos/old.webp",),
+        )
+
+        with patch.object(PostCommitActions, "add", autospec=True) as add_action:
+            response = self.api.client.put(
+                f"/api/knowledge/people/{file.item_id}/photo",
+                files={"file": ("photo.png", b"png-bytes", "image/png")},
+            )
+
+        self.asserts.status(response=response, expected_status=codes.OK)
+        assert response.json()["contentPath"] == f"/api/knowledge/files/{file.id}/content"
+        params = self.use_case.replace_person_photo.await_args.kwargs["params"]
+        assert params.item_id == file.item_id
+        assert params.author_username == TEST_USERNAME
+        assert params.kind == KnowledgeFileKind.PERSON_PHOTO
+        assert (
+            self.use_case.replace_person_photo.await_args.kwargs["rollback_registrar"]
+            is self.rollback_registrar
+        )
+        assert add_action.call_args.kwargs["action"].keywords == {
+            "object_names": ("person-photos/old.webp",),
+        }
+
+    def test_photo_deletion_schedules_object_cleanup_after_commit(self) -> None:
+        file = self.photo
+        self.use_case.delete_person_photo.return_value = KnowledgeFileMutationResult(
+            file=None,
+            object_names_to_delete=(file.relative_path,),
+        )
+
+        with patch.object(PostCommitActions, "add", autospec=True) as add_action:
+            response = self.api.client.delete(
+                f"/api/knowledge/people/{file.item_id}/photo",
+            )
+
+        self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
+        self.use_case.delete_person_photo.assert_awaited_once_with(
+            person_id=file.item_id,
+            author_username=TEST_USERNAME,
+            current_datetime=NOW,
+        )
+        assert add_action.call_args.kwargs["action"].keywords == {
+            "object_names": (file.relative_path,),
+        }
 
     def test_editor_image_upload_returns_attachment_metadata_and_protected_content_path(
         self,

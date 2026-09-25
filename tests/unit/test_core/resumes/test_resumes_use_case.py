@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeExportFormatEnum
+from core.resumes.enums import ResumeExportFormatEnum, ResumeThemeEnum
 from core.resumes.exceptions import ResumeNotFoundError
 from core.resumes.exporters import ResumeDocumentExporter
 from core.resumes.schemas import (
@@ -192,6 +192,7 @@ class TestResumesUseCase(TestCase):
         )
         params = ResumeExportParams(
             format=ResumeExportFormatEnum.PDF,
+            theme=ResumeThemeEnum.SIMPLE,
             title="Unsaved resume",
             language=LanguageEnum.EN,
             content=export_content,
@@ -216,6 +217,7 @@ class TestResumesUseCase(TestCase):
     async def test_export_resume_propagates_not_found_before_rendering(self) -> None:
         params = ResumeExportParams(
             format=ResumeExportFormatEnum.DOCX,
+            theme=ResumeThemeEnum.SIMPLE,
             title="Resume",
             language=LanguageEnum.RU,
             content=self.factory.core.resume_full_content(

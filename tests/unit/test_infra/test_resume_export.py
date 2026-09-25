@@ -6,7 +6,7 @@ from zipfile import ZipFile
 from pypdf import PdfReader
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
 from core.resumes.schemas import ResumeExperienceItem, ResumeExportParams
 from infra.config.constants import constants
 from infra.resume_export.document_exporter import ResumeDocumentExporterImpl
@@ -28,6 +28,7 @@ class TestResumeDocumentExporter(TestCase):
         document = exporter.export_resume(
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.PDF,
+                theme=ResumeThemeEnum.SIMPLE,
                 title="Backend resume",
                 language=LanguageEnum.EN,
                 content=self.factory.core.resume_content(summary=summary),
@@ -42,6 +43,7 @@ class TestResumeDocumentExporter(TestCase):
         document = exporter.export_resume(
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.PDF,
+                theme=ResumeThemeEnum.SIMPLE,
                 title="Backend resume",
                 language=LanguageEnum.EN,
                 content=self.factory.core.resume_full_content(
@@ -87,6 +89,7 @@ class TestResumeDocumentExporter(TestCase):
         document = exporter.export_resume(
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.PDF,
+                theme=ResumeThemeEnum.SIMPLE,
                 title="Backend resume",
                 language=LanguageEnum.RU,
                 content=self.factory.core.resume_content(
@@ -132,6 +135,7 @@ class TestResumeDocumentExporter(TestCase):
         document = exporter.export_resume(
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.DOCX,
+                theme=ResumeThemeEnum.SIMPLE,
                 title="Backend resume",
                 language=LanguageEnum.EN,
                 content=self.factory.core.resume_full_content(
@@ -182,6 +186,7 @@ class TestResumeDocumentExporter(TestCase):
         document = exporter.export_resume(
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.PDF,
+                theme=ResumeThemeEnum.SIMPLE,
                 title="Backend resume",
                 language=LanguageEnum.RU,
                 content=self.factory.core.resume_content(
@@ -201,6 +206,7 @@ class TestResumeDocumentExporter(TestCase):
         document = exporter.export_resume(
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.DOCX,
+                theme=ResumeThemeEnum.SIMPLE,
                 title="Backend resume",
                 language=LanguageEnum.EN,
                 content=self.factory.core.resume_content(
@@ -216,6 +222,55 @@ class TestResumeDocumentExporter(TestCase):
             document_xml = archive.read("word/document.xml").decode()
         assert "Candidate Name" in document_xml
         assert "Builds reliable backend systems." in document_xml
+
+    def test_accent_pdf_preserves_resume_content_and_adds_page_footer(self) -> None:
+        document = self._exporter().export_resume(
+            params=ResumeExportParams(
+                format=ResumeExportFormatEnum.PDF,
+                theme=ResumeThemeEnum.ACCENT,
+                title="Backend resume",
+                language=LanguageEnum.RU,
+                content=self.factory.core.resume_full_content(
+                    summary="Разрабатывает надежные системы.",
+                    skill_items=["Python", "PostgreSQL"],
+                ),
+            ),
+        )
+
+        text = self._extract_pdf_text(content=document.content)
+        assert "Разрабатывает надежные системы." in text
+        assert "Python" in text
+        assert "Portfolio" in text
+        assert "Creator" in text
+        assert "09.2014 - 06.2018" in text
+        assert "Выдан: 01.2025" in text
+        assert "Страница 1" in text
+
+    def test_accent_docx_preserves_resume_content_and_uses_theme_styling(self) -> None:
+        document = self._exporter().export_resume(
+            params=ResumeExportParams(
+                format=ResumeExportFormatEnum.DOCX,
+                theme=ResumeThemeEnum.ACCENT,
+                title="Backend resume",
+                language=LanguageEnum.EN,
+                content=self.factory.core.resume_full_content(
+                    summary="Builds reliable backend systems.",
+                    skill_items=["Python", "PostgreSQL"],
+                ),
+            ),
+        )
+
+        with ZipFile(io.BytesIO(document.content)) as archive:
+            document_xml = archive.read("word/document.xml").decode()
+            footer_xml = archive.read("word/footer1.xml").decode()
+        text = self._extract_word_text(document_xml=document_xml)
+        assert "Builds reliable backend systems." in text
+        assert "Portfolio" in text
+        assert "Creator" in text
+        assert "Sep 2014 - Jun 2018" in text
+        assert "Issued: Jan 2025" in text
+        assert 'w:fill="F1F7FC"' in document_xml
+        assert "PAGE" in footer_xml
 
     def _exporter(self) -> ResumeDocumentExporterImpl:
         return ResumeDocumentExporterImpl(

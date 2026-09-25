@@ -10,3 +10,8 @@ class ResumeCurrentStatusEnum(StrEnum):
 class ResumeExportFormatEnum(StrEnum):
     PDF = "pdf"
     DOCX = "docx"
+
+
+class ResumeThemeEnum(StrEnum):
+    SIMPLE = "simple"
+    ACCENT = "accent"

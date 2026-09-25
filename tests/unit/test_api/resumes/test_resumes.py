@@ -5,7 +5,7 @@ import pytest_asyncio
 from httpx import codes
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
 from core.resumes.exceptions import ResumeNotFoundError
 from core.resumes.schemas import (
     ResumeCreateParams,
@@ -298,6 +298,7 @@ class TestResumesApi(ApiTestCase):
             resume_id=3,
             data={
                 "format": "pdf",
+                "theme": "accent",
                 **self.factory.api.resume_request(
                     title="Target resume",
                     language="en",
@@ -315,6 +316,7 @@ class TestResumesApi(ApiTestCase):
             resume_id=self.factory.core.hex_id(3),
             params=ResumeExportParams(
                 format=ResumeExportFormatEnum.PDF,
+                theme=ResumeThemeEnum.ACCENT,
                 title="Target resume",
                 language=LanguageEnum.EN,
                 content=content,
@@ -330,7 +332,7 @@ class TestResumesApi(ApiTestCase):
 
         docx_response = self.api.post_export_resume(
             resume_id=5,
-            data={"format": "docx", **self.factory.api.resume_request()},
+            data={"format": "docx", "theme": "simple", **self.factory.api.resume_request()},
         )
 
         self.asserts.status(response=docx_response, expected_status=codes.OK)
@@ -342,10 +344,17 @@ class TestResumesApi(ApiTestCase):
         self.use_case.export_resume.reset_mock()
         invalid_response = self.api.post_export_resume(
             resume_id=5,
-            data={"format": "xlsx", **self.factory.api.resume_request()},
+            data={"format": "xlsx", "theme": "simple", **self.factory.api.resume_request()},
         )
 
         self.asserts.status(response=invalid_response, expected_status=codes.BAD_REQUEST)
+        self.use_case.export_resume.assert_not_awaited()
+
+        invalid_theme_response = self.api.post_export_resume(
+            resume_id=5,
+            data={"format": "pdf", "theme": "unknown", **self.factory.api.resume_request()},
+        )
+        self.asserts.status(response=invalid_theme_response, expected_status=codes.BAD_REQUEST)
         self.use_case.export_resume.assert_not_awaited()
 
     @pytest.mark.parametrize("operation", ["export", "delete"])
@@ -357,7 +366,7 @@ class TestResumesApi(ApiTestCase):
             self.use_case.export_resume.side_effect = ResumeNotFoundError()
             response = self.api.post_export_resume(
                 resume_id=404,
-                data={"format": "pdf", **self.factory.api.resume_request()},
+                data={"format": "pdf", "theme": "simple", **self.factory.api.resume_request()},
             )
         else:
             self.use_case.delete_resume.side_effect = ResumeNotFoundError()

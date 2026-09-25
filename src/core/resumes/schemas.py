@@ -4,7 +4,7 @@ from math import ceil
 from typing import Self
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
 from core.schemas import ValuedDataclass
 
 
@@ -181,6 +181,7 @@ class ResumeUpdateParams:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ResumeExportParams:
     format: ResumeExportFormatEnum
+    theme: ResumeThemeEnum
     title: str
     language: LanguageEnum
     content: ResumeContent

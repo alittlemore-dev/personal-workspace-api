@@ -174,6 +174,7 @@ class ResumesApiController(Controller):
                         "title": "Backend Engineer",
                         "language": "en",
                         "format": "docx",
+                        "theme": "simple",
                         "content": {
                             "profile": {
                                 "fullName": "Dmitriy Lunev",

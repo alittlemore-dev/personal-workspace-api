@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, exists, select, update
+from sqlalchemy import delete, exists, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.sql.elements import ColumnElement
@@ -12,7 +12,7 @@ from core.files.exceptions import NamespaceNotAllowedError
 from core.files.schemas import StoredFile, StoredFiles
 from core.files.storages import FileStorage
 from core.files.types import Namespace
-from infra.postgresql.models import FileModel
+from infra.postgresql.models import FileModel, ResumeModel
 from infra.postgresql.models.knowledge.files import KnowledgeItemFileModel
 
 
@@ -24,7 +24,10 @@ class FilesDatabaseStorage(FileStorage):
     def file_usage_exists(
         file_id: str | ColumnElement[str] | InstrumentedAttribute[str],
     ) -> ColumnElement[bool]:
-        return exists().where(KnowledgeItemFileModel.file_id == file_id)
+        return or_(
+            exists().where(KnowledgeItemFileModel.file_id == file_id),
+            exists().where(ResumeModel.content["profile"]["photo_file_id"].astext == file_id),
+        )
 
     async def create_file(self, namespace: Namespace, file: StoredFile) -> StoredFile:
         if file.namespace != namespace:

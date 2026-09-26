@@ -5,6 +5,7 @@ from datetime import date
 from zipfile import ZipFile
 
 from docx import Document
+from PIL import Image
 from pypdf import PdfReader
 
 from core.i18n.enums import LanguageEnum
@@ -28,6 +29,53 @@ class TestResumeExportConstants:
 
 
 class TestResumeDocumentExporter(TestCase):
+    def test_photo_and_new_details_appear_in_pdf_and_docx(self) -> None:
+        image = Image.new("RGB", (24, 24), color="white")
+        photo = io.BytesIO()
+        image.save(photo, format="JPEG")
+        content = self.factory.core.resume_full_content()
+        content = replace(
+            content,
+            profile=replace(
+                content.profile,
+                photo_file_id="0" * 32,
+            ),
+        )
+        exporter = self._exporter()
+        for theme in ResumeThemeEnum:
+            pdf = exporter.export_resume(
+                params=ResumeExportParams(
+                    format=ResumeExportFormatEnum.PDF,
+                    theme=theme,
+                    title="Resume",
+                    language=LanguageEnum.EN,
+                    content=content,
+                ),
+                photo_content=photo.getvalue(),
+            )
+            text = self._extract_pdf_text(content=pdf.content)
+            assert "https://company.example" in text
+            assert "Team size: 6 engineers" in text
+            assert "Scale and load: 2M requests/day" in text
+            assert b"/Subtype /Image" in pdf.content
+
+            docx = exporter.export_resume(
+                params=ResumeExportParams(
+                    format=ResumeExportFormatEnum.DOCX,
+                    theme=theme,
+                    title="Resume",
+                    language=LanguageEnum.EN,
+                    content=content,
+                ),
+                photo_content=photo.getvalue(),
+            )
+            with ZipFile(io.BytesIO(docx.content)) as archive:
+                assert any(name.startswith("word/media/") for name in archive.namelist())
+            document_text = "\n".join(p.text for p in Document(io.BytesIO(docx.content)).paragraphs)
+            assert "https://company.example" in document_text
+            assert "Team size: 6 engineers" in document_text
+            assert "Scale and load: 2M requests/day" in document_text
+
     def test_pdf_export_preserves_authored_xml_sensitive_text(self) -> None:
         exporter = self._exporter()
         summary = 'Owner & <operator> said "don\'t" > "ship".'
@@ -40,6 +88,7 @@ class TestResumeDocumentExporter(TestCase):
                 language=LanguageEnum.EN,
                 content=self.factory.core.resume_content(summary=summary),
             ),
+            photo_content=b"",
         )
 
         assert summary in self._extract_pdf_text(content=document.content)
@@ -58,6 +107,7 @@ class TestResumeDocumentExporter(TestCase):
                     skill_items=["Python", "PostgreSQL", "Docker"],
                 ),
             ),
+            photo_content=b"",
         )
 
         text = self._extract_pdf_text(content=document.content)
@@ -106,6 +156,7 @@ class TestResumeDocumentExporter(TestCase):
                     experience=[
                         ResumeExperienceItem(
                             company="Компания",
+                            company_website_url="",
                             position="Инженер",
                             location="Москва",
                             start_date=date(2023, 1, 1),
@@ -119,6 +170,7 @@ class TestResumeDocumentExporter(TestCase):
                     ],
                 ),
             ),
+            photo_content=b"",
         )
 
         text = self._extract_pdf_text(content=document.content)
@@ -150,6 +202,7 @@ class TestResumeDocumentExporter(TestCase):
                     skill_items=["Python", "PostgreSQL", "Docker"],
                 ),
             ),
+            photo_content=b"",
         )
 
         with ZipFile(io.BytesIO(document.content)) as archive:
@@ -202,6 +255,7 @@ class TestResumeDocumentExporter(TestCase):
                     summary="Строит надежные backend-системы.",
                 ),
             ),
+            photo_content=b"",
         )
 
         assert document.format == ResumeExportFormatEnum.PDF
@@ -222,6 +276,7 @@ class TestResumeDocumentExporter(TestCase):
                     summary="Builds reliable backend systems.",
                 ),
             ),
+            photo_content=b"",
         )
 
         assert document.format == ResumeExportFormatEnum.DOCX
@@ -242,6 +297,7 @@ class TestResumeDocumentExporter(TestCase):
                     skill_items=["Python", "PostgreSQL"],
                 ),
             ),
+            photo_content=b"",
         )
 
         text = self._extract_pdf_text(content=document.content)
@@ -265,6 +321,7 @@ class TestResumeDocumentExporter(TestCase):
                     skill_items=["Python", "PostgreSQL"],
                 ),
             ),
+            photo_content=b"",
         )
 
         with ZipFile(io.BytesIO(document.content)) as archive:
@@ -314,6 +371,7 @@ class TestResumeDocumentExporter(TestCase):
                     language=LanguageEnum.EN,
                     content=content,
                 ),
+                photo_content=b"",
             )
             if export_format == ResumeExportFormatEnum.PDF:
                 text = self._extract_pdf_text(content=document.content)

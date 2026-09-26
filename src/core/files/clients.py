@@ -24,6 +24,10 @@ class FileClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def download_file(self, object_name: str, namespace: str) -> bytes:
+        raise NotImplementedError
+
+    @abstractmethod
     async def init_storage(self) -> None:
         raise NotImplementedError
 

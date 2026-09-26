@@ -97,6 +97,16 @@ class FileService:
             ),
         )
 
+    async def download_file(self, *, file_id: str) -> bytes:
+        file = await self.file_storage.get_file(
+            namespace=self.config.namespace,
+            file_id=file_id,
+        )
+        return await self.file_client.download_file(
+            object_name=file.relative_path,
+            namespace=file.namespace,
+        )
+
     async def list_files(self, *, purpose: FilePurpose) -> list[FileRead]:
         files = await self.file_storage.list_files(
             namespace=self.config.namespace,

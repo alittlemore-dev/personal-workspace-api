@@ -18,6 +18,29 @@ def request_content() -> dict[str, Any]:
     return ApiFactoryHelper.resume_content(experience=[experience_payload()])
 
 
+def test_resume_accepts_project_scale_and_company_website() -> None:
+    content = request_content()
+    content["experience"][0]["companyWebsiteUrl"] = "https://company.example"
+    content["experience"][0]["projects"][0].update(
+        teamSize="5–7 engineers", scale="2M requests/day"
+    )
+    resume = ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+    assert resume.content.experience[0].company_website_url == "https://company.example"
+    assert resume.content.experience[0].projects[0].team_size == "5–7 engineers"
+    assert resume.content.experience[0].projects[0].scale == "2M requests/day"
+
+
+def test_resume_photo_requires_file_reference() -> None:
+    content = request_content()
+    content["profile"]["photoFileId"] = "0" * 32
+    ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+    content["profile"]["photoFileId"] = "data:image/jpeg;base64,ZmFrZQ=="
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
 @pytest.mark.parametrize(
     ("section", "count"),
     [
@@ -65,6 +88,20 @@ def test_rejects_sixteenth_project_within_one_job() -> None:
         ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
 
 
+def test_project_technologies_allow_fifty_but_reject_fifty_one() -> None:
+    content = request_content()
+    technologies = [f"Technology {index}" for index in range(50)]
+    content["experience"][0]["projects"][0]["technologies"] = technologies
+    ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+    content["experience"][0]["projects"][0]["technologies"] = [
+        *technologies,
+        "Technology 50",
+    ]
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -87,7 +124,7 @@ def test_rejects_empty_skill_group_and_oversized_highlight() -> None:
     with pytest.raises(ValidationError):
         ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
     content["skills"][0]["items"] = ["Python"]
-    content["experience"][0]["highlights"] = ["x" * 301]
+    content["experience"][0]["highlights"] = ["x" * 513]
     with pytest.raises(ValidationError):
         ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
 

@@ -131,6 +131,7 @@ class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
     def _profile_to_json(*, profile: ResumeProfile) -> dict[str, str]:
         return {
             "full_name": profile.full_name,
+            "photo_file_id": profile.photo_file_id,
             "role": profile.role,
             "location": profile.location,
             "email": profile.email,
@@ -145,6 +146,7 @@ class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
     def _experience_to_json(cls, *, experience: ResumeExperienceItem) -> dict[str, Any]:
         return {
             "company": experience.company,
+            "company_website_url": experience.company_website_url,
             "position": experience.position,
             "location": experience.location,
             "start_date": cls._date_to_json(value=experience.start_date),
@@ -161,6 +163,8 @@ class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
         return {
             "name": project.name,
             "role": project.role,
+            "team_size": project.team_size,
+            "scale": project.scale,
             "description": project.description,
             "highlights": list(project.highlights),
             "technologies": list(project.technologies),
@@ -250,6 +254,7 @@ class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
     def _profile_from_json(cls, *, data: dict[str, Any]) -> ResumeProfile:
         return ResumeProfile(
             full_name=cls._string_from_json(value=data["full_name"]),
+            photo_file_id=cls._string_from_json(value=data.get("photo_file_id", "")),
             role=cls._string_from_json(value=data["role"]),
             location=cls._string_from_json(value=data["location"]),
             email=cls._string_from_json(value=data["email"]),
@@ -264,6 +269,7 @@ class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
     def _experience_from_json(cls, *, data: dict[str, Any]) -> ResumeExperienceItem:
         return ResumeExperienceItem(
             company=cls._string_from_json(value=data["company"]),
+            company_website_url=cls._string_from_json(value=data.get("company_website_url", "")),
             position=cls._string_from_json(value=data["position"]),
             location=cls._string_from_json(value=data["location"]),
             start_date=cls._date_from_json(value=data["start_date"]),
@@ -283,6 +289,8 @@ class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
         return ResumeProjectItem(
             name=cls._string_from_json(value=data["name"]),
             role=cls._string_from_json(value=data["role"]),
+            team_size=cls._string_from_json(value=data.get("team_size", "")),
+            scale=cls._string_from_json(value=data.get("scale", "")),
             description=cls._string_from_json(value=data["description"]),
             highlights=cls._string_list_from_json(value=data["highlights"]),
             technologies=cls._string_list_from_json(value=data["technologies"]),

@@ -3,6 +3,7 @@ from dishka import make_async_container
 from core.files.clients import FileClient
 from core.knowledge.files.clients import KnowledgeFileClient
 from infra.ioc.registry import get_providers
+from infra.s3.clients import S3PrivateResumeFileClient
 
 
 async def init_buckets_command() -> None:
@@ -10,7 +11,9 @@ async def init_buckets_command() -> None:
     try:
         file_client = await command_container.get(FileClient)
         knowledge_file_client = await command_container.get(KnowledgeFileClient)
+        resume_photo_client = await command_container.get(S3PrivateResumeFileClient)
         await file_client.init_storage()
         await knowledge_file_client.init_storage()
+        await resume_photo_client.init_storage()
     finally:
         await command_container.close()

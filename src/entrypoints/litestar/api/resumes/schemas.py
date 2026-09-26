@@ -1,7 +1,8 @@
 from datetime import date
 from typing import Annotated, Self, cast
 
-from pydantic import AfterValidator, Field, model_validator
+from litestar.datastructures.upload_file import UploadFile
+from pydantic import AfterValidator, ConfigDict, Field, model_validator
 
 from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
@@ -46,6 +47,9 @@ from entrypoints.litestar.api.validation import (
 
 class ResumeProfileSchema(CamelCaseSchema):
     full_name: Annotated[RequiredShortText, Field(title="Full name")]
+    photo_file_id: Annotated[
+        str, Field(title="Photo file ID", max_length=32, pattern=r"^(?:[0-9a-f]{32})?$")
+    ]
     role: Annotated[RequiredShortText, Field(title="Role")]
     location: Annotated[ResumeOptionalShortText, Field(title="Location")]
     email: Annotated[BlankableEmailString, Field(title="Email")]
@@ -60,6 +64,7 @@ class ResumeProfileSchema(CamelCaseSchema):
     def to_domain_schema(self) -> ResumeProfile:
         return ResumeProfile(
             full_name=self.full_name,
+            photo_file_id=self.photo_file_id,
             role=self.role,
             location=self.location,
             email=self.email,
@@ -76,6 +81,7 @@ class ResumeProfileSchema(CamelCaseSchema):
             "Self",
             cls.model_construct(
                 full_name=schema.full_name,
+                photo_file_id=schema.photo_file_id,
                 role=schema.role,
                 location=schema.location,
                 email=schema.email,
@@ -86,6 +92,12 @@ class ResumeProfileSchema(CamelCaseSchema):
                 telegram=schema.telegram,
             ),
         )
+
+
+class ResumePhotoUploadRequestSchema(CamelCaseSchema):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    file: Annotated[UploadFile, Field(title="Resume photo")]
 
 
 class ResumeSummarySchema(CamelCaseSchema):
@@ -128,6 +140,8 @@ class ResumeSkillGroupSchema(CamelCaseSchema):
 class ResumeProjectItemSchema(CamelCaseSchema):
     name: Annotated[RequiredShortText, Field(title="Project name")]
     role: Annotated[RequiredShortText, Field(title="Project role")]
+    team_size: Annotated[ResumeOptionalShortText, Field(title="Team size")]
+    scale: Annotated[ResumeOptionalShortText, Field(title="Project scale")]
     description: Annotated[
         ResumeLongText,
         Field(title="Project description", max_length=ResumeLimits.project_description),
@@ -148,6 +162,8 @@ class ResumeProjectItemSchema(CamelCaseSchema):
         return ResumeProjectItem(
             name=self.name,
             role=self.role,
+            team_size=self.team_size,
+            scale=self.scale,
             description=self.description,
             highlights=list(self.highlights),
             technologies=list(self.technologies),
@@ -161,6 +177,8 @@ class ResumeProjectItemSchema(CamelCaseSchema):
             cls.model_construct(
                 name=schema.name,
                 role=schema.role,
+                team_size=schema.team_size,
+                scale=schema.scale,
                 description=schema.description,
                 highlights=list(schema.highlights),
                 technologies=list(schema.technologies),
@@ -171,6 +189,7 @@ class ResumeProjectItemSchema(CamelCaseSchema):
 
 class ResumeExperienceItemSchema(CamelCaseSchema):
     company: Annotated[RequiredShortText, Field(title="Company")]
+    company_website_url: Annotated[BlankableHttpUrlString, Field(title="Company website URL")]
     position: Annotated[RequiredShortText, Field(title="Position")]
     location: Annotated[ResumeOptionalShortText, Field(title="Location")]
     start_date: Annotated[date, Field(title="Start date")]
@@ -198,6 +217,7 @@ class ResumeExperienceItemSchema(CamelCaseSchema):
     def to_domain_schema(self) -> ResumeExperienceItem:
         return ResumeExperienceItem(
             company=self.company,
+            company_website_url=self.company_website_url,
             position=self.position,
             location=self.location,
             start_date=self.start_date,
@@ -215,6 +235,7 @@ class ResumeExperienceItemSchema(CamelCaseSchema):
             "Self",
             cls.model_construct(
                 company=schema.company,
+                company_website_url=schema.company_website_url,
                 position=schema.position,
                 location=schema.location,
                 start_date=cast("date", schema.start_date),

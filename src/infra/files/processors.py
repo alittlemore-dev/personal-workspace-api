@@ -28,6 +28,28 @@ class AttachmentContentProcessor(FileContentProcessor):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ResumePhotoContentProcessor(FileContentProcessor):
+    max_dimension: int
+
+    def process(self, *, params: FileUploadParams) -> FileUploadParams:
+        try:
+            with catch_warnings():
+                simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(BytesIO(params.content)) as image:
+                    if image.format != "JPEG" or max(image.size) > self.max_dimension:
+                        raise FileImageOptimizationError
+                    image.verify()
+        except (
+            OSError,
+            ValueError,
+            Image.DecompressionBombError,
+            Image.DecompressionBombWarning,
+        ) as error:
+            raise FileImageOptimizationError from error
+        return params
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PersonPhotoContentProcessor(KnowledgePhotoProcessor):
     max_width_px: int
     max_height_px: int

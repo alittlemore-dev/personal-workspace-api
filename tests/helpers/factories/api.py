@@ -19,6 +19,7 @@ class ApiFactoryHelper:
         return {
             "profile": {
                 "fullName": full_name,
+                "photoFileId": "",
                 "role": role,
                 "location": "",
                 "email": "",

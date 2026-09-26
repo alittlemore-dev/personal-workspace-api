@@ -7,14 +7,53 @@ from sqlalchemy.exc import IntegrityError
 
 from core.exceptions import EntryNotFoundError
 from core.files.enums import FilePurpose
+from core.i18n.enums import LanguageEnum
+from core.resumes.schemas import ResumeCreateParams
 from infra.postgresql.models import FileModel
 from infra.postgresql.storages.files import FilesDatabaseStorage
+from infra.postgresql.storages.resumes import ResumesDatabaseStorage
 from tests.test_cases import StorageTestCase
 
 CURRENT_DATETIME = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 
 
 class TestFilesDatabaseStorage(StorageTestCase):
+    async def test_resume_photo_reference_keeps_private_file_attached(self) -> None:
+        files = FilesDatabaseStorage(session=self.db_session)
+        resumes = ResumesDatabaseStorage(session=self.db_session)
+        photo = self.factory.core.stored_file(
+            file_id=7,
+            namespace="resume-private",
+            relative_path="photos/photo.jpg",
+            mime_type="image/jpeg",
+            orphaned_at=CURRENT_DATETIME,
+        )
+        await files.create_file(namespace="resume-private", file=photo)
+        content = self.factory.core.resume_empty_content()
+        content = replace(content, profile=replace(content.profile, photo_file_id=photo.id))
+        resume = await resumes.create_resume(
+            params=ResumeCreateParams(
+                title="Resume",
+                language=LanguageEnum.EN,
+                content=content,
+                author_username="admin",
+            )
+        )
+
+        assert await files.file_has_usages(namespace="resume-private", file_id=photo.id)
+        await files.set_files_attached(namespace="resume-private", file_ids=frozenset({photo.id}))
+        await files.set_files_orphaned_if_unused(
+            namespace="resume-private",
+            file_ids=frozenset({photo.id}),
+            orphaned_at=CURRENT_DATETIME,
+        )
+        assert (
+            await files.get_file(namespace="resume-private", file_id=photo.id)
+        ).orphaned_at is None
+
+        await resumes.delete_resume(resume_id=resume.id, author_username="admin")
+        assert not await files.file_has_usages(namespace="resume-private", file_id=photo.id)
+
     async def test_crud_is_isolated_by_namespace(self) -> None:
         storage = FilesDatabaseStorage(session=self.db_session)
         media_file = self.factory.core.stored_file(

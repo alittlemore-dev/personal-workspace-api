@@ -13,7 +13,7 @@ class ResumeLimits(IntEnum):
     experience_highlights = 15
     project_highlights = 12
     experience_technologies = 30
-    project_technologies = 25
+    project_technologies = 50
     education = 8
     languages = 9
     certifications = 15
@@ -26,4 +26,4 @@ class ResumeLimits(IntEnum):
     project_description = 600
     education_description = 500
     additional_description = 500
-    highlight = 300
+    highlight = 512

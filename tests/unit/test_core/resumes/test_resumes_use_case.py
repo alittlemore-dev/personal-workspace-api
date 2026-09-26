@@ -1,9 +1,13 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
 
+from core.files.enums import FilePurpose
+from core.files.exceptions import FilePurposeNotAllowedError
+from core.files.schemas import FileUploadParams
 from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeExportFormatEnum, ResumeThemeEnum
 from core.resumes.exceptions import ResumeNotFoundError
@@ -16,6 +20,7 @@ from core.resumes.schemas import (
     Resumes,
     ResumeUpdateParams,
 )
+from core.resumes.services import ResumePhotoFileService
 from core.resumes.storages import ResumesStorage
 from core.resumes.use_cases import ResumesUseCase
 from tests.test_cases import TestCase
@@ -28,7 +33,10 @@ class TestResumesUseCase(TestCase):
     def setup(self) -> None:
         self.storage = Mock(spec=ResumesStorage)
         self.exporter = Mock(spec=ResumeDocumentExporter)
-        self.use_case = ResumesUseCase(storage=self.storage, exporter=self.exporter)
+        self.photo_files = Mock(spec=ResumePhotoFileService)
+        self.use_case = ResumesUseCase(
+            storage=self.storage, exporter=self.exporter, photo_files=self.photo_files
+        )
 
     def test_resume_filters_require_explicit_values(self) -> None:
         missing_filter_values: dict[str, Any] = {}
@@ -169,14 +177,87 @@ class TestResumesUseCase(TestCase):
         assert updated_resume.content.experience == []
 
     async def test_delete_resume_delegates_to_storage(self) -> None:
+        self.storage.get_resume.return_value = self.factory.core.resume(
+            content=self.factory.core.resume_empty_content()
+        )
         await self.use_case.delete_resume(
-            resume_id=self.factory.core.hex_id(1), author_username="test"
+            resume_id=self.factory.core.hex_id(1),
+            author_username="test",
+            current_datetime=CURRENT_DATETIME,
         )
 
         self.storage.delete_resume.assert_called_once_with(
             resume_id=self.factory.core.hex_id(1),
             author_username="test",
         )
+
+    async def test_upload_photo_uses_file_service_and_attaches_to_owned_resume(self) -> None:
+        old_id = self.factory.core.hex_id(2)
+        new_id = self.factory.core.hex_id(3)
+        original = self.factory.core.resume(
+            resume_id=self.factory.core.hex_id(1),
+            content=replace(
+                self.factory.core.resume_empty_content(),
+                profile=replace(
+                    self.factory.core.resume_empty_content().profile, photo_file_id=old_id
+                ),
+            ),
+        )
+        self.storage.get_resume.return_value = original
+        self.storage.update_resume.side_effect = lambda *, resume: resume
+        self.photo_files.upload_file.return_value = self.factory.core.file_read(
+            file=self.factory.core.stored_file(
+                file_id=new_id, namespace="resume-private", mime_type="image/jpeg"
+            )
+        )
+        params = FileUploadParams(
+            id=new_id,
+            purpose=FilePurpose.ATTACHMENT,
+            name="Resume photo",
+            original_name="photo.jpg",
+            mime_type="image/jpeg",
+            content=b"jpeg",
+        )
+
+        result = await self.use_case.upload_photo(
+            resume_id=original.id,
+            author_username="test",
+            params=params,
+            current_datetime=CURRENT_DATETIME,
+        )
+
+        assert result.content.profile.photo_file_id == new_id
+        self.storage.get_resume.assert_awaited_once_with(
+            resume_id=original.id, author_username="test"
+        )
+        self.photo_files.upload_file.assert_awaited_once_with(
+            params=params, current_datetime=CURRENT_DATETIME
+        )
+        self.photo_files.sync_file_usages.assert_awaited_once_with(
+            attached_file_ids=frozenset({new_id}),
+            detached_file_ids=frozenset({old_id}),
+            orphaned_at=CURRENT_DATETIME,
+        )
+
+    async def test_update_rejects_unowned_photo_file_id(self) -> None:
+        original = self.factory.core.resume(content=self.factory.core.resume_empty_content())
+        self.storage.get_resume.return_value = original
+        content = replace(
+            original.content,
+            profile=replace(original.content.profile, photo_file_id=self.factory.core.hex_id(3)),
+        )
+
+        with pytest.raises(FilePurposeNotAllowedError):
+            await self.use_case.update_resume(
+                resume_id=original.id,
+                params=ResumeUpdateParams(
+                    title=original.title, language=original.language, content=content
+                ),
+                author_username="test",
+                current_datetime=CURRENT_DATETIME,
+            )
+
+        self.storage.update_resume.assert_not_awaited()
 
     async def test_export_resume_checks_owner_and_exports_current_payload(self) -> None:
         existing_resume = self.factory.core.resume(
@@ -212,7 +293,7 @@ class TestResumesUseCase(TestCase):
             resume_id=self.factory.core.hex_id(1),
             author_username="test",
         )
-        self.exporter.export_resume.assert_called_once_with(params=params)
+        self.exporter.export_resume.assert_called_once_with(params=params, photo_content=b"")
 
     async def test_export_resume_propagates_not_found_before_rendering(self) -> None:
         params = ResumeExportParams(

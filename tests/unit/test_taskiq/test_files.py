@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 from core.files.schemas import FileOrphanCleanupResult
 from core.files.services import FileOrphanCleanupService
+from core.resumes.services import ResumePhotoOrphanCleanupService
 from entrypoints.taskiq.files import tasks as file_tasks_module
 from infra.config.settings import settings
 
@@ -17,19 +18,30 @@ async def test_file_orphan_prune_uses_retention_cutoff_and_returns_camel_case_co
         failed_count=1,
         skipped_in_use_count=1,
     )
+    photo_service = Mock(spec=ResumePhotoOrphanCleanupService)
+    photo_service.prune.return_value = FileOrphanCleanupResult(
+        scanned_count=1,
+        deleted_count=1,
+        failed_count=0,
+        skipped_in_use_count=0,
+    )
 
     injected_func = cast("Any", file_tasks_module.prune_file_orphans.original_func)
     result = await injected_func.__dishka_orig_func__(
         service=service,
+        photo_service=photo_service,
         current_datetime=current_datetime,
     )
 
     service.prune.assert_awaited_once_with(
         cutoff=current_datetime - timedelta(seconds=settings.files.orphan_retention_seconds),
     )
+    photo_service.prune.assert_awaited_once_with(
+        cutoff=current_datetime - timedelta(seconds=settings.files.orphan_retention_seconds),
+    )
     assert result == {
-        "scannedCount": 4,
-        "deletedCount": 2,
+        "scannedCount": 5,
+        "deletedCount": 3,
         "failedCount": 1,
         "skippedInUseCount": 1,
     }

@@ -1,8 +1,10 @@
+import base64
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
-from docxtpl import DocxTemplate
+from docx.shared import Mm
+from docxtpl import DocxTemplate, InlineImage
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from markupsafe import Markup
 from xhtml2pdf import pisa
@@ -20,8 +22,13 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
     font_regular_name: str
     font_bold_name: str
 
-    def export_resume(self, *, params: ResumeExportParams) -> ResumeExport:
+    def export_resume(self, *, params: ResumeExportParams, photo_content: bytes) -> ResumeExport:
         context = ResumeTemplateContext.from_params(params=params).as_dict()
+        context["photo_data_url"] = (
+            "data:image/jpeg;base64," + base64.b64encode(photo_content).decode("ascii")
+            if photo_content
+            else ""
+        )
         if params.format == ResumeExportFormatEnum.PDF:
             return ResumeExport(
                 format=params.format,
@@ -30,7 +37,9 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
         if params.format == ResumeExportFormatEnum.DOCX:
             return ResumeExport(
                 format=params.format,
-                content=self._render_docx(params=params, context=context),
+                content=self._render_docx(
+                    params=params, context=context, photo_content=photo_content
+                ),
             )
         message = f"Unsupported resume export format: {params.format}"
         raise ValueError(message)
@@ -64,9 +73,14 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
             raise ValueError(message)
         return output.getvalue()
 
-    def _render_docx(self, *, params: ResumeExportParams, context: dict[str, object]) -> bytes:
+    def _render_docx(
+        self, *, params: ResumeExportParams, context: dict[str, object], photo_content: bytes
+    ) -> bytes:
         template_path = Path(__file__).parent / "templates" / params.theme.value / "resume.docx"
         template = DocxTemplate(template_path)
+        context["photo"] = (
+            InlineImage(template, BytesIO(photo_content), width=Mm(26)) if photo_content else ""
+        )
         environment = Environment(undefined=StrictUndefined, autoescape=True)
         template.render(context, jinja_env=environment, autoescape=True)
         output = BytesIO()
@@ -77,6 +91,8 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
         return Markup.escape(value).replace("\n", Markup("<br/>"))
 
     def _resolve_resource(self, uri: str, _basepath: str | None) -> str:
+        if uri.startswith("data:image/jpeg;base64,"):
+            return uri
         if uri == "resume-font-regular":
             return str(self.font_regular_path)
         if uri == "resume-font-bold":

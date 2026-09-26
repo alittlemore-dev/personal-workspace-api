@@ -1,5 +1,7 @@
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
+from unittest.mock import ANY
 
 import pytest
 import pytest_asyncio
@@ -24,6 +26,7 @@ from tests.unit.conftest import TEST_USERNAME
 def experience_payload() -> dict[str, Any]:
     return {
         "company": "Company",
+        "companyWebsiteUrl": "https://company.example",
         "position": "Engineer",
         "location": "",
         "startDate": "2024-01-01",
@@ -36,6 +39,8 @@ def experience_payload() -> dict[str, Any]:
             {
                 "name": "Portfolio",
                 "role": "Creator",
+                "teamSize": "6 engineers",
+                "scale": "2M requests/day",
                 "description": "Site and knowledge base",
                 "highlights": ["Hybrid CSR"],
                 "technologies": ["Litestar", "Angular"],
@@ -75,6 +80,7 @@ class TestResumesApi(ApiTestCase):
         experience = [
             ResumeExperienceItem(
                 company="Company",
+                company_website_url="https://company.example",
                 position="Engineer",
                 location="",
                 start_date=date(2024, 1, 1),
@@ -87,6 +93,8 @@ class TestResumesApi(ApiTestCase):
                     ResumeProjectItem(
                         name="Portfolio",
                         role="Creator",
+                        team_size="6 engineers",
+                        scale="2M requests/day",
                         description="Site and knowledge base",
                         highlights=["Hybrid CSR"],
                         technologies=["Litestar", "Angular"],
@@ -277,8 +285,8 @@ class TestResumesApi(ApiTestCase):
     def test_update_accepts_highlights_at_new_limit(self) -> None:
         self.use_case.update_resume.return_value = self.factory.core.resume(resume_id=3)
         content = self.factory.api.resume_content(experience=[experience_payload()])
-        content["experience"][0]["highlights"] = ["x" * 300]
-        content["experience"][0]["projects"][0]["highlights"] = ["y" * 300]
+        content["experience"][0]["highlights"] = ["x" * 512]
+        content["experience"][0]["projects"][0]["highlights"] = ["y" * 512]
 
         response = self.api.put_update_resume(
             resume_id=3,
@@ -287,8 +295,8 @@ class TestResumesApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.OK)
         params = self.use_case.update_resume.await_args.kwargs["params"]
-        assert params.content.experience[0].highlights == ["x" * 300]
-        assert params.content.experience[0].projects[0].highlights == ["y" * 300]
+        assert params.content.experience[0].highlights == ["x" * 512]
+        assert params.content.experience[0].projects[0].highlights == ["y" * 512]
 
     def test_get_missing_resume_uses_stable_not_found_contract(self) -> None:
         self.use_case.get_resume.side_effect = ResumeNotFoundError()
@@ -403,4 +411,34 @@ class TestResumesApi(ApiTestCase):
         self.use_case.delete_resume.assert_awaited_once_with(
             resume_id=self.factory.core.hex_id(3),
             author_username=TEST_USERNAME,
+            current_datetime=ANY,
+        )
+
+    def test_photo_upload_and_read_are_scoped_to_current_author(self) -> None:
+        file_id = self.factory.core.hex_id(9)
+        original = self.factory.core.resume(resume_id=3)
+        self.use_case.upload_photo.return_value = replace(
+            original,
+            content=replace(
+                original.content,
+                profile=replace(original.content.profile, photo_file_id=file_id),
+            ),
+        )
+        self.use_case.read_photo.return_value = b"jpeg-bytes"
+
+        upload = self.api.client.post(
+            f"/api/resumes/{original.id}/photo",
+            files={"file": ("photo.jpg", b"jpeg-bytes", "image/jpeg")},
+        )
+        assert upload.status_code == codes.OK
+        assert upload.json()["content"]["profile"]["photoFileId"] == file_id
+        assert self.use_case.upload_photo.await_args.kwargs["author_username"] == TEST_USERNAME
+
+        photo = self.api.client.get(f"/api/resumes/{original.id}/photo")
+        assert photo.status_code == codes.OK
+        assert photo.content == b"jpeg-bytes"
+        assert photo.headers["content-type"].startswith("image/jpeg")
+        assert photo.headers["cache-control"] == "private, no-store"
+        self.use_case.read_photo.assert_awaited_once_with(
+            resume_id=original.id, author_username=TEST_USERNAME
         )

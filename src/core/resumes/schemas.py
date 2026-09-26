@@ -11,6 +11,7 @@ from core.schemas import ValuedDataclass
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ResumeProfile:
     full_name: str
+    photo_file_id: str
     role: str
     location: str
     email: str
@@ -36,6 +37,8 @@ class ResumeSkillGroup:
 class ResumeProjectItem:
     name: str
     role: str
+    team_size: str
+    scale: str
     description: str
     highlights: list[str]
     technologies: list[str]
@@ -45,6 +48,7 @@ class ResumeProjectItem:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ResumeExperienceItem:
     company: str
+    company_website_url: str
     position: str
     location: str
     start_date: date | None

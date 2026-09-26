@@ -5,6 +5,7 @@ import pytest
 from core.files.clients import FileClient
 from core.knowledge.files.clients import KnowledgeFileClient
 from entrypoints.litestar.cli.commands.storage import init_buckets_command
+from infra.s3.clients import S3PrivateResumeFileClient
 
 
 class TestStorageCliCommands:
@@ -14,9 +15,11 @@ class TestStorageCliCommands:
         file_client.init_storage = AsyncMock()
         knowledge_file_client = Mock(spec=KnowledgeFileClient)
         knowledge_file_client.init_storage = AsyncMock()
+        resume_photo_client = Mock(spec=S3PrivateResumeFileClient)
+        resume_photo_client.init_storage = AsyncMock()
         command_container = Mock()
         command_container.get = AsyncMock(
-            side_effect=[file_client, knowledge_file_client],
+            side_effect=[file_client, knowledge_file_client, resume_photo_client],
         )
         command_container.close = AsyncMock()
 
@@ -36,9 +39,11 @@ class TestStorageCliCommands:
         assert command_container.get.await_args_list == [
             ((FileClient,), {}),
             ((KnowledgeFileClient,), {}),
+            ((S3PrivateResumeFileClient,), {}),
         ]
         file_client.init_storage.assert_awaited_once_with()
         knowledge_file_client.init_storage.assert_awaited_once_with()
+        resume_photo_client.init_storage.assert_awaited_once_with()
         command_container.close.assert_awaited_once_with()
 
     async def test_init_buckets_command_closes_container_when_storage_initialization_fails(

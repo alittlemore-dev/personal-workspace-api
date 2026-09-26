@@ -28,6 +28,8 @@ class ResumeLabels:
     expires: str
     phone: str
     website: str
+    team_size: str
+    scale: str
     contacts: str
     footer: str
     page: str
@@ -207,6 +209,8 @@ class ResumeTemplateContext:
                 expires="Истекает",
                 phone="Телефон",
                 website="Сайт",
+                team_size="Размер команды",
+                scale="Масштаб и нагрузка",
                 contacts="Контактные данные",
                 footer="Резюме",
                 page="Страница",
@@ -225,6 +229,8 @@ class ResumeTemplateContext:
             expires="Expires",
             phone="Phone",
             website="Website",
+            team_size="Team size",
+            scale="Scale and load",
             contacts="Contacts",
             footer="Resume",
             page="Page",

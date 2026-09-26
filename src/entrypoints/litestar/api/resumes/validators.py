@@ -54,7 +54,9 @@ def visible_text_length(value: object) -> int:
         return sum(
             visible_text_length(item)
             for key, item in value.items()
-            if isinstance(key, str) and not key.endswith("url") and key != "current_status"
+            if isinstance(key, str)
+            and not key.endswith("url")
+            and key not in {"current_status", "photo_file_id"}
         )
     return 0
 

@@ -5,6 +5,7 @@
   <style>{% include "simple/pdf.css" %}</style>
 </head>
 <body>
+  {% if photo_data_url %}<img class="photo" src="{{ photo_data_url }}" alt="">{% endif %}
   <p class="name">{{ display_name }}</p>
   {% if content.profile.role %}<p class="role">{{ content.profile.role }}</p>{% endif %}
   {% if simple_contact_line %}<p class="contacts">{{ simple_contact_line }}</p>{% endif %}
@@ -25,12 +26,15 @@
   <p class="section">{{ labels.experience }}</p>
   {% for experience in experiences %}
   <p class="item-title">{{ experience.item.position }} | {{ experience.item.company }}</p>
+  {% if experience.item.company_website_url %}<p>{{ experience.item.company_website_url }}</p>{% endif %}
   <p>{{ experience.item.location }}{% if experience.item.location and experience.period %} | {% endif %}{{ experience.period }}</p>
   {% if experience.item.summary %}<p>{{ experience.item.summary | linebreaks }}</p>{% endif %}
   {% for highlight in experience.item.highlights %}<p class="bullet">- {{ highlight | linebreaks }}</p>{% endfor %}
   {% if experience.item.technologies %}<p>{{ labels.technologies }}: {{ experience.item.technologies | join(", ") }}</p>{% endif %}
   {% for project in experience.item.projects %}
   <p class="item-title">{{ labels.project }}: {{ project.name }}{% if project.role %} | {{ project.role }}{% endif %}</p>
+  {% if project.team_size %}<p>{{ labels.team_size }}: {{ project.team_size }}</p>{% endif %}
+  {% if project.scale %}<p>{{ labels.scale }}: {{ project.scale }}</p>{% endif %}
   {% if project.description %}<p>{{ project.description | linebreaks }}</p>{% endif %}
   {% for highlight in project.highlights %}<p class="bullet">- {{ highlight | linebreaks }}</p>{% endfor %}
   {% if project.technologies %}<p>{{ labels.technologies }}: {{ project.technologies | join(", ") }}</p>{% endif %}

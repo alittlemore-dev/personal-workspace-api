@@ -18,6 +18,7 @@ class PathConstants:
 class MinioBucketNamesConstants:
     media: Literal["media"] = "media"
     knowledge_private: Literal["knowledge-private"] = "knowledge-private"
+    resume_private: Literal["resume-private"] = "resume-private"
 
 
 class ValkeyDatabaseConstants:
@@ -63,6 +64,8 @@ class TaskiqConstants:
 
 class FilesConstants:
     orphan_cleanup_batch_size: int = 100
+    resume_photo_max_size_bytes: int = 262_144
+    resume_photo_max_dimension: int = 800
     attachment_mime_types: frozenset[str] = frozenset({"*/*"})
     attachment_max_size_bytes: int = 20 * 1024 * 1024
     rules: FileRules = FileRules(

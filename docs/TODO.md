@@ -82,13 +82,13 @@ unchecked entries remain active work unless a later product decision supersedes 
     - [ ] Advices of resume improvement
     - [ ] Analyze vacancy requirements and match against resume
     - [ ] Generate cover letter
-  - [ ] New blocks and fields
-    - [ ] Companies
-      - [ ] website
-    - [ ] Projects
-      - [ ] Team size
-      - [ ] Scale
-    - [ ] Photo
+  - [x] New blocks and fields
+    - [x] Companies
+      - [x] website
+    - [x] Projects
+      - [x] Team size
+      - [x] Scale
+    - [x] Photo
   - [ ] Resume customization
     - [ ] Blocks order (Title, Photo, Summary, Experience, etc.)
     - [ ] Blocks visibility

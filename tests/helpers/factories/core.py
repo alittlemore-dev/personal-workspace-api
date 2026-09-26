@@ -48,6 +48,7 @@ class CoreFactoryHelper:
         return ResumeContent(
             profile=ResumeProfile(
                 full_name=full_name,
+                photo_file_id="",
                 role=role,
                 location="",
                 email="",
@@ -73,6 +74,7 @@ class CoreFactoryHelper:
         return ResumeContent(
             profile=ResumeProfile(
                 full_name="",
+                photo_file_id="",
                 role="",
                 location="",
                 email="",
@@ -100,6 +102,7 @@ class CoreFactoryHelper:
         return ResumeContent(
             profile=ResumeProfile(
                 full_name="Dmitriy Ivanov",
+                photo_file_id="",
                 role="Backend engineer",
                 location="Moscow",
                 email="dmitriy@example.com",
@@ -119,6 +122,7 @@ class CoreFactoryHelper:
             experience=[
                 ResumeExperienceItem(
                     company="Company",
+                    company_website_url="https://company.example",
                     position="Engineer",
                     location="Moscow",
                     start_date=date(2023, 1, 1),
@@ -131,6 +135,8 @@ class CoreFactoryHelper:
                         ResumeProjectItem(
                             name="Portfolio",
                             role="Creator",
+                            team_size="6 engineers",
+                            scale="2M requests/day",
                             description="Site and knowledge base",
                             highlights=["Angular CSR"],
                             technologies=["Litestar", "Angular"],

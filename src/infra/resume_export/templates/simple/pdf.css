@@ -62,3 +62,7 @@ p {
 .bullet {
   margin-left: 8pt;
 }
+.photo {
+  width: 26mm;
+  height: auto;
+}

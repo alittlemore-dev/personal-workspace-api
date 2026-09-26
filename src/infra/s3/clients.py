@@ -155,6 +155,18 @@ class S3FileClient(FileClient):
         await self.ensure_namespace_exists(namespace="media")
         logger.info("Storage initialized successfully")
 
+    async def download_file(self, object_name: str, namespace: str) -> bytes:
+        _namespace = self._ensure_valid_namespace(namespace)
+        try:
+            response = await self.clients.internal.get_object(Bucket=_namespace, Key=object_name)
+            body = response["Body"]
+            try:
+                return bytes(await body.read())
+            finally:
+                body.close()
+        except (BotoCoreError, ClientError) as error:
+            raise FileClientInternalError(message="File download failed") from error
+
     def get_access_url(self, object_name: str, namespace: str) -> str:
         _namespace = self._ensure_valid_namespace(namespace)
         return settings.minio.get_object_url(bucket=_namespace, object_path=object_name)
@@ -189,6 +201,76 @@ class S3FileClient(FileClient):
         with suppress(KeyError):
             return str(exc.response["Error"]["Code"]) == "NotImplemented"
         return False
+
+
+@dataclass(kw_only=True)
+class S3PrivateResumeFileClient(FileClient):
+    internal_client: S3Client
+    bucket_name: str
+
+    def _check_namespace(self, namespace: str) -> None:
+        if namespace != self.bucket_name:
+            raise NamespaceNotAllowedError(namespace=namespace)
+
+    async def ensure_namespace_exists(self, namespace: str) -> None:
+        self._check_namespace(namespace)
+        try:
+            await self.internal_client.head_bucket(Bucket=namespace)
+        except ClientError as error:
+            if not S3KnowledgeFileClient.bucket_is_not_found(error=error):
+                raise
+            await self.internal_client.create_bucket(Bucket=namespace)
+        for operation in (
+            self.internal_client.delete_bucket_policy,
+            self.internal_client.delete_bucket_cors,
+        ):
+            try:
+                await operation(Bucket=namespace)
+            except ClientError as error:
+                if not S3KnowledgeFileClient.operation_is_absent_or_unsupported(error=error):
+                    raise
+
+    async def upload_file(
+        self, file_data: BytesIO, object_name: str, namespace: str, content_type: str
+    ) -> FileUploadResult:
+        await self.ensure_namespace_exists(namespace)
+        try:
+            content = file_data.getvalue()
+            await self.internal_client.put_object(
+                Bucket=namespace, Key=object_name, Body=content, ContentType=content_type
+            )
+            return FileUploadResult(
+                url="", bucket=namespace, object_name=object_name, size=len(content)
+            )
+        except (BotoCoreError, ClientError) as error:
+            raise FileClientInternalError(message="Private resume photo upload failed") from error
+
+    async def delete_file(self, object_name: str, namespace: str) -> None:
+        self._check_namespace(namespace)
+        try:
+            await self.internal_client.delete_object(Bucket=namespace, Key=object_name)
+        except (BotoCoreError, ClientError) as error:
+            raise FileClientInternalError(message="Private resume photo deletion failed") from error
+
+    async def download_file(self, object_name: str, namespace: str) -> bytes:
+        self._check_namespace(namespace)
+        try:
+            response = await self.internal_client.get_object(Bucket=namespace, Key=object_name)
+            body = response["Body"]
+            try:
+                return bytes(await body.read())
+            finally:
+                body.close()
+        except (BotoCoreError, ClientError) as error:
+            raise FileClientInternalError(message="Private resume photo download failed") from error
+
+    async def init_storage(self) -> None:
+        await self.ensure_namespace_exists(self.bucket_name)
+
+    def get_access_url(self, object_name: str, namespace: str) -> str:
+        self._check_namespace(namespace)
+        _ = object_name
+        return ""
 
 
 @dataclass(kw_only=True)

@@ -236,9 +236,9 @@ invitation tokens are never persisted.
 
 `auth-api` exposes `GET /api/auth/account/me` and `PUT /api/auth/account/me/settings`
 for the complete account settings object, including `telegramBots`. The bot reads the switch
-through a service-secret-protected internal GET at
-`/api/auth/internal/telegram/personal-workspace/settings?ownerUsername=...`, which the public edge
-blocks.
+through the service-secret-protected internal GET
+`/api/auth/internal/telegram/{telegram_bot_id}/settings?ownerUsername=...`, using
+`personal-workspace` as its bot ID. The public edge blocks this route.
 `personal-workspace` exposes authenticated invitation and connection management and the bot
 webhook at `/api/personal-workspace/telegram`. The Angular interface lives in `frontend`.
 

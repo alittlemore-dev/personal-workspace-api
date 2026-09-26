@@ -145,7 +145,11 @@ class ResumeTemplateContext:
 
     @classmethod
     def _experience_view(
-        cls, *, item: ResumeExperienceItem, language: LanguageEnum, present: str
+        cls,
+        *,
+        item: ResumeExperienceItem,
+        language: LanguageEnum,
+        present: str,
     ) -> ExperienceView:
         period = cls._date_range(
             start_date=item.start_date,
@@ -163,7 +167,11 @@ class ResumeTemplateContext:
 
     @classmethod
     def _education_view(
-        cls, *, item: ResumeEducationItem, language: LanguageEnum, present: str
+        cls,
+        *,
+        item: ResumeEducationItem,
+        language: LanguageEnum,
+        present: str,
     ) -> EducationView:
         period = cls._date_range(
             start_date=item.start_date,
@@ -181,7 +189,11 @@ class ResumeTemplateContext:
 
     @classmethod
     def _certification_view(
-        cls, *, item: ResumeCertificationItem, language: LanguageEnum, labels: ResumeLabels
+        cls,
+        *,
+        item: ResumeCertificationItem,
+        language: LanguageEnum,
+        labels: ResumeLabels,
     ) -> CertificationView:
         dates = []
         if item.issued_on:

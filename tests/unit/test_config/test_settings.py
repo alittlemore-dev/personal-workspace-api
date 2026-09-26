@@ -3,7 +3,7 @@ from collections.abc import Generator
 import pytest
 from pydantic import ValidationError
 
-from infra.config.settings import Settings
+from infra.config.settings import SecretStrExtended, Settings, TelegramSettings
 
 
 class TestSettings:
@@ -95,3 +95,35 @@ class TestSettings:
 
         with pytest.raises(ValidationError, match="greater than or equal to 604800"):
             type(self.settings.files)(_env_file=None, orphan_retention_seconds=604_799)
+
+
+class TestTelegramSettings:
+    def test_telegram_requires_auth_api_connection_when_available(self) -> None:
+        with pytest.raises(ValidationError):
+            TelegramSettings(
+                _env_file=None,
+                available=True,
+                bot_username="alittlemore_workspace_bot",
+                bot_token=SecretStrExtended("123456:BOT_TOKEN"),
+                webhook_secret=SecretStrExtended("WEBHOOK_SECRET"),
+                auth_api_url="http://auth-api:8080/api/auth/internal/telegram/personal-workspace/settings",
+                service_secret=SecretStrExtended(""),
+            )
+
+    def test_telegram_cannot_be_available_without_bot_credentials(self) -> None:
+        with pytest.raises(ValidationError):
+            TelegramSettings(
+                available=True,
+                bot_username="",
+                bot_token=SecretStrExtended(""),
+                webhook_secret=SecretStrExtended(""),
+            )
+
+    def test_telegram_cannot_be_available_with_placeholder_username(self) -> None:
+        with pytest.raises(ValidationError):
+            TelegramSettings(
+                available=True,
+                bot_username="configure_bot",
+                bot_token=SecretStrExtended("123456:BOT_TOKEN"),
+                webhook_secret=SecretStrExtended("WEBHOOK_SECRET"),
+            )

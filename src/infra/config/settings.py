@@ -2,7 +2,7 @@ from ipaddress import IPv4Address
 from typing import Annotated, Literal
 
 from litestar.config.response_cache import CACHE_FOREVER
-from pydantic import Field, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr
+from pydantic import Field, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core.files.types import Namespace
@@ -10,6 +10,7 @@ from core.schemas import Secret
 from infra.config.constants import constants
 
 _LOCAL_ALL_INTERFACES_HOST = IPv4Address(0).compressed
+_MISSING_TELEGRAM_CREDENTIALS = "Telegram credentials and bot username are required when available"
 
 
 class ProjectBaseSettings(BaseSettings):
@@ -152,6 +153,34 @@ class TaskiqSettings(ProjectBaseSettings):
     result_expire_seconds: PositiveInt
 
 
+class TelegramSettings(ProjectBaseSettings):
+    model_config = SettingsConfigDict(env_prefix="TELEGRAM_")
+
+    available: bool = False
+    bot_username: str = ""
+    bot_token: SecretStrExtended = SecretStrExtended("")
+    webhook_secret: SecretStrExtended = SecretStrExtended("")
+    auth_api_url: str = ""
+    service_secret: SecretStrExtended = SecretStrExtended("")
+
+    @model_validator(mode="after")
+    def validate_available_configuration(self) -> TelegramSettings:  # noqa: N804
+        if self.available and (
+            self.bot_username == "configure_bot"
+            or not all(
+                (
+                    self.bot_username,
+                    self.bot_token.get_secret_value(),
+                    self.webhook_secret.get_secret_value(),
+                    self.auth_api_url,
+                    self.service_secret.get_secret_value(),
+                ),
+            )
+        ):
+            raise ValueError(_MISSING_TELEGRAM_CREDENTIALS)
+        return self
+
+
 class Settings:
     app: AppSettings
     auth: AuthSettings
@@ -160,6 +189,7 @@ class Settings:
     minio: MinioSettings
     sentry: SentrySettings
     taskiq: TaskiqSettings
+    telegram: TelegramSettings
     valkey: ValkeySettings
 
     def __init__(self) -> None:
@@ -170,6 +200,7 @@ class Settings:
         self.minio = MinioSettings()
         self.sentry = SentrySettings()
         self.taskiq = TaskiqSettings()
+        self.telegram = TelegramSettings()
         self.valkey = ValkeySettings()
 
 

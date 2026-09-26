@@ -30,7 +30,8 @@ class TestPytestWorkerCount:
 
     def test_invalid_env_override_raises_readable_error(self) -> None:
         with pytest.raises(
-            ValueError, match="BACKEND_PYTEST_WORKERS must be a non-negative integer"
+            ValueError,
+            match="BACKEND_PYTEST_WORKERS must be a non-negative integer",
         ):
             detect_pytest_worker_count(
                 env={"BACKEND_PYTEST_WORKERS": "many"},
@@ -62,12 +63,14 @@ class TestPytestWorkerCount:
 class TestWorkerDatabaseName:
     def test_master_worker_uses_base_database_name(self) -> None:
         assert build_worker_database_name(
-            base_database_name="personal_workspace_database_test", worker_id="master"
+            base_database_name="personal_workspace_database_test",
+            worker_id="master",
         ) == ("personal_workspace_database_test")
 
     def test_xdist_worker_uses_suffix(self) -> None:
         assert build_worker_database_name(
-            base_database_name="personal_workspace_database_test", worker_id="gw0"
+            base_database_name="personal_workspace_database_test",
+            worker_id="gw0",
         ) == ("personal_workspace_database_test_gw0")
 
     @pytest.mark.parametrize("worker_id", ["gw-1", "worker 1", ""])

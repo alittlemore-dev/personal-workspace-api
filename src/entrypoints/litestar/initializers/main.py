@@ -1,6 +1,7 @@
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 
+from aiogram import Bot
 from dishka import AsyncContainer
 from dishka.integrations.litestar import setup_dishka
 from litestar import Litestar, Router
@@ -26,6 +27,7 @@ from entrypoints.litestar.middlewares.logging import (
 )
 from entrypoints.litestar.openapi_metadata import install_openapi_request_body_metadata
 from entrypoints.litestar.response_cache import ResponseCacheDomain, ResponseCacheDomainStore
+from entrypoints.telegram.dispatcher import TelegramBotDispatcher
 from infra.config import loggers
 from infra.config.constants import constants
 from infra.config.settings import settings
@@ -156,4 +158,9 @@ def create_litestar_app(
     )
     setup_dishka(container=container, app=app)
     install_openapi_request_body_metadata()
+    if settings.telegram.available:
+        app.state.telegram_dispatcher = TelegramBotDispatcher.create(
+            container=container,
+            bot=Bot(settings.telegram.bot_token.get_secret_value()),
+        )
     return app

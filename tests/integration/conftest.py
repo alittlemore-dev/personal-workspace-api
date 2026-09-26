@@ -36,7 +36,9 @@ def worker_database(test_settings: Settings, worker_id: str, testrun_uid: str) -
         run_id=os.environ.get(_TEMPLATE_DATABASE_RUN_ID_ENV, testrun_uid),
     )
     maintenance_engine = create_engine(
-        _maintenance_database_url(test_settings), isolation_level="AUTOCOMMIT", poolclass=NullPool
+        _maintenance_database_url(test_settings),
+        isolation_level="AUTOCOMMIT",
+        poolclass=NullPool,
     )
     try:
         _ensure_template_database(
@@ -58,7 +60,8 @@ def worker_database(test_settings: Settings, worker_id: str, testrun_uid: str) -
 
 @pytest_asyncio.fixture(loop_scope="session", scope="session", autouse=True)
 async def runtime_database_bindings(
-    test_settings: Settings, worker_database: None
+    test_settings: Settings,
+    worker_database: None,
 ) -> AsyncGenerator[None]:
     _ = worker_database
     original_engine = meta.engine
@@ -96,7 +99,9 @@ async def session_maker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
 
 @pytest.fixture(scope="package")
 def setup_migrations(
-    engine: AsyncEngine, test_settings: Settings, worker_id: str
+    engine: AsyncEngine,
+    test_settings: Settings,
+    worker_id: str,
 ) -> Generator[None]:
     _ = (engine, test_settings)
     if worker_id != "master":
@@ -116,7 +121,9 @@ async def clear_tables(engine: AsyncEngine) -> None:
 
 @pytest_asyncio.fixture
 async def session(
-    session_maker: async_sessionmaker[AsyncSession], setup_migrations: None, clear_tables: None
+    session_maker: async_sessionmaker[AsyncSession],
+    setup_migrations: None,
+    clear_tables: None,
 ) -> AsyncGenerator:
     _ = (setup_migrations, clear_tables)
     async with session_maker() as db:
@@ -136,15 +143,17 @@ def _maintenance_database_url(test_settings: Settings) -> URL:
 
 
 def _create_database_from_template(
-    engine: Engine, database_name: str, template_database_name: str
+    engine: Engine,
+    database_name: str,
+    template_database_name: str,
 ) -> None:
     with engine.connect() as connection:
         connection.execute(
             text(
                 "CREATE DATABASE "
                 f"{quote_postgresql_identifier(database_name)} "
-                f"TEMPLATE {quote_postgresql_identifier(template_database_name)}"
-            )
+                f"TEMPLATE {quote_postgresql_identifier(template_database_name)}",
+            ),
         )
 
 
@@ -155,17 +164,19 @@ def _drop_database(engine: Engine, database_name: str) -> None:
                 "SELECT pg_terminate_backend(pid) "
                 "FROM pg_stat_activity "
                 "WHERE datname = :database_name "
-                "AND pid <> pg_backend_pid()"
+                "AND pid <> pg_backend_pid()",
             ),
             {"database_name": database_name},
         )
         connection.execute(
-            text(f"DROP DATABASE IF EXISTS {quote_postgresql_identifier(database_name)}")
+            text(f"DROP DATABASE IF EXISTS {quote_postgresql_identifier(database_name)}"),
         )
 
 
 def _ensure_template_database(
-    engine: Engine, template_database_name: str, test_settings: Settings
+    engine: Engine,
+    template_database_name: str,
+    test_settings: Settings,
 ) -> None:
     lock_id = _template_database_lock_id(template_database_name=template_database_name)
     with engine.connect() as connection:
@@ -174,10 +185,11 @@ def _ensure_template_database(
             if _database_exists(connection=connection, database_name=template_database_name):
                 return
             connection.execute(
-                text(f"CREATE DATABASE {quote_postgresql_identifier(template_database_name)}")
+                text(f"CREATE DATABASE {quote_postgresql_identifier(template_database_name)}"),
             )
             _migrate_template_database(
-                test_settings=test_settings, template_database_name=template_database_name
+                test_settings=test_settings,
+                template_database_name=template_database_name,
             )
         finally:
             connection.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id})
@@ -202,6 +214,7 @@ def _migrate_template_database(test_settings: Settings, template_database_name: 
 
 def _template_database_lock_id(template_database_name: str) -> int:
     digest = sha1(
-        f"pytest-template-db:{template_database_name}".encode(), usedforsecurity=False
+        f"pytest-template-db:{template_database_name}".encode(),
+        usedforsecurity=False,
     ).digest()
     return int.from_bytes(digest[:8], byteorder="big") % (2**63 - 1)

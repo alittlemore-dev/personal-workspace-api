@@ -19,7 +19,8 @@ from infra.s3.clients import S3ClientBundle, S3PrivateResumeFileClient
 class ResumesProvider(Provider):
     @provide(scope=Scope.APP)
     async def provide_resume_photo_client(
-        self, clients: S3ClientBundle
+        self,
+        clients: S3ClientBundle,
     ) -> S3PrivateResumeFileClient:
         return S3PrivateResumeFileClient(
             internal_client=clients.internal,
@@ -38,7 +39,7 @@ class ResumesProvider(Provider):
             file_storage=file_storage,
             file_name_generator=file_name_generator,
             file_content_processor=ResumePhotoContentProcessor(
-                max_dimension=constants.files.resume_photo_max_dimension
+                max_dimension=constants.files.resume_photo_max_dimension,
             ),
             config=FileServiceConfig(
                 namespace=constants.minio_buckets.resume_private,
@@ -48,8 +49,8 @@ class ResumesProvider(Provider):
                             folder="photos",
                             allowed_mime_types=frozenset({"image/jpeg"}),
                             max_size_bytes=constants.files.resume_photo_max_size_bytes,
-                        )
-                    }
+                        ),
+                    },
                 ),
             ),
         )

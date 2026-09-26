@@ -208,7 +208,10 @@ class CoreFactoryHelper:
 
     @classmethod
     def resumes(
-        cls, values: list[Resume] | None = None, total_count: int = 0, total_pages: int = 0
+        cls,
+        values: list[Resume] | None = None,
+        total_count: int = 0,
+        total_pages: int = 0,
     ) -> Resumes:
         return Resumes(values=values or [], total_count=total_count, total_pages=total_pages)
 

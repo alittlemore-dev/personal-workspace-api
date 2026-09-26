@@ -160,7 +160,8 @@ class ResumesApiController(Controller):
         use_case: FromDishka[ResumesUseCase],
     ) -> Response[bytes]:
         content = await use_case.read_photo(
-            resume_id=resume_id, author_username=request.user.username
+            resume_id=resume_id,
+            author_username=request.user.username,
         )
         return Response(
             content=content,

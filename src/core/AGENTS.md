@@ -43,6 +43,7 @@ event_dispatchers.py    # Domain event/reporting interfaces; concrete transports
 ## Domain Rules
 
 - New core code must be domain dataclasses, value objects, use cases, services, interfaces, exceptions, or generators.
+- Put domain enumerations in the owning domain's `enums.py`, separate from schemas and use cases.
 - Use cases must be concrete standalone classes. Do not add abstract use-case interfaces,
   `Protocol` contracts, base use-case classes, or inheritance between use cases.
 - Use-case constructor attributes may contain injected collaborating abstractions and class-based
@@ -67,6 +68,10 @@ event_dispatchers.py    # Domain event/reporting interfaces; concrete transports
 - Group ordinary service configuration values, such as namespaces, rules, limits, and batch sizes,
   in a typed configuration schema and inject that schema through a `config` attribute. Keep service
   attributes outside `config` for collaborating abstractions only.
+- When a built-in scalar represents a distinct domain value with additional behavior, define a
+  dedicated subtype of that scalar with `__slots__ = ()`. Put the behavior on the value object and
+  use the subtype in core signatures; convert raw transport values at the boundary. For example,
+  an invitation token should know how to produce its own cryptographic hash.
 - Core exceptions must express domain failures and inherit only from `Exception` or project domain
   exception bases that themselves inherit from `Exception`. Litestar/HTTP representation belongs in
   the Litestar entrypoint layer, where core exceptions should be mapped to

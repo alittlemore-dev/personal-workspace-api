@@ -46,7 +46,7 @@ def analyze_explain_result(  # noqa: PLR0913
         if relation_name in expectation.allow_seq_scan_relations:
             observations.append(
                 f"allowed Seq Scan on {relation_cardinalities.get(relation_name, 0)}-row "
-                f"relation {relation_name}"
+                f"relation {relation_name}",
             )
         elif (
             relation_name not in expectation.forbidden_seq_scan_relations
@@ -54,7 +54,7 @@ def analyze_explain_result(  # noqa: PLR0913
         ):
             observations.append(
                 f"Seq Scan on {relation_cardinalities.get(relation_name, 0)}-row "
-                f"relation {relation_name}"
+                f"relation {relation_name}",
             )
     return PlanAnalysis(
         name=name,

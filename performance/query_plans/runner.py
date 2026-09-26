@@ -397,7 +397,7 @@ def write_report(  # noqa: PLR0913
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run Knowledge and Resumes PostgreSQL query-plan gate."
+        description="Run Knowledge and Resumes PostgreSQL query-plan gate.",
     )
     parser.add_argument("--profile", required=True, choices=(REALISTIC_PROFILE.name,))
     parser.add_argument("--report-dir", required=True, type=Path)

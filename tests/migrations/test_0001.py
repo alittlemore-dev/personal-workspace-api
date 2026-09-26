@@ -120,7 +120,7 @@ class TestMigration0001:
                 lambda sync_connection: {
                     column["name"]
                     for column in sa.inspect(sync_connection).get_columns(
-                        "knowledge__knowledge_item_file_model"
+                        "knowledge__knowledge_item_file_model",
                     )
                 },
             )
@@ -128,7 +128,7 @@ class TestMigration0001:
                 lambda sync_connection: {
                     foreign_key["name"]: foreign_key["options"].get("ondelete")
                     for foreign_key in sa.inspect(sync_connection).get_foreign_keys(
-                        "knowledge__knowledge_item_file_model"
+                        "knowledge__knowledge_item_file_model",
                     )
                 },
             )
@@ -136,7 +136,7 @@ class TestMigration0001:
                 lambda sync_connection: {
                     index["name"]
                     for index in sa.inspect(sync_connection).get_indexes(
-                        "knowledge__knowledge_item_file_model"
+                        "knowledge__knowledge_item_file_model",
                     )
                     if index["unique"]
                 },

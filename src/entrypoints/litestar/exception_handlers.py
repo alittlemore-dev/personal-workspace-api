@@ -4,8 +4,10 @@ from litestar import Request, Response
 from verbose_http_exceptions import (
     BadRequestHTTPException,
     ConflictHTTPException,
+    ForbiddenHTTPException,
     InternalServerErrorHTTPException,
     NotFoundHTTPException,
+    ServiceUnavailableHTTPException,
     status,
 )
 from verbose_http_exceptions.exc.base import BaseVerboseHTTPException, VerboseHTTPExceptionDict
@@ -18,6 +20,12 @@ from verbose_http_exceptions.ext.litestar.types import LitestarExceptionHandlers
 from core.exceptions import DomainError, EntryNotFoundError
 from core.files.exceptions import FileClientInternalError, FileInUseError, InvalidFileDataError
 from core.knowledge.exceptions import InvalidKnowledgeDataError, KnowledgeConflictError
+from core.telegram.exceptions import (
+    TelegramAccessError,
+    TelegramInvitationError,
+    TelegramLimitError,
+    TelegramServiceError,
+)
 from infra.healthcheck import ReadinessCheckError
 
 DOMAIN_ERROR_MAPPING: dict[type[DomainError], type[BaseVerboseHTTPException]] = {
@@ -27,6 +35,10 @@ DOMAIN_ERROR_MAPPING: dict[type[DomainError], type[BaseVerboseHTTPException]] = 
     FileClientInternalError: InternalServerErrorHTTPException,
     InvalidKnowledgeDataError: BadRequestHTTPException,
     KnowledgeConflictError: ConflictHTTPException,
+    TelegramAccessError: ForbiddenHTTPException,
+    TelegramInvitationError: BadRequestHTTPException,
+    TelegramLimitError: BadRequestHTTPException,
+    TelegramServiceError: ServiceUnavailableHTTPException,
 }
 
 

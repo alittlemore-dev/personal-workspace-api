@@ -35,7 +35,9 @@ class TestResumesUseCase(TestCase):
         self.exporter = Mock(spec=ResumeDocumentExporter)
         self.photo_files = Mock(spec=ResumePhotoFileService)
         self.use_case = ResumesUseCase(
-            storage=self.storage, exporter=self.exporter, photo_files=self.photo_files
+            storage=self.storage,
+            exporter=self.exporter,
+            photo_files=self.photo_files,
         )
 
     def test_resume_filters_require_explicit_values(self) -> None:
@@ -91,7 +93,8 @@ class TestResumesUseCase(TestCase):
         self.storage.get_resume.return_value = expected
 
         result = await self.use_case.get_resume(
-            resume_id=self.factory.core.hex_id(1), author_username="test"
+            resume_id=self.factory.core.hex_id(1),
+            author_username="test",
         )
 
         assert result == expected
@@ -105,7 +108,8 @@ class TestResumesUseCase(TestCase):
 
         with pytest.raises(ResumeNotFoundError):
             await self.use_case.get_resume(
-                resume_id=self.factory.core.hex_id(404), author_username="test"
+                resume_id=self.factory.core.hex_id(404),
+                author_username="test",
             )
 
     async def test_create_resume_persists_explicit_content(self) -> None:
@@ -178,7 +182,7 @@ class TestResumesUseCase(TestCase):
 
     async def test_delete_resume_delegates_to_storage(self) -> None:
         self.storage.get_resume.return_value = self.factory.core.resume(
-            content=self.factory.core.resume_empty_content()
+            content=self.factory.core.resume_empty_content(),
         )
         await self.use_case.delete_resume(
             resume_id=self.factory.core.hex_id(1),
@@ -199,7 +203,8 @@ class TestResumesUseCase(TestCase):
             content=replace(
                 self.factory.core.resume_empty_content(),
                 profile=replace(
-                    self.factory.core.resume_empty_content().profile, photo_file_id=old_id
+                    self.factory.core.resume_empty_content().profile,
+                    photo_file_id=old_id,
                 ),
             ),
         )
@@ -207,8 +212,10 @@ class TestResumesUseCase(TestCase):
         self.storage.update_resume.side_effect = lambda *, resume: resume
         self.photo_files.upload_file.return_value = self.factory.core.file_read(
             file=self.factory.core.stored_file(
-                file_id=new_id, namespace="resume-private", mime_type="image/jpeg"
-            )
+                file_id=new_id,
+                namespace="resume-private",
+                mime_type="image/jpeg",
+            ),
         )
         params = FileUploadParams(
             id=new_id,
@@ -228,10 +235,12 @@ class TestResumesUseCase(TestCase):
 
         assert result.content.profile.photo_file_id == new_id
         self.storage.get_resume.assert_awaited_once_with(
-            resume_id=original.id, author_username="test"
+            resume_id=original.id,
+            author_username="test",
         )
         self.photo_files.upload_file.assert_awaited_once_with(
-            params=params, current_datetime=CURRENT_DATETIME
+            params=params,
+            current_datetime=CURRENT_DATETIME,
         )
         self.photo_files.sync_file_usages.assert_awaited_once_with(
             attached_file_ids=frozenset({new_id}),
@@ -251,7 +260,9 @@ class TestResumesUseCase(TestCase):
             await self.use_case.update_resume(
                 resume_id=original.id,
                 params=ResumeUpdateParams(
-                    title=original.title, language=original.language, content=content
+                    title=original.title,
+                    language=original.language,
+                    content=content,
                 ),
                 author_username="test",
                 current_datetime=CURRENT_DATETIME,

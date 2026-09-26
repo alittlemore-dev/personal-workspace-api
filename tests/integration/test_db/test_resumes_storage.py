@@ -133,7 +133,8 @@ class TestResumesDatabaseStorage(StorageTestCase):
         await self.db_session.flush()
 
         loaded = await self.storage.get_resume(
-            resume_id=self.factory.core.hex_id(50), author_username="admin"
+            resume_id=self.factory.core.hex_id(50),
+            author_username="admin",
         )
 
         assert loaded.content.profile.full_name == ""
@@ -182,13 +183,15 @@ class TestResumesDatabaseStorage(StorageTestCase):
 
         with pytest.raises(ResumeNotFoundError):
             await self.storage.get_resume(
-                resume_id=self.factory.core.hex_id(10), author_username="admin"
+                resume_id=self.factory.core.hex_id(10),
+                author_username="admin",
             )
         with pytest.raises(ResumeNotFoundError):
             await self.storage.update_resume(resume=other_author_resume)
         with pytest.raises(ResumeNotFoundError):
             await self.storage.delete_resume(
-                resume_id=self.factory.core.hex_id(10), author_username="admin"
+                resume_id=self.factory.core.hex_id(10),
+                author_username="admin",
             )
 
     async def test_missing_resume_operations_raise_domain_error(self) -> None:
@@ -204,13 +207,15 @@ class TestResumesDatabaseStorage(StorageTestCase):
 
         with pytest.raises(ResumeNotFoundError):
             await self.storage.get_resume(
-                resume_id=self.factory.core.hex_id(404), author_username="admin"
+                resume_id=self.factory.core.hex_id(404),
+                author_username="admin",
             )
         with pytest.raises(ResumeNotFoundError):
             await self.storage.update_resume(resume=missing_resume)
         with pytest.raises(ResumeNotFoundError):
             await self.storage.delete_resume(
-                resume_id=self.factory.core.hex_id(404), author_username="admin"
+                resume_id=self.factory.core.hex_id(404),
+                author_username="admin",
             )
 
     async def create_resume_row(

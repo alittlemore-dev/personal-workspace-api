@@ -62,6 +62,13 @@ class TaskiqConstants:
     file_orphan_prune_task_name: Literal["file_orphan_prune"] = "file_orphan_prune"
 
 
+class TelegramConstants:
+    redemption_attempt_limit: int = 10
+    redemption_attempt_window_seconds: int = 900
+    invitation_limit_per_hour: int = 5
+    connection_limit_per_workspace: int = 20
+
+
 class FilesConstants:
     orphan_cleanup_batch_size: int = 100
     resume_photo_max_size_bytes: int = 262_144
@@ -151,6 +158,7 @@ class Constants:
     valkey: ValkeyConstants = ValkeyConstants()
     response_cache: ResponseCacheConstants = ResponseCacheConstants()
     taskiq: TaskiqConstants = TaskiqConstants()
+    telegram: TelegramConstants = TelegramConstants()
     files: FilesConstants = FilesConstants()
     knowledge_files: KnowledgeFilesConstants = KnowledgeFilesConstants()
     request_logging: RequestLoggingConstants = RequestLoggingConstants()

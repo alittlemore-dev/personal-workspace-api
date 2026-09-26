@@ -119,7 +119,10 @@ class APIHelper:
         return self.client.post("/api/knowledge/people/relationship-types", json=data)
 
     def put_person_relationship_type(
-        self, *, relationship_type_id: int | str, data: dict[str, Any]
+        self,
+        *,
+        relationship_type_id: int | str,
+        data: dict[str, Any],
     ) -> Response:
         return self.client.put(
             f"/api/knowledge/people/relationship-types/{self._entity_id(relationship_type_id)}",
@@ -128,7 +131,7 @@ class APIHelper:
 
     def delete_person_relationship_type(self, *, relationship_type_id: int | str) -> Response:
         return self.client.delete(
-            f"/api/knowledge/people/relationship-types/{self._entity_id(relationship_type_id)}"
+            f"/api/knowledge/people/relationship-types/{self._entity_id(relationship_type_id)}",
         )
 
     def get_tools_cache(self) -> Response:
@@ -173,7 +176,13 @@ class APIHelper:
         return self.client.delete(f"/api/resumes/{self._entity_id(resume_id)}")
 
     def post_file(
-        self, *, purpose: str, name: str, filename: str, content: bytes, content_type: str
+        self,
+        *,
+        purpose: str,
+        name: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
     ) -> Response:
         return self.client.post(
             "/api/files",

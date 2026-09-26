@@ -37,7 +37,7 @@ class TestFilesDatabaseStorage(StorageTestCase):
                 language=LanguageEnum.EN,
                 content=content,
                 author_username="admin",
-            )
+            ),
         )
 
         assert await files.file_has_usages(namespace="resume-private", file_id=photo.id)

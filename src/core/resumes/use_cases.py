@@ -81,10 +81,12 @@ class ResumesUseCase:
         current_datetime: datetime,
     ) -> Resume:
         existing = await self.storage.get_resume(
-            resume_id=resume_id, author_username=author_username
+            resume_id=resume_id,
+            author_username=author_username,
         )
         uploaded = await self.photo_files.upload_file(
-            params=params, current_datetime=current_datetime
+            params=params,
+            current_datetime=current_datetime,
         )
         old_id = existing.content.profile.photo_file_id
         updated = await self.storage.update_resume(
@@ -95,7 +97,7 @@ class ResumesUseCase:
                     profile=replace(existing.content.profile, photo_file_id=uploaded.file.id),
                 ),
                 updated_at=current_datetime,
-            )
+            ),
         )
         await self.photo_files.sync_file_usages(
             attached_file_ids=frozenset({uploaded.file.id}),
@@ -115,10 +117,15 @@ class ResumesUseCase:
         return await self.photo_files.download_file(file_id=file_id)
 
     async def delete_resume(
-        self, *, resume_id: str, author_username: str, current_datetime: datetime
+        self,
+        *,
+        resume_id: str,
+        author_username: str,
+        current_datetime: datetime,
     ) -> None:
         existing = await self.storage.get_resume(
-            resume_id=resume_id, author_username=author_username
+            resume_id=resume_id,
+            author_username=author_username,
         )
         await self.storage.delete_resume(resume_id=resume_id, author_username=author_username)
         file_id = existing.content.profile.photo_file_id

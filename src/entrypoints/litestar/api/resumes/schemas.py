@@ -48,13 +48,16 @@ from entrypoints.litestar.api.validation import (
 class ResumeProfileSchema(CamelCaseSchema):
     full_name: Annotated[RequiredShortText, Field(title="Full name")]
     photo_file_id: Annotated[
-        str, Field(title="Photo file ID", max_length=32, pattern=r"^(?:[0-9a-f]{32})?$")
+        str,
+        Field(title="Photo file ID", max_length=32, pattern=r"^(?:[0-9a-f]{32})?$"),
     ]
     role: Annotated[RequiredShortText, Field(title="Role")]
     location: Annotated[ResumeOptionalShortText, Field(title="Location")]
     email: Annotated[BlankableEmailString, Field(title="Email")]
     phone: Annotated[
-        str, Field(title="Phone", max_length=64), AfterValidator(validate_resume_phone)
+        str,
+        Field(title="Phone", max_length=64),
+        AfterValidator(validate_resume_phone),
     ]
     website_url: Annotated[BlankableHttpUrlString, Field(title="Website URL")]
     linkedin_url: Annotated[BlankableHttpUrlString, Field(title="LinkedIn URL")]
@@ -408,17 +411,20 @@ class ResumeContentSchema(CamelCaseSchema):
     profile: Annotated[ResumeProfileSchema, Field(title="Profile")]
     summary: Annotated[ResumeSummarySchema, Field(title="Summary")]
     skills: Annotated[
-        list[ResumeSkillGroupSchema], Field(title="Skills", max_length=ResumeLimits.skill_groups)
+        list[ResumeSkillGroupSchema],
+        Field(title="Skills", max_length=ResumeLimits.skill_groups),
     ]
     experience: Annotated[
         list[ResumeExperienceItemSchema],
         Field(title="Experience", max_length=ResumeLimits.experience),
     ]
     education: Annotated[
-        list[ResumeEducationItemSchema], Field(title="Education", max_length=ResumeLimits.education)
+        list[ResumeEducationItemSchema],
+        Field(title="Education", max_length=ResumeLimits.education),
     ]
     languages: Annotated[
-        list[ResumeLanguageItemSchema], Field(title="Languages", max_length=ResumeLimits.languages)
+        list[ResumeLanguageItemSchema],
+        Field(title="Languages", max_length=ResumeLimits.languages),
     ]
     certifications: Annotated[
         list[ResumeCertificationItemSchema],

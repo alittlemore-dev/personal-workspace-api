@@ -9,10 +9,12 @@ from performance.query_plans.database import (
 class TestQueryPlanDatabase:
     def test_run_database_names_are_isolated_and_safe_for_postgresql(self) -> None:
         first = build_run_database_name(
-            base_name="personal_workspace_database_test", run_id="run-one"
+            base_name="personal_workspace_database_test",
+            run_id="run-one",
         )
         second = build_run_database_name(
-            base_name="personal_workspace_database_test", run_id="run-two"
+            base_name="personal_workspace_database_test",
+            run_id="run-two",
         )
 
         assert first != second

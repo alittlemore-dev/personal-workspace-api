@@ -231,16 +231,26 @@ class S3PrivateResumeFileClient(FileClient):
                     raise
 
     async def upload_file(
-        self, file_data: BytesIO, object_name: str, namespace: str, content_type: str
+        self,
+        file_data: BytesIO,
+        object_name: str,
+        namespace: str,
+        content_type: str,
     ) -> FileUploadResult:
         await self.ensure_namespace_exists(namespace)
         try:
             content = file_data.getvalue()
             await self.internal_client.put_object(
-                Bucket=namespace, Key=object_name, Body=content, ContentType=content_type
+                Bucket=namespace,
+                Key=object_name,
+                Body=content,
+                ContentType=content_type,
             )
             return FileUploadResult(
-                url="", bucket=namespace, object_name=object_name, size=len(content)
+                url="",
+                bucket=namespace,
+                object_name=object_name,
+                size=len(content),
             )
         except (BotoCoreError, ClientError) as error:
             raise FileClientInternalError(message="Private resume photo upload failed") from error

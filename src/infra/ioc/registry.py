@@ -16,6 +16,7 @@ from infra.ioc.prodivers.knowledge import (
 )
 from infra.ioc.prodivers.response_cache_warm_provider import ResponseCacheWarmProvider
 from infra.ioc.prodivers.resumes_provider import ResumesProvider
+from infra.ioc.prodivers.telegram_provider import TelegramProvider
 from infra.ioc.prodivers.wiki_links_provider import WikiLinksProvider
 
 
@@ -27,6 +28,7 @@ def get_providers() -> Iterable[Provider]:
         LitestarProvider(),
         CalendarProvider(),
         ResumesProvider(),
+        TelegramProvider(),
         KnowledgeItemsProvider(),
         KnowledgeFilesProvider(),
         KnowledgeDatesProvider(),

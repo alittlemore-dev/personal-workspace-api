@@ -38,7 +38,9 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
             return ResumeExport(
                 format=params.format,
                 content=self._render_docx(
-                    params=params, context=context, photo_content=photo_content
+                    params=params,
+                    context=context,
+                    photo_content=photo_content,
                 ),
             )
         message = f"Unsupported resume export format: {params.format}"
@@ -74,7 +76,11 @@ class ResumeDocumentExporterImpl(ResumeDocumentExporter):
         return output.getvalue()
 
     def _render_docx(
-        self, *, params: ResumeExportParams, context: dict[str, object], photo_content: bytes
+        self,
+        *,
+        params: ResumeExportParams,
+        context: dict[str, object],
+        photo_content: bytes,
     ) -> bytes:
         template_path = Path(__file__).parent / "templates" / params.theme.value / "resume.docx"
         template = DocxTemplate(template_path)

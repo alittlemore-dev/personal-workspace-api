@@ -22,7 +22,8 @@ def test_resume_accepts_project_scale_and_company_website() -> None:
     content = request_content()
     content["experience"][0]["companyWebsiteUrl"] = "https://company.example"
     content["experience"][0]["projects"][0].update(
-        teamSize="5–7 engineers", scale="2M requests/day"
+        teamSize="5–7 engineers",
+        scale="2M requests/day",
     )
     resume = ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
 
@@ -146,7 +147,7 @@ def test_rejects_duplicate_languages_and_reversed_certification_dates() -> None:
             "issuedOn": "2025-01-01",
             "expiresOn": "2024-12-31",
             "credentialUrl": "",
-        }
+        },
     ]
     with pytest.raises(ValidationError):
         ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))

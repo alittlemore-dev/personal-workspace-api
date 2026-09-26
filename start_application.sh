@@ -27,6 +27,9 @@ load_runtime_secrets() {
         "MINIO_ACCESS_KEY"
         "MINIO_SECRET_KEY"
         "SENTRY_DSN"
+        "TELEGRAM_BOT_TOKEN"
+        "TELEGRAM_WEBHOOK_SECRET"
+        "TELEGRAM_SERVICE_SECRET"
     )
     local variable_name
 

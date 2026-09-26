@@ -7,6 +7,7 @@ from entrypoints.litestar.api.files.endpoints import api_router as files_router
 from entrypoints.litestar.api.healthcheck.endpoints import api_router as healthcheck_router
 from entrypoints.litestar.api.knowledge.router import api_router as knowledge_router
 from entrypoints.litestar.api.resumes.endpoints import api_router as resumes_router
+from entrypoints.litestar.api.telegram.endpoints import api_router as telegram_router
 from entrypoints.litestar.api.tools.endpoints import api_router as tools_router
 from entrypoints.litestar.api.wiki_links.endpoints import api_router as wiki_links_router
 
@@ -29,6 +30,7 @@ api_router = Router(
     "/api",
     route_handlers=[
         healthcheck_router,
+        telegram_router,
         protected_api_router,
     ],
     tags=["api"],

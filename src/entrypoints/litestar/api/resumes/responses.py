@@ -33,7 +33,7 @@ class ResumeExportResponse(Response[bytes]):
         if document.format == ResumeExportFormatEnum.PDF:
             with suppress(PdfReadError):
                 headers["X-Resume-Page-Count"] = str(
-                    len(PdfReader(BytesIO(document.content)).pages)
+                    len(PdfReader(BytesIO(document.content)).pages),
                 )
 
         return cls(

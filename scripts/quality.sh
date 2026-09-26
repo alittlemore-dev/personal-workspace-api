@@ -21,12 +21,15 @@ run_vulture() {
     PYTHONPATH=src uv run vulture src --min-confidence 100
 }
 
+# COM812 is enforced by ruff check; the formatter needs it ignored to avoid its compatibility warning.
 run_fix() {
-    uv run ruff format src tests performance --config ./pyproject.toml
+    uv run ruff format src tests performance --config ./pyproject.toml \
+        --config 'lint.ignore = ["COM812"]'
 }
 
 run_format_check() {
-    uv run ruff format src tests performance --check --config ./pyproject.toml
+    uv run ruff format src tests performance --check --config ./pyproject.toml \
+        --config 'lint.ignore = ["COM812"]'
 }
 
 run_lint_file() {
@@ -36,7 +39,8 @@ run_lint_file() {
         exit 2
     fi
     uv run ruff check --fix "$file_path" --config ./pyproject.toml
-    uv run ruff format "$file_path" --config ./pyproject.toml
+    uv run ruff format "$file_path" --config ./pyproject.toml \
+        --config 'lint.ignore = ["COM812"]'
 }
 
 run_ruff_check() {

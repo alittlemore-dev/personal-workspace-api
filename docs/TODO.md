@@ -8,8 +8,8 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 
-- [ ] Connect multiple Telegram accounts to one Personal Workspace through one-time invitations.
-- [ ] Manage pending, active, revoked, and blocked connections in web settings.
+- [x] Connect multiple Telegram accounts to one Personal Workspace through one-time invitations.
+- [x] Manage pending, active, revoked, and blocked connections in web settings.
 - [ ] Configure all notifications and each notification type for every connection.
 - [ ] Deliver birthday and memorable-date reminders to subscribed connections.
 - [ ] Deliver event reminders when calendar events are implemented.
@@ -56,7 +56,7 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 - [ ] Finance tracker
   - [ ] Workspace statistic chosen period
 - [ ] Telegram bot integration
-  - [ ] Add a Workspace-wide Telegram ON/OFF setting and invitation management.
+  - [x] Add a Workspace-wide Telegram ON/OFF setting and invitation management.
   - [ ] Add individual connection notification switches for birthdays, dates, events, and finance.
   - [ ] Select available button-driven quick-add categories for the Workspace.
 

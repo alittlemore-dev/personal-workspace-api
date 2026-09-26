@@ -440,5 +440,6 @@ class TestResumesApi(ApiTestCase):
         assert photo.headers["content-type"].startswith("image/jpeg")
         assert photo.headers["cache-control"] == "private, no-store"
         self.use_case.read_photo.assert_awaited_once_with(
-            resume_id=original.id, author_username=TEST_USERNAME
+            resume_id=original.id,
+            author_username=TEST_USERNAME,
         )

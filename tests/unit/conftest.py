@@ -22,6 +22,7 @@ from tests.unit.mocks.providers.general import MockGeneralProvider
 from tests.unit.mocks.providers.healthcheck import MockHealthcheckProvider
 from tests.unit.mocks.providers.knowledge import MockKnowledgeProvider
 from tests.unit.mocks.providers.resumes import MockResumesProvider
+from tests.unit.mocks.providers.telegram import MockTelegramProvider
 from tests.unit.mocks.providers.wiki_links import MockWikiLinksProvider
 
 TEST_CURRENT_DATETIME = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
@@ -51,6 +52,7 @@ async def container(
         MockCalendarProvider(),
         MockKnowledgeProvider(),
         MockResumesProvider(),
+        MockTelegramProvider(),
         MockCacheToolsProvider(),
         MockWikiLinksProvider(),
         MockHealthcheckProvider(),

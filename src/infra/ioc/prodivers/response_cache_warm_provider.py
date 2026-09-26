@@ -74,7 +74,7 @@ class ResponseCacheWarmProvider(Provider):
     ) -> AsyncIterable[ResponseCacheStatusStorage]:
         valkey = Valkey.from_url(
             settings.valkey.get_url(
-                db=constants.valkey.databases.response_cache
+                db=constants.valkey.databases.response_cache,
             ).get_secret_value(),
             decode_responses=False,
         )

@@ -56,7 +56,10 @@ def date_person_seed_keys(*, dates: int, people: int, links: int) -> tuple[tuple
 
 
 def relationship_seed_key(
-    *, value: int, people: int, relationship_types: int
+    *,
+    value: int,
+    people: int,
+    relationship_types: int,
 ) -> tuple[int, int, int]:
     source_number = 1 + ((value - 1) % people)
     offset = 1 + ((value - 1) // people)
@@ -315,5 +318,5 @@ async def seed_profile(*, connection: AsyncConnection, profile: QueryPlanProfile
 
 async def clear_seeded_tables(*, connection: AsyncConnection) -> None:
     await connection.execute(
-        text(f"TRUNCATE TABLE {', '.join(SEEDED_TABLES)} RESTART IDENTITY CASCADE")
+        text(f"TRUNCATE TABLE {', '.join(SEEDED_TABLES)} RESTART IDENTITY CASCADE"),
     )

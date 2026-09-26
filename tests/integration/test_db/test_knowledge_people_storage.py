@@ -215,7 +215,7 @@ class TestKnowledgePeopleStorage(StorageTestCase):
                     relationship_type_id=relationship_type.id,
                     direction=PersonRelationshipDirection.FORWARD,
                     note="before",
-                )
+                ),
             ],
             relationship_types={relationship_type.id: relationship_type},
             created_at=CURRENT_DATETIME,
@@ -285,7 +285,7 @@ class TestKnowledgePeopleStorage(StorageTestCase):
                 await storage.list_relationships(
                     person_id=first_id,
                     author_username="owner",
-                )
+                ),
             )
             == 1
         )
@@ -345,7 +345,7 @@ class TestKnowledgePeopleStorage(StorageTestCase):
                     relationship_type_id=relationship_type.id,
                     direction=PersonRelationshipDirection.FORWARD,
                     note="",
-                )
+                ),
             ],
             relationship_types={relationship_type.id: relationship_type},
             created_at=CURRENT_DATETIME,

@@ -39,9 +39,10 @@ outside the first version.
   `docs/finance-tracker-architecture.md` already specifies one owner, multiple Telegram
   participants, transaction creation, and actor auditing. This document defines their shared
   Telegram boundary and replaces the earlier assumption of one bot and token per tracker.
-- Existing language and theme account settings belong to `auth-api`. Telegram connections and
-  notifications belong to `personal-workspace` because they depend on its owner and domain data.
-  The Angular settings page can display both without moving Telegram data into `auth-api`.
+- `auth-api` owns the per-bot enable switch in `UserModel.settings`. `personal-workspace` owns
+  invitations, Telegram connections and chat IDs, its bot token, webhook, and commands. The
+  Workspace reads the switch through a protected internal `auth-api` endpoint. The Angular page
+  reads account settings from `auth-api` and connection data from `personal-workspace`.
 
 ## 3. Options considered
 
@@ -97,9 +98,9 @@ user.
 4. Web settings show the Telegram ID and the name/username observed at request time. The owner
    approves that specific request to make it `active`, or rejects it. Approval rechecks the
    current state and absence of conflicts.
-5. The bot informs the person about approval or rejection. Plain `/start` without a valid
-   invitation shows help or the existing active connection's state; it never creates a
-   connection.
+5. In the first integration phase, the bot acknowledges a pending request. Approval and
+   rejection notifications are deferred with the other notification work. Plain `/start`
+   without a valid invitation does not create a connection.
 
 A repeated link does not duplicate an active connection. A pending request expires after 24
 hours, after which the owner can issue a new invitation. Expired and used tokens receive a
@@ -140,8 +141,9 @@ remain, no message is sent.
 For example, Anna and Boris are linked to the same Workspace. Anna subscribes to birthdays but
 disables finance transactions; Boris subscribes to finance transactions but disables birthdays.
 Only Anna receives a birthday reminder. Only Boris receives a notification about an expense
-added by Anna. Preferences are stored by connection ID in Personal Workspace; the shared bot
-token does not affect recipient selection. New notification types are not enabled automatically
+added by Anna. The future location of notification preferences will be decided when notification
+behavior is implemented; the shared bot token does not affect recipient selection. New
+notification types are not enabled automatically
 for everyone: the owner selects them for each connection.
 
 ## 7. Action and notification catalog
@@ -180,10 +182,11 @@ files, and the entire knowledge database are not notification sources in this de
 
 The shared bot sends webhooks to a separately classified integration HTTP endpoint in
 `personal-workspace`. The endpoint validates `X-Telegram-Bot-Api-Secret-Token` **before**
-processing payload data and does not rely on a web cookie. The numeric Telegram `user.id` is
-then resolved to its one active connection. The adapter calls the owning domain use case with an
-explicit `owner_username` and participant ID. A domain use case never trusts an owner, category,
-or object ID from callback data without an owner-scoped check.
+processing payload data and does not rely on a web cookie. The bot sends a private `/start`
+settings request to `auth-api` with a separate service credential. `personal-workspace` resolves
+the numeric Telegram `user.id` against its own connections. Future product commands must obtain
+current connection state from `personal-workspace` before acting; a domain use case never trusts an owner,
+category, or object ID from callback data without an owner-scoped check.
 
 Guided forms use buttons and constrained value input, present a summary before final
 confirmation, and allow cancellation. Temporary draft state with a TTL lives in Valkey; after it
@@ -213,30 +216,30 @@ meaning for family members in different countries.
 
 ## 9. Data and implementation boundaries
 
-Logical PostgreSQL entities:
+Account state in `auth-api` PostgreSQL:
 
-- `telegram_workspace_config`: owner, enabled state, change time and actor;
-- `telegram_invite`: owner, token hash, expiry, state, label, creator;
-- `telegram_connection`: owner, Telegram user ID and private chat ID, state, label, profile
-  snapshot, connection/revocation/block times, approving actor;
-- `telegram_notification_preferences`: connection, global switch, time zone, preferred time, and
-  switches from a versioned type catalog;
-- `telegram_update_receipt` plus outgoing event and delivery records: idempotency keys,
-  processing state, deadlines, attempts, and safe error details.
+- `UserModel.settings.telegram_bots`: per-bot enabled state, keyed by the `TelegramBotId` enum.
 
-Database constraints enforce uniqueness of an active Telegram user ID across Workspaces and
-single-use invitation redemption. Connection history is separate from finance revisions. The bot
-token and webhook secret come from deployment configuration; raw invitation tokens are never
-persisted. Logs and metrics omit full Telegram updates, finance transaction descriptions,
-integration secrets, invitation links, and message bodies. Retention periods for technical
-records and deletion of sensitive data need an operations policy before release.
+Bot domain state in `personal-workspace` PostgreSQL:
 
-Domain rules belong in `core`, PostgreSQL adapters in `infra/postgresql`, the webhook and
-protected API in `entrypoints/litestar`, background delivery and scheduling in
-`entrypoints/taskiq`, and the Angular interface in the sibling `frontend` repository. The
-proposed protected API root is `/api/telegram`, accessible only to the web-authenticated owner.
-The Telegram webhook is an externally authenticated integration endpoint, not an anonymous
-product API. Its path and external routing are finalized with `infra` during implementation.
+- Telegram invitations: owner username, token hash, expiry, use/cancellation state, and label;
+- Telegram connections: owner username, Telegram user ID and private chat ID, state, label,
+  profile snapshot, and connection timestamps;
+- Product events, update receipts, outgoing delivery records, and possible future connection
+  preferences belong here when those features are designed.
+
+The owner username is a cross-service identity and has no database foreign key to an auth table.
+The authenticated Workspace API scopes management operations to that username. Database
+constraints enforce uniqueness of an active Telegram user ID across Workspaces and single-use
+invitation redemption. The bot token and webhook secret come from deployment configuration; raw
+invitation tokens are never persisted.
+
+`auth-api` exposes `GET /api/auth/account/me` and `PUT /api/auth/account/me/settings`
+for the complete account settings object, including `telegramBots`. The bot reads the switch
+through a service-secret-protected internal endpoint at
+`/api/auth/internal/telegram/personal-workspace/settings`, which the public edge blocks.
+`personal-workspace` exposes authenticated invitation and connection management and the bot
+webhook at `/api/personal-workspace/telegram`. The Angular interface lives in `frontend`.
 
 ### 9.1. Telegram library and dependency boundaries
 

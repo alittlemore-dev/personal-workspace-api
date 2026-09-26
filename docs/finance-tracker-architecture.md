@@ -37,6 +37,8 @@ platform.
   Telegram transaction.
 - One Personal Workspace owner may connect multiple trusted Telegram users to the same tracker.
   Telegram participants have no roles and can only append transactions.
+- The shared Personal Workspace bot owns Telegram connections, invites, and notification settings;
+  the tracker consumes that trust boundary. See `docs/telegram-bot-architecture.md`.
 - Historical analytics remains a PostgreSQL read-model concern until measured scale justifies a
   different store.
 
@@ -53,7 +55,8 @@ The feature follows the existing `personal-workspace` layer boundaries:
 - `infra.postgresql` owns SQLAlchemy models and implementations of finance storage abstractions.
 - `infra.http` owns the Bank of Russia adapter behind a provider-neutral core client interface.
 - `infra.valkey` owns temporary Telegram form state only.
-- `entrypoints.litestar` exposes the protected finance API and the Telegram webhook.
+- `entrypoints.litestar` exposes the protected finance API and uses the shared Personal Workspace
+  Telegram webhook.
 - `entrypoints.taskiq` synchronizes exchange rates.
 - `infra.ioc` wires adapters and use cases through Dishka.
 - The sibling `frontend` repository owns the Angular workspace pages and navigation.
@@ -70,8 +73,8 @@ must not lose or duplicate a confirmed transaction.
 ### 4.1. Tracker
 
 A tracker belongs to exactly one Personal Workspace identity and contains all of that owner's
-months, categories, transactions, and Telegram connections. The tracker has an explicit IANA time
-zone used for month boundaries and exchange-rate dates.
+months, categories, and transactions. Telegram connections belong to the Workspace-wide integration.
+The tracker has an explicit IANA time zone used for month boundaries and exchange-rate dates.
 
 ### 4.2. Month
 
@@ -150,9 +153,8 @@ erDiagram
     EXCHANGE_RATE_SET ||--o{ FINANCE_TRANSACTION : values
     FINANCE_MONTH ||--o{ MONTH_CURRENCY_CHANGE : records
     EXCHANGE_RATE_SET ||--o{ MONTH_CURRENCY_CHANGE : applies
-    FINANCE_TRACKER ||--o| TELEGRAM_BOT_CONFIG : configures
-    TELEGRAM_BOT_CONFIG ||--o{ TELEGRAM_MEMBER : trusts
-    TELEGRAM_BOT_CONFIG ||--o{ TELEGRAM_INVITE : issues
+    WORKSPACE_OWNER ||--o{ TELEGRAM_CONNECTION : trusts
+    WORKSPACE_OWNER ||--|| FINANCE_TRACKER : owns
 ```
 
 ### 5.1. `finance_tracker`
@@ -264,18 +266,13 @@ created. Existing transactions remain linked to the set originally applied.
 A month currency change converts the opening balance and all category plans in one database
 transaction. Original transaction amounts and their rate-set references remain unchanged.
 
-### 5.10. Telegram tables
+### 5.10. Telegram connections
 
-`finance_telegram_bot_config` stores one bot configuration per tracker: encrypted bot token,
-enabled state, bot identity, webhook secret, and audit timestamps.
-
-`finance_telegram_member` stores the bot configuration, numeric Telegram user ID, display-name
-snapshot, join timestamp, and optional revocation timestamp. Telegram user ID, not display name,
-is the trusted identity.
-
-`finance_telegram_invite` stores a one-time invitation token hash, expiration, consumption
-timestamp, and linked member. The raw token is shown only in the generated Telegram deep link and
-is never persisted.
+Invites, connections, per-participant notification preferences, and the shared bot configuration
+belong to the Workspace-wide Telegram integration described in
+`docs/telegram-bot-architecture.md`. The finance model keeps only transaction source, responsible
+actor, and Telegram idempotency metadata; it has no finance-specific bot, token, or membership
+tables.
 
 ## 6. Money and exchange-rate architecture
 
@@ -394,16 +391,17 @@ same database transaction.
 
 ### 9.1. Trust model
 
-The tracker owner configures one Telegram bot and generates one-time invitation links. Opening a
-valid invitation binds a Telegram user ID to the owner's tracker. The owner can revoke a binding
-from the web application.
+The Workspace owner uses the shared Personal Workspace bot, generates one-time invitation links,
+confirms pending Telegram connections, and can revoke or block each connection from the web
+application. The finance adapter accepts only active connections resolved to that owner. The
+connection lifecycle and invitation rules are defined in `docs/telegram-bot-architecture.md`.
 
-All active Telegram members have the same append-only capability. There are no participant roles.
-The Personal Workspace owner boundary is used only to configure the bot and manage trust.
+All active Telegram members have the same append-only finance capability. There are no participant
+roles. The Personal Workspace owner manages trust and bot integration settings through the web app.
 
-The webhook is an externally authenticated integration endpoint. It validates the per-bot webhook
-secret before resolving a member or processing payload data. Bot tokens, webhook secrets, and raw
-invitation tokens must never be logged.
+The shared webhook is an externally authenticated integration endpoint. It validates its webhook
+secret before resolving a connection or processing payload data. The shared bot token, webhook
+secret, and raw invitation tokens must never be logged.
 
 ### 9.2. Form state machine
 
@@ -417,8 +415,8 @@ The month currency is presented first at the currency step. The occurrence times
 the current time but may be selected within the current month. Description is optional. Final
 confirmation is mandatory.
 
-Draft state is stored in Valkey under bot configuration and Telegram user ID with an explicit TTL.
-The final confirmation revalidates membership, current month, category availability, and rate
+Draft state is stored in Valkey under owner and Telegram user ID with an explicit TTL.
+The final confirmation revalidates active connection, current month, category availability, and rate
 selection because those may have changed while the form was open.
 
 The confirmed operation and its Telegram callback/update idempotency key are persisted atomically
@@ -438,12 +436,11 @@ The protected API exposes domain-oriented operations rather than database-shaped
 - monthly category and plan management;
 - transaction mutation and revision reads;
 - month-currency conversion;
-- explicit opening-balance synchronization;
-- Telegram configuration, invitations, members, and revocation.
+- explicit opening-balance synchronization.
 
-The Telegram webhook does not use a web user session. It resolves the tracker only after validating
-the bot configuration and trusted Telegram member, then invokes the same finance use cases used by
-the protected API.
+The shared Telegram webhook does not use a web user session. It resolves the tracker only after
+validating the webhook secret and an active connection belonging to the Workspace owner, then
+invokes the same finance use cases used by the protected API.
 
 The Angular frontend treats backend calculations as authoritative. It does not maintain a separate
 balance or currency-conversion implementation.
@@ -453,11 +450,10 @@ balance or currency-conversion implementation.
 The following operations are atomic database transactions:
 
 - lazy month creation with its opening balance and category snapshots;
-- transaction creation with Telegram idempotency metadata when applicable;
+- transaction creation with its notification event and Telegram idempotency metadata when applicable;
 - transaction mutation with its previous-state revision;
 - month-currency conversion with opening-balance and plan updates;
-- explicit opening-balance synchronization;
-- invitation consumption with Telegram-member creation.
+- explicit opening-balance synchronization.
 
 Month creation uses locking plus a unique database constraint. Transaction updates use optimistic
 versions. Rate-set rows are immutable. These mechanisms prevent duplicate months, duplicate
@@ -490,8 +486,8 @@ deletion state, and Telegram idempotency identifiers.
 
 - Web access is scoped by `owner_username` in storage queries.
 - Finance web routes are protected product routes.
-- The Telegram webhook is authenticated with a per-bot secret before payload processing.
-- Bot tokens are encrypted at rest through the existing cryptography boundary.
+- The shared Telegram webhook is authenticated with its secret before payload processing.
+- The bot token is a deployment secret owned by the Workspace-wide integration.
 - Invitation tokens are cryptographically random, single-use, expiring, and stored only as hashes.
 - Telegram numeric user IDs are identities; display names are untrusted labels.
 - Revocation is checked again at final confirmation and invalidates any existing draft.

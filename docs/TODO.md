@@ -6,17 +6,17 @@ unchecked entries remain active work unless a later product decision supersedes 
 
 ## Telegram Bot
 
-- [ ] Trusted users (Many TG users to One site user)
-- [ ] Notifications
-  - [ ] Birthdays and dates
-  - [ ] Events
-- [ ] Quick add (only with buttons)
-  - [ ] TODOs
-  - [ ] Finance tracker
-  - [ ] Scrap links
-    - [ ] Recipes category
-    - [ ] Places category
-    - [ ] Watch later category
+Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
+
+- [ ] Connect multiple Telegram accounts to one Personal Workspace through one-time invitations.
+- [ ] Manage pending, active, revoked, and blocked connections in web settings.
+- [ ] Configure all notifications and each notification type for every connection.
+- [ ] Deliver birthday and memorable-date reminders to subscribed connections.
+- [ ] Deliver event reminders when calendar events are implemented.
+- [ ] Notify subscribed connections about transactions added by another Telegram participant and soft expense-limit crossings.
+- [ ] Add finance transactions through a confirmed button-driven bot flow.
+- [ ] Add TODOs through a button-driven bot flow when TODOs are implemented.
+- [ ] Save links to Recipes, Places, and Watch later through button-driven bot flows when those categories exist.
 
 ## Finance tracker
 
@@ -56,15 +56,9 @@ unchecked entries remain active work unless a later product decision supersedes 
 - [ ] Finance tracker
   - [ ] Workspace statistic chosen period
 - [ ] Telegram bot integration
-  - [ ] Initial setup
-    - [ ] Telegram bot ON/OFF
-    - [ ] Generate token for bot trusted users (Invites to bot)
-    - [ ] Telegram bot token set
-  - [ ] Notifications
-    - [ ] Birthdays: ON/FF
-    - [ ] Dates: ON/OFF
-    - [ ] Events: ON/OFF
-  - [ ] multi-choice of available "Quick add" categories
+  - [ ] Add a Workspace-wide Telegram ON/OFF setting and invitation management.
+  - [ ] Add individual connection notification switches for birthdays, dates, events, and finance.
+  - [ ] Select available button-driven quick-add categories for the Workspace.
 
 ## Resume
 

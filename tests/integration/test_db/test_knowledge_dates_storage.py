@@ -48,6 +48,7 @@ class TestKnowledgeDatesStorage(StorageTestCase):
             details=KnowledgeDateDetails(
                 item_id=item_id,
                 date=KnowledgeDateValue(day=day, month=month, year=None),
+                notifications_enabled=True,
             ),
             author_username=author_username,
         )
@@ -69,6 +70,7 @@ class TestKnowledgeDatesStorage(StorageTestCase):
                 phone="",
                 telegram="",
                 birthday=None,
+                notifications_enabled=True,
             ),
             author_username=author_username,
         )

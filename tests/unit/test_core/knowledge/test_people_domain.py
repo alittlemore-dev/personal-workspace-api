@@ -55,6 +55,7 @@ class TestPeopleDomain(TestCase):
             phone="",
             telegram="",
             birthday=None,
+            notifications_enabled=True,
         )
 
         assert details.display_name == "Иванов Иван"

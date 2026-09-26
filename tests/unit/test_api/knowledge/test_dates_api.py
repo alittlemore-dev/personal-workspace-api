@@ -40,6 +40,7 @@ def date_response(*, date_id: str = "1" * 32) -> KnowledgeDate:
         details=KnowledgeDateDetails(
             item_id=date_id,
             date=KnowledgeDateValue(day=29, month=2, year=None),
+            notifications_enabled=True,
         ),
         related_people=[],
         attachments=[],
@@ -145,6 +146,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
             "description": "",
             "tagIds": ["2" * 32],
             "personIds": ["3" * 32],
+            "notificationsEnabled": True,
         }
 
         response = self.api.put_knowledge_date(date_id=1, data=payload)
@@ -158,6 +160,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
             description="",
             tag_ids=["2" * 32],
             person_ids=["3" * 32],
+            notifications_enabled=True,
         )
         assert call["author_username"] == TEST_USERNAME
 

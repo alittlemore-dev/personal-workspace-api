@@ -6,6 +6,7 @@ from entrypoints.taskiq import broker as taskiq_broker_module
 from entrypoints.taskiq import worker as taskiq_worker_module
 from entrypoints.taskiq.cache_warm import tasks as cache_warm_tasks_module
 from entrypoints.taskiq.files import tasks as file_tasks_module
+from entrypoints.taskiq.notifications import tasks as notification_tasks_module
 from infra.config.constants import constants
 from infra.config.settings import settings
 
@@ -43,6 +44,19 @@ class TestTaskiqBrokerConfiguration:
 
 
 class TestTaskiqScheduleConfiguration:
+    def test_reminder_tasks_have_distinct_interval_schedules(self) -> None:
+        schedules = (
+            (notification_tasks_module.plan_reminders, constants.taskiq.plan_reminders_task_name),
+            (notification_tasks_module.send_reminders, constants.taskiq.send_reminders_task_name),
+            (notification_tasks_module.prune_reminders, constants.taskiq.prune_reminders_task_name),
+        )
+        for task, name in schedules:
+            assert taskiq_worker_module.broker.find_task(name) is task
+            schedule = task.labels["schedule"]
+            assert len(schedule) == 1
+            assert schedule[0]["schedule_id"] == name
+            assert "interval" in schedule[0]
+
     def test_cache_warm_all_uses_interval_schedule_without_cron(self) -> None:
         schedule = cache_warm_tasks_module.cache_warm_all.labels["schedule"]
 

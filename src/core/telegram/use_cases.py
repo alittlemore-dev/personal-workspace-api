@@ -12,6 +12,7 @@ from core.telegram.schemas import (
     InvitationToken,
     IssuedTelegramInvitation,
     TelegramConnection,
+    TelegramConnectionSettings,
     TelegramInvitation,
     TelegramParticipant,
     TelegramUseCaseConfig,
@@ -238,3 +239,19 @@ class TelegramUseCase:
             raise TelegramAccessError
         connection.require_owner(owner_username=owner_username)
         return await self.storage.set_connection_label(connection_id=connection_id, label=label)
+
+    async def set_connection_settings(
+        self,
+        *,
+        owner_username: str,
+        connection_id: str,
+        settings: TelegramConnectionSettings,
+    ) -> TelegramConnection:
+        connection = await self.storage.get_connection(connection_id=connection_id)
+        if connection is None:
+            raise TelegramAccessError
+        connection.require_owner(owner_username=owner_username)
+        return await self.storage.set_connection_settings(
+            connection_id=connection_id,
+            settings=settings,
+        )

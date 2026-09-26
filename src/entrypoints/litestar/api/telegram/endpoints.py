@@ -13,6 +13,7 @@ from core.telegram.enums import TelegramConnectionState
 from core.telegram.use_cases import TelegramUseCase
 from entrypoints.litestar.api.telegram.schemas import (
     TelegramConnectionResponse,
+    TelegramConnectionSettingsRequest,
     TelegramInvitationResponse,
     TelegramIssuedInvitationResponse,
     TelegramItemId,
@@ -185,6 +186,25 @@ class TelegramApiController(Controller):
                 owner_username=request.user.username,
                 connection_id=connection_id,
                 label=data.label,
+            ),
+        )
+
+    @put(
+        "/connections/{connection_id:str}/settings",
+        name="telegram-update-connection-settings",
+    )
+    async def update_connection_settings(
+        self,
+        connection_id: TelegramItemId,
+        data: TelegramConnectionSettingsRequest,
+        request: Request,
+        use_case: FromDishka[TelegramUseCase],
+    ) -> TelegramConnectionResponse:
+        return TelegramConnectionResponse.from_domain_schema(
+            await use_case.set_connection_settings(
+                owner_username=request.user.username,
+                connection_id=connection_id,
+                settings=data.to_domain_schema(),
             ),
         )
 

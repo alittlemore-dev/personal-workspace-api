@@ -191,6 +191,7 @@ class KnowledgeDatesDatabaseStorage(KnowledgeDatesStorage):
                 day=details.date.day,
                 month=details.date.month,
                 year=details.date.year,
+                notifications_enabled=details.notifications_enabled,
             )
             .returning(KnowledgeDateDetailsModel)
         )

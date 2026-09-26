@@ -58,3 +58,20 @@ class TestTelegramManagementApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.BAD_REQUEST)
         self.use_case.create_invitation.assert_not_awaited()
+
+    def test_connection_settings_require_complete_valid_payload(self) -> None:
+        for payload in (
+            {"notifyBirthday": True, "notifyMemorableDate": False, "language": "en"},
+            {
+                "notifyBirthday": True,
+                "notifyMemorableDate": False,
+                "language": "en",
+                "timeZone": "Not/AZone",
+            },
+        ):
+            response = self.api.client.put(
+                "/api/telegram/connections/connection-id/settings",
+                json=payload,
+            )
+            self.asserts.status(response=response, expected_status=codes.BAD_REQUEST)
+        self.use_case.set_connection_settings.assert_not_awaited()

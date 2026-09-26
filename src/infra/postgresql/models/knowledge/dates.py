@@ -1,6 +1,7 @@
 from typing import Self
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     ForeignKeyConstraint,
     Index,
@@ -33,6 +34,7 @@ class KnowledgeDateDetailsModel(BaseModel):
     day: Mapped[int] = mapped_column(Integer)
     month: Mapped[int] = mapped_column(Integer)
     year: Mapped[int | None] = mapped_column(Integer)
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     @declared_attr.directive
     @classmethod
@@ -100,12 +102,14 @@ class KnowledgeDateDetailsModel(BaseModel):
             day=details.date.day,
             month=details.date.month,
             year=details.date.year,
+            notifications_enabled=details.notifications_enabled,
         )
 
     def to_domain_schema(self) -> KnowledgeDateDetails:
         return KnowledgeDateDetails(
             item_id=self.item_id,
             date=KnowledgeDateValue(day=self.day, month=self.month, year=self.year),
+            notifications_enabled=self.notifications_enabled,
         )
 
 

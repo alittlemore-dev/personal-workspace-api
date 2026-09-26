@@ -14,6 +14,7 @@ from infra.ioc.prodivers.knowledge import (
     KnowledgeItemsProvider,
     KnowledgePeopleProvider,
 )
+from infra.ioc.prodivers.notifications_provider import NotificationsProvider
 from infra.ioc.prodivers.response_cache_warm_provider import ResponseCacheWarmProvider
 from infra.ioc.prodivers.resumes_provider import ResumesProvider
 from infra.ioc.prodivers.telegram_provider import TelegramProvider
@@ -29,6 +30,7 @@ def get_providers() -> Iterable[Provider]:
         CalendarProvider(),
         ResumesProvider(),
         TelegramProvider(),
+        NotificationsProvider(),
         KnowledgeItemsProvider(),
         KnowledgeFilesProvider(),
         KnowledgeDatesProvider(),

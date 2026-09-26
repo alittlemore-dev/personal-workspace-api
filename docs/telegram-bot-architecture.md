@@ -2,7 +2,8 @@
 
 Date: September 26, 2026.
 
-Status: design under review.
+Status: Telegram connections and calendar reminders implemented in code; other scenarios are
+planned.
 
 ## 1. Goal and scope
 
@@ -112,7 +113,7 @@ Group chats cannot redeem invitations or run product commands.
 The integration section has a Workspace-wide enable switch, invitations, and participants. Each
 participant row shows an owner-defined label, Telegram ID, username snapshot, connection date,
 state, delivery availability, and last successful contact when known. Actions include approving
-or rejecting a request, changing its label, switching all or individual notification types,
+or rejecting a request, changing its label, switching birthday and memorable-date notifications,
 revoking the connection, blocking the user, and lifting a block. Destructive actions have a
 clear confirmation and explain their consequences.
 
@@ -121,28 +122,28 @@ retains connections and preferences for later reactivation. The **bot's own toke
 deployment secret and is never entered by the owner in web settings. The UI must distinguish it
 from a single-use invitation token.
 
-Each connection stores `notifications_enabled`, switches for stable notification types, an IANA
-time zone, and a preferred time for scheduled reminders. All notifications start disabled for a
-new connection until the owner explicitly selects them, to avoid unexpectedly sending financial
-amounts or personal dates. The connection-wide switch suppresses all types without erasing the
-individual selections. If the owner configures which quick-add flows appear, that selection
-applies to the Workspace and includes only implemented flows; it does not create hidden
-per-participant roles.
+The bot has a separate `notify` switch in Auth API, defaulting to off. Each connection stores
+`notify_birthday`, `notify_memorable_date`, `language` (`ru` or `en`), and an IANA `time_zone`.
+New connections start with both types off, `en`, and `UTC`. There is no connection-wide
+notification switch. A person's `notifications_enabled` switch controls birthday reminders;
+a memorable date has its own switch. Both card switches default to on and can suppress future
+channels as well. If the owner configures which quick-add flows appear, that selection applies
+to the Workspace and includes only implemented flows; it does not create hidden per-participant
+roles.
 
 ### 6.1. Recipient selection
 
 Each notification event has an `owner_username` and a stable type, such as
 `finance.transaction_by_other`. The sender loads **only active connections for that owner**. For
-each connection it checks the Workspace-wide switch, the connection-wide switch, and the switch
-for that event type. It then excludes the actor for an "added by someone else" event and calls
+each connection it checks the bot enable and notify switches, the type subscription, and the
+source card switch. It then excludes the actor for an "added by someone else" event and calls
 Telegram `sendMessage` separately for each remaining `private_chat_id`. If no connections
 remain, no message is sent.
 
 For example, Anna and Boris are linked to the same Workspace. Anna subscribes to birthdays but
 disables finance transactions; Boris subscribes to finance transactions but disables birthdays.
 Only Anna receives a birthday reminder. Only Boris receives a notification about an expense
-added by Anna. The future location of notification preferences will be decided when notification
-behavior is implemented; the shared bot token does not affect recipient selection. New
+added by Anna. The shared bot token does not affect recipient selection. New
 notification types are not enabled automatically
 for everyone: the owner selects them for each connection.
 
@@ -195,11 +196,11 @@ category ownership, current month, amount, and other domain rules. The confirmed
 Telegram update/callback idempotency key are persisted in one PostgreSQL transaction. A repeated
 tap, retried webhook, or race between confirmations cannot create another record.
 
-Domains create a durable notification event in the same transaction as the business change,
-using a transactional outbox or an equivalent atomic mechanism. After commit, background tasks
-resolve subscribed recipients and send messages. A unique delivery record for each (event,
-connection, type) prevents duplicate internal scheduling and tracks attempts and outcome. Before
-sending, the worker checks the Workspace switch, connection state and preferences, and whether
+Future change-driven domains create a durable notification event in the same transaction as the
+business change, using a transactional outbox or an equivalent atomic mechanism. After commit,
+background tasks resolve subscribed recipients and send messages. A unique delivery record for
+each (event, connection, type) prevents duplicate internal scheduling and tracks attempts and
+outcome. Before sending, the worker checks the Workspace switch, connection state and preferences, and whether
 the source object is still current. Telegram API failures have bounded retries. Permanent errors
 and a user blocking the bot appear in web settings without undoing the business change.
 
@@ -209,24 +210,30 @@ transaction: a crash between them can occasionally duplicate a message. This lim
 be disclosed as a delivery property. After a long integration outage, reminders past an explicit
 relevance deadline are skipped rather than sent in a backlog burst.
 
-Calendar notification times use the connection's IANA time zone. The finance tracker retains its
-own time zone for month boundaries, as defined in the finance architecture. A change of
-notification time or time zone affects future deliveries. This gives date-only reminders a clear
-meaning for family members in different countries.
+Three TaskIQ schedules handle calendar reminders. Every minute, the planner creates unique
+`PENDING` records for birthdays and memorable dates due in 7 or 1 day, scheduled for 09:00 in
+the recipient's local time. The sender separately claims ready records, rechecks bot, connection, and
+card settings, and sends each private message. It records `DONE`, `RETRY`, `CANCELED`, `EXPIRED`,
+or `FAILED`; temporary failures have at most three attempts before the local day ends. An hourly
+cleanup marks overdue records `EXPIRED` and removes terminal records after 90 days. The delivery
+key includes connection, type, card, occurrence date, and lead interval. February 29 is skipped
+in nonleap years. The finance tracker retains its own time zone for month boundaries, as defined
+in the finance architecture. A change of connection time zone affects future reminders.
 
 ## 9. Data and implementation boundaries
 
 Account state in `auth-api` PostgreSQL:
 
-- `UserModel.settings.telegram_bots`: per-bot enabled state, keyed by the `TelegramBotId` enum.
+- `UserModel.settings.telegram_bots`: per-bot enabled and notify switches, keyed by the
+  `TelegramBotId` enum.
 
 Bot domain state in `personal-workspace` PostgreSQL:
 
 - Telegram invitations: owner username, token hash, expiry, use/cancellation state, and label;
 - Telegram connections: owner username, Telegram user ID and private chat ID, state, label,
   profile snapshot, and connection timestamps;
-- Product events, update receipts, outgoing delivery records, and possible future connection
-  preferences belong here when those features are designed.
+- Connection subscriptions, language, time zone, and reminder delivery records live here;
+  product events and update receipts can be added with later features.
 
 The owner username is a cross-service identity and has no database foreign key to an auth table.
 The authenticated Workspace API scopes management operations to that username. Database
@@ -240,7 +247,9 @@ through the service-secret-protected internal GET
 `/api/auth/internal/telegram/{telegram_bot_id}/settings?ownerUsername=...`, using
 `personal-workspace` as its bot ID. The public edge blocks this route.
 `personal-workspace` exposes authenticated invitation and connection management and the bot
-webhook at `/api/personal-workspace/telegram`. The Angular interface lives in `frontend`.
+webhook at `/api/personal-workspace/telegram`. Connection preferences are replaced through
+`PUT /api/personal-workspace/telegram/connections/{id}/settings`. The Angular interface lives
+in `frontend`.
 
 ### 9.1. Telegram library and dependency boundaries
 

@@ -78,6 +78,7 @@ def person_details(
         phone="",
         telegram=telegram,
         birthday=None,
+        notifications_enabled=True,
     )
 
 
@@ -209,10 +210,12 @@ class TestPeopleUseCase(TestCase):
             KnowledgeDateDetails(
                 item_id=december_id,
                 date=KnowledgeDateValue(day=31, month=12, year=None),
+                notifications_enabled=True,
             ),
             KnowledgeDateDetails(
                 item_id=january_id,
                 date=KnowledgeDateValue(day=1, month=1, year=2020),
+                notifications_enabled=True,
             ),
         ]
 
@@ -347,6 +350,7 @@ class TestPeopleUseCase(TestCase):
                 ],
                 delete_ids=[],
             ),
+            notifications_enabled=True,
         )
 
         await self.use_case.update_person(

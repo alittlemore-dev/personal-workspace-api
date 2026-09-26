@@ -4,6 +4,7 @@ from datetime import datetime
 from core.telegram.enums import TelegramConnectionState
 from core.telegram.schemas import (
     TelegramConnection,
+    TelegramConnectionSettings,
     TelegramInvitation,
     TelegramParticipant,
 )
@@ -99,6 +100,14 @@ class TelegramStorage(ABC):
         label: str,
     ) -> TelegramConnection: ...
 
+    @abstractmethod
+    async def set_connection_settings(
+        self,
+        *,
+        connection_id: str,
+        settings: TelegramConnectionSettings,
+    ) -> TelegramConnection: ...
+
 
 class TelegramRedemptionLimiter(ABC):
     @abstractmethod
@@ -108,6 +117,9 @@ class TelegramRedemptionLimiter(ABC):
 class TelegramAccountSettingsReader(ABC):
     @abstractmethod
     async def is_enabled(self, *, owner_username: str) -> bool: ...
+
+    @abstractmethod
+    async def can_notify(self, *, owner_username: str) -> bool: ...
 
 
 class TelegramTransaction(ABC):

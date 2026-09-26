@@ -5,6 +5,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 from entrypoints.taskiq.broker import broker
 from entrypoints.taskiq.cache_warm import tasks  # noqa: F401
 from entrypoints.taskiq.files import tasks as file_tasks  # noqa: F401
+from entrypoints.taskiq.notifications import tasks as notification_tasks  # noqa: F401
 from infra.ioc.container import container
 
 setup_dishka(container=container, broker=broker)

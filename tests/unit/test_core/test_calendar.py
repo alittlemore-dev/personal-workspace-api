@@ -61,10 +61,12 @@ class TestCalendarSchema(TestCase):
                 KnowledgeDateDetails(
                     item_id=next_date_id,
                     date=KnowledgeDateValue(day=2, month=8, year=None),
+                    notifications_enabled=True,
                 ),
                 KnowledgeDateDetails(
                     item_id=current_date_id,
                     date=KnowledgeDateValue(day=20, month=7, year=2020),
+                    notifications_enabled=True,
                 ),
             ],
             birthday_details=[
@@ -77,6 +79,7 @@ class TestCalendarSchema(TestCase):
                     phone="",
                     telegram="",
                     birthday=PersonBirthday(day=2, month=8, year=2000),
+                    notifications_enabled=True,
                 ),
                 PersonDetails(
                     item_id=current_birthday_id,
@@ -87,6 +90,7 @@ class TestCalendarSchema(TestCase):
                     phone="",
                     telegram="",
                     birthday=PersonBirthday(day=20, month=7, year=None),
+                    notifications_enabled=True,
                 ),
             ],
         )
@@ -168,10 +172,12 @@ class TestCalendarSchema(TestCase):
                 KnowledgeDateDetails(
                     item_id=december_id,
                     date=KnowledgeDateValue(day=31, month=12, year=2020),
+                    notifications_enabled=True,
                 ),
                 KnowledgeDateDetails(
                     item_id=january_id,
                     date=KnowledgeDateValue(day=1, month=1, year=2020),
+                    notifications_enabled=True,
                 ),
             ],
             birthday_details=[],
@@ -211,6 +217,7 @@ class TestCalendarSchema(TestCase):
                 KnowledgeDateDetails(
                     item_id=date_id,
                     date=KnowledgeDateValue(day=29, month=2, year=None),
+                    notifications_enabled=True,
                 ),
             ],
             birthday_details=[],
@@ -292,6 +299,7 @@ class TestCalendarUseCase(TestCase):
             KnowledgeDateDetails(
                 item_id=date_id,
                 date=KnowledgeDateValue(day=20, month=7, year=2020),
+                notifications_enabled=True,
             ),
         ]
         self.people_storage.list_birthday_details_for_months.return_value = [
@@ -304,6 +312,7 @@ class TestCalendarUseCase(TestCase):
                 phone="",
                 telegram="",
                 birthday=PersonBirthday(day=21, month=7, year=2000),
+                notifications_enabled=True,
             ),
         ]
         self.dates_storage.list_person_links.return_value = [

@@ -70,6 +70,7 @@ class TestKnowledgePeopleStorage(StorageTestCase):
                 phone="",
                 telegram="",
                 birthday=birthday,
+                notifications_enabled=True,
             ),
             author_username=author_username,
         )

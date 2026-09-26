@@ -44,6 +44,7 @@ def person_response(*, person_id: str = "1" * 32) -> Person:
             phone="",
             telegram="",
             birthday=None,
+            notifications_enabled=True,
         ),
         relationships=[],
         related_dates=[],
@@ -64,6 +65,7 @@ def update_payload() -> dict[str, object]:
         "description": "",
         "tagIds": [],
         "relationshipChanges": {"create": [], "update": [], "deleteIds": []},
+        "notificationsEnabled": True,
     }
 
 

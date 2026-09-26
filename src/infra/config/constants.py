@@ -60,6 +60,9 @@ class TaskiqConstants:
     cache_warm_operation_key_prefix: Literal["operation"] = "operation"
     cache_warm_latest_operation_key: Literal["latest"] = "latest"
     file_orphan_prune_task_name: Literal["file_orphan_prune"] = "file_orphan_prune"
+    plan_reminders_task_name: Literal["plan_reminders"] = "plan_reminders"
+    send_reminders_task_name: Literal["send_reminders"] = "send_reminders"
+    prune_reminders_task_name: Literal["prune_reminders"] = "prune_reminders"
 
 
 class TelegramConstants:
@@ -67,6 +70,13 @@ class TelegramConstants:
     redemption_attempt_window_seconds: int = 900
     invitation_limit_per_hour: int = 5
     connection_limit_per_workspace: int = 20
+    reminder_scan_interval_seconds: int = 60
+    reminder_retry_interval_seconds: int = 900
+    reminder_claim_lease_seconds: int = 300
+    reminder_scan_batch_size: int = 100
+    reminder_max_attempts: int = 3
+    reminder_prune_interval_seconds: int = 3600
+    reminder_retention_days: int = 90
 
 
 class FilesConstants:

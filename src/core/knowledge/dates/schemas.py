@@ -31,6 +31,7 @@ class KnowledgeDateValue:
 class KnowledgeDateDetails:
     item_id: str
     date: KnowledgeDateValue
+    notifications_enabled: bool
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -129,6 +130,7 @@ class KnowledgeDateUpdateParams:
     description: str
     tag_ids: list[str]
     person_ids: list[str]
+    notifications_enabled: bool
 
     def __post_init__(self) -> None:
         if not self.display_name.strip() or len(self.person_ids) != len(set(self.person_ids)):

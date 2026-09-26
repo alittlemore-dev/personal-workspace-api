@@ -42,6 +42,7 @@ class PersonDetails:
     phone: str
     telegram: str
     birthday: PersonBirthday | None
+    notifications_enabled: bool
 
     def __post_init__(self) -> None:
         if not self.last_name.strip() or not self.first_name.strip():
@@ -205,6 +206,7 @@ class PersonQuickCreateParams:
             phone="",
             telegram="",
             birthday=None,
+            notifications_enabled=True,
         )
 
 
@@ -241,6 +243,7 @@ class PersonUpdateParams:
     phone: str
     telegram: str
     birthday: PersonBirthday | None
+    notifications_enabled: bool
     description: str
     tag_ids: list[str]
     relationship_changes: PersonRelationshipChanges
@@ -255,6 +258,7 @@ class PersonUpdateParams:
             phone=self.phone.strip(),
             telegram=self.telegram.strip(),
             birthday=self.birthday,
+            notifications_enabled=self.notifications_enabled,
         )
 
 

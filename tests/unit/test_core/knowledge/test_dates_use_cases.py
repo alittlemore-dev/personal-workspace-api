@@ -95,6 +95,7 @@ class TestKnowledgeDatesUseCase(TestCase):
             KnowledgeDateDetails(
                 item_id=date_id,
                 date=KnowledgeDateValue(day=29, month=2, year=None),
+                notifications_enabled=True,
             ),
         ]
         self.dates_storage.list_person_links.return_value = [
@@ -139,6 +140,7 @@ class TestKnowledgeDatesUseCase(TestCase):
         self.dates_storage.get_details.return_value = KnowledgeDateDetails(
             item_id=date_id,
             date=KnowledgeDateValue(day=1, month=5, year=2020),
+            notifications_enabled=True,
         )
         self.dates_storage.list_person_links.return_value = []
         self.item_storage.get_items_by_ids.return_value = []
@@ -169,6 +171,7 @@ class TestKnowledgeDatesUseCase(TestCase):
         self.dates_storage.get_details.return_value = KnowledgeDateDetails(
             item_id=date_id,
             date=KnowledgeDateValue(day=1, month=1, year=None),
+            notifications_enabled=True,
         )
         self.dates_storage.list_person_links.return_value = []
         self.item_storage.get_items_by_ids.return_value = []
@@ -182,6 +185,7 @@ class TestKnowledgeDatesUseCase(TestCase):
                     description="",
                     tag_ids=[],
                     person_ids=[person_id],
+                    notifications_enabled=True,
                 ),
                 author_username="owner",
                 current_datetime=CURRENT_DATETIME,
@@ -208,6 +212,7 @@ class TestKnowledgeDatesUseCase(TestCase):
         self.dates_storage.get_details.return_value = KnowledgeDateDetails(
             item_id=date_id,
             date=KnowledgeDateValue(day=2, month=1, year=None),
+            notifications_enabled=True,
         )
         self.dates_storage.list_person_links.side_effect = [
             [KnowledgeDatePersonLink(date_id=date_id, person_id=old_person_id)],
@@ -223,6 +228,7 @@ class TestKnowledgeDatesUseCase(TestCase):
                 description="Описание",
                 tag_ids=[],
                 person_ids=[new_person_id],
+                notifications_enabled=True,
             ),
             author_username="owner",
             current_datetime=CURRENT_DATETIME,

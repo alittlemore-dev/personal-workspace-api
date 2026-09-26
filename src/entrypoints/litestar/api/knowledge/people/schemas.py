@@ -236,6 +236,7 @@ class PersonUpdateRequestSchema(CamelCaseSchema):
     phone: Annotated[str, Field(title="Phone", max_length=64)]
     telegram: Annotated[ShortText, Field(title="Telegram")]
     birthday: Annotated[PersonBirthdaySchema | None, Field(title="Birthday")]
+    notifications_enabled: bool
     description: Annotated[KnowledgeDescriptionText, Field(title="Markdown description")]
     tag_ids: Annotated[list[str], Field(title="Tag identifiers")]
     relationship_changes: Annotated[
@@ -252,6 +253,7 @@ class PersonUpdateRequestSchema(CamelCaseSchema):
             phone=self.phone,
             telegram=self.telegram,
             birthday=(self.birthday.to_domain_schema() if self.birthday is not None else None),
+            notifications_enabled=self.notifications_enabled,
             description=self.description,
             tag_ids=list(self.tag_ids),
             relationship_changes=self.relationship_changes.to_domain_schema(),
@@ -329,6 +331,7 @@ class PersonResponseSchema(CamelCaseSchema):
     phone: Annotated[str, Field(title="Phone")]
     telegram: Annotated[str, Field(title="Telegram")]
     birthday: Annotated[PersonBirthdaySchema | None, Field(title="Birthday")]
+    notifications_enabled: bool
     description: Annotated[str, Field(title="Markdown description")]
     tags: Annotated[list[KnowledgeTagResponseSchema], Field(title="Tags")]
     relationships: Annotated[
@@ -362,6 +365,7 @@ class PersonResponseSchema(CamelCaseSchema):
                     if schema.details.birthday is not None
                     else None
                 ),
+                notifications_enabled=schema.details.notifications_enabled,
                 description=schema.item.description,
                 tags=[
                     KnowledgeTagResponseSchema.from_domain_schema(schema=tag)

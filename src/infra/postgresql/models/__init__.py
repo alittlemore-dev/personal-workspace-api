@@ -9,6 +9,7 @@ from .knowledge import KnowledgeTagModel as KnowledgeTagModel
 from .knowledge import PersonDetailsModel as PersonDetailsModel
 from .knowledge import PersonRelationshipModel as PersonRelationshipModel
 from .knowledge import PersonRelationshipTypeModel as PersonRelationshipTypeModel
+from .notifications import ReminderDeliveryModel as ReminderDeliveryModel
 from .resumes import ResumeModel as ResumeModel
 from .telegram import TelegramConnectionModel as TelegramConnectionModel
 from .telegram import TelegramInvitationModel as TelegramInvitationModel

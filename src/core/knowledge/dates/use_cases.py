@@ -150,7 +150,11 @@ class KnowledgeDatesUseCase:
             ),
         )
         await self.dates_storage.create_details(
-            details=KnowledgeDateDetails(item_id=item.id, date=params.date),
+            details=KnowledgeDateDetails(
+                item_id=item.id,
+                date=params.date,
+                notifications_enabled=True,
+            ),
             author_username=params.author_username,
         )
         return await self.get_date(date_id=item.id, author_username=params.author_username)
@@ -194,7 +198,11 @@ class KnowledgeDatesUseCase:
             updated_at=current_datetime,
         )
         await self.dates_storage.update_details(
-            details=KnowledgeDateDetails(item_id=date_id, date=params.date),
+            details=KnowledgeDateDetails(
+                item_id=date_id,
+                date=params.date,
+                notifications_enabled=params.notifications_enabled,
+            ),
             author_username=author_username,
         )
         await self.dates_storage.replace_person_links(

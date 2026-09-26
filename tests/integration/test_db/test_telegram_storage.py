@@ -3,9 +3,15 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from core.i18n.enums import LanguageEnum
 from core.telegram.enums import TelegramConnectionState
-from core.telegram.exceptions import TelegramInvitationError
-from core.telegram.schemas import InvitationToken, TelegramParticipant, TelegramUseCaseConfig
+from core.telegram.exceptions import TelegramAccessError, TelegramInvitationError
+from core.telegram.schemas import (
+    InvitationToken,
+    TelegramConnectionSettings,
+    TelegramParticipant,
+    TelegramUseCaseConfig,
+)
 from core.telegram.use_cases import TelegramUseCase
 from infra.postgresql.storages.telegram import TelegramDatabaseStorage
 from tests.test_cases import StorageTestCase
@@ -114,3 +120,55 @@ class TestTelegramStorage(StorageTestCase):
         )
         assert approved.state == TelegramConnectionState.ACTIVE
         assert await storage.has_active_connection(telegram_user_id=42)
+
+    async def test_connection_settings_are_owner_scoped_and_persisted(self) -> None:
+        storage = TelegramDatabaseStorage(session=self.db_session)
+        connection = await storage.create_pending_connection(
+            owner_username="owner-a",
+            participant=TelegramParticipant(
+                user_id=777,
+                private_chat_id=777,
+                first_name="Anne",
+                username="anne",
+            ),
+            label="Family",
+            now=NOW,
+        )
+        assert not connection.notify_birthday
+        assert not connection.notify_memorable_date
+        assert connection.language == LanguageEnum.EN
+        assert connection.time_zone == "UTC"
+        use_case = TelegramUseCase(
+            storage=storage,
+            settings_reader=AsyncMock(),
+            token_generator=Mock(),
+            config=TelegramUseCaseConfig(
+                bot_username="test_bot",
+                invitation_limit=5,
+                connection_limit=20,
+                available=True,
+            ),
+            limiter=None,
+        )
+        changed = TelegramConnectionSettings(
+            notify_birthday=True,
+            notify_memorable_date=True,
+            language=LanguageEnum.RU,
+            time_zone="Asia/Yerevan",
+        )
+        with pytest.raises(TelegramAccessError):
+            await use_case.set_connection_settings(
+                owner_username="owner-b",
+                connection_id=connection.id,
+                settings=changed,
+            )
+        updated = await use_case.set_connection_settings(
+            owner_username="owner-a",
+            connection_id=connection.id,
+            settings=changed,
+        )
+        assert updated.notify_birthday
+        assert updated.notify_memorable_date
+        assert updated.language == LanguageEnum.RU
+        assert updated.time_zone == "Asia/Yerevan"
+        assert await storage.get_connection(connection_id=connection.id) == updated

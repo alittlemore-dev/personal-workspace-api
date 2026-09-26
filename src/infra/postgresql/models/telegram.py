@@ -1,9 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Enum, Index, String
+from sqlalchemy import BigInteger, Boolean, Enum, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy_dev_utils.types.datetime import UTCDateTime
 
+from core.i18n.enums import LanguageEnum
+from core.notifications.schemas import ReminderRecipient
 from core.telegram.enums import TelegramConnectionState
 from core.telegram.schemas import TelegramConnection, TelegramInvitation
 from infra.postgresql.models.base import BaseModel
@@ -45,6 +47,13 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
     connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     state_changed_at: Mapped[datetime] = mapped_column(UTCDateTime)
     last_contact_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    notify_birthday: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    notify_memorable_date: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    language: Mapped[LanguageEnum] = mapped_column(
+        Enum(LanguageEnum, name="telegram_notification_language_enum", native_enum=True),
+        server_default=LanguageEnum.EN.name,
+    )
+    time_zone: Mapped[str] = mapped_column(String(64), server_default="UTC")
 
     __table_args__ = (
         Index(
@@ -81,4 +90,19 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
             requested_at=self.requested_at,
             connected_at=self.connected_at,
             last_contact_at=self.last_contact_at,
+            notify_birthday=self.notify_birthday,
+            notify_memorable_date=self.notify_memorable_date,
+            language=self.language,
+            time_zone=self.time_zone,
+        )
+
+    def to_reminder_recipient(self) -> ReminderRecipient:
+        return ReminderRecipient(
+            connection_id=self.id,
+            owner_username=self.owner_username,
+            private_chat_id=self.private_chat_id,
+            notify_birthday=self.notify_birthday,
+            notify_memorable_date=self.notify_memorable_date,
+            language=self.language,
+            time_zone=self.time_zone,
         )

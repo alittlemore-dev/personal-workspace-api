@@ -199,6 +199,7 @@ class PeopleDatabaseStorage(PeopleStorage):
                 email=details.email,
                 phone=details.phone,
                 telegram=details.telegram,
+                notifications_enabled=details.notifications_enabled,
                 birthday_day=birthday.day if birthday is not None else None,
                 birthday_month=birthday.month if birthday is not None else None,
                 birthday_year=birthday.year if birthday is not None else None,

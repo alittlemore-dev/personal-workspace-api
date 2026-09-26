@@ -18,6 +18,17 @@ class TelegramAuthApiSettingsReader(TelegramAccountSettingsReader):
     config: TelegramAuthApiClientConfig
 
     async def is_enabled(self, *, owner_username: str) -> bool:
+        payload = await self._get_settings(owner_username=owner_username)
+        return payload["available"] and payload["enabled"]
+
+    async def can_notify(self, *, owner_username: str) -> bool:
+        payload = await self._get_settings(owner_username=owner_username)
+        notify = payload.get("notify")
+        if not isinstance(notify, bool):
+            raise TelegramServiceError
+        return payload["available"] and payload["enabled"] and notify
+
+    async def _get_settings(self, *, owner_username: str) -> dict[str, bool]:
         try:
             response = await self.http_client.get(
                 self.config.url,
@@ -38,4 +49,4 @@ class TelegramAuthApiSettingsReader(TelegramAccountSettingsReader):
         enabled = payload.get("enabled")
         if not isinstance(available, bool) or not isinstance(enabled, bool):
             raise TelegramServiceError
-        return available and enabled
+        return payload

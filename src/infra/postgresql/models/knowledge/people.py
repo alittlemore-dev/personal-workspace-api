@@ -44,6 +44,7 @@ class PersonDetailsModel(BaseModel):
     birthday_day: Mapped[int | None] = mapped_column(Integer)
     birthday_month: Mapped[int | None] = mapped_column(Integer)
     birthday_year: Mapped[int | None] = mapped_column(Integer)
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     @declared_attr.directive
     @classmethod
@@ -173,6 +174,7 @@ class PersonDetailsModel(BaseModel):
             birthday_day=details.birthday.day if details.birthday is not None else None,
             birthday_month=details.birthday.month if details.birthday is not None else None,
             birthday_year=details.birthday.year if details.birthday is not None else None,
+            notifications_enabled=details.notifications_enabled,
         )
 
     def to_domain_schema(self) -> PersonDetails:
@@ -192,6 +194,7 @@ class PersonDetailsModel(BaseModel):
             phone=self.phone,
             telegram=self.telegram,
             birthday=birthday,
+            notifications_enabled=self.notifications_enabled,
         )
 
 

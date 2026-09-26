@@ -49,3 +49,47 @@ async def test_settings_reader_fails_closed_on_invalid_auth_response() -> None:
         )
         with pytest.raises(TelegramServiceError):
             await reader.is_enabled(owner_username="anna")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("response", "allowed"),
+    [
+        ({"available": True, "enabled": True, "notify": True}, True),
+        ({"available": True, "enabled": True, "notify": False}, False),
+        ({"available": True, "enabled": False, "notify": True}, False),
+    ],
+)
+async def test_notification_reader_checks_both_bot_switches(
+    response: dict[str, bool],
+    allowed: bool,
+) -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response)),
+    ) as http_client:
+        reader = TelegramAuthApiSettingsReader(
+            http_client=http_client,
+            config=TelegramAuthApiClientConfig(
+                url="http://auth-api:8080/api/auth/internal/telegram/personal-workspace/settings",
+                service_secret="test-service-secret",
+            ),
+        )
+        assert await reader.can_notify(owner_username="anna") is allowed
+
+
+@pytest.mark.asyncio
+async def test_notification_reader_requires_explicit_notify_value() -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, json={"available": True, "enabled": True}),
+        ),
+    ) as http_client:
+        reader = TelegramAuthApiSettingsReader(
+            http_client=http_client,
+            config=TelegramAuthApiClientConfig(
+                url="http://auth-api:8080/api/auth/internal/telegram/personal-workspace/settings",
+                service_secret="test-service-secret",
+            ),
+        )
+        with pytest.raises(TelegramServiceError):
+            await reader.can_notify(owner_username="anna")

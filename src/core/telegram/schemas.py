@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
 
+from core.i18n.enums import LanguageEnum
 from core.telegram.enums import TelegramConnectionState
 from core.telegram.exceptions import TelegramAccessError, TelegramInvitationError
 
@@ -73,7 +74,19 @@ class TelegramConnection:
     requested_at: datetime
     connected_at: datetime | None
     last_contact_at: datetime
+    notify_birthday: bool
+    notify_memorable_date: bool
+    language: LanguageEnum
+    time_zone: str
 
     def require_owner(self, *, owner_username: str) -> None:
         if self.owner_username != owner_username:
             raise TelegramAccessError
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TelegramConnectionSettings:
+    notify_birthday: bool
+    notify_memorable_date: bool
+    language: LanguageEnum
+    time_zone: str

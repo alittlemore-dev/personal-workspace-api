@@ -88,6 +88,7 @@ class KnowledgeDateUpdateRequestSchema(CamelCaseSchema):
     description: Annotated[KnowledgeDescriptionText, Field(title="Markdown description")]
     tag_ids: Annotated[list[str], Field(title="Tag identifiers")]
     person_ids: Annotated[list[str], Field(title="Related person identifiers")]
+    notifications_enabled: bool
 
     def to_domain_schema(self) -> KnowledgeDateUpdateParams:
         return KnowledgeDateUpdateParams(
@@ -96,6 +97,7 @@ class KnowledgeDateUpdateRequestSchema(CamelCaseSchema):
             description=self.description,
             tag_ids=list(self.tag_ids),
             person_ids=list(self.person_ids),
+            notifications_enabled=self.notifications_enabled,
         )
 
 
@@ -154,6 +156,7 @@ class KnowledgeDateResponseSchema(CamelCaseSchema):
     display_name: Annotated[str, Field(title="Display name")]
     date: Annotated[KnowledgeDateValueSchema, Field(title="Annual date")]
     description: Annotated[str, Field(title="Markdown description")]
+    notifications_enabled: bool
     tags: Annotated[list[KnowledgeTagResponseSchema], Field(title="Tags")]
     related_people: Annotated[list[RelatedPersonResponseSchema], Field(title="Related people")]
     attachments: Annotated[list[KnowledgeFileResponseSchema], Field(title="Attachments")]
@@ -169,6 +172,7 @@ class KnowledgeDateResponseSchema(CamelCaseSchema):
                 display_name=schema.item.display_name,
                 date=KnowledgeDateValueSchema.from_domain_schema(schema=schema.details.date),
                 description=schema.item.description,
+                notifications_enabled=schema.details.notifications_enabled,
                 tags=[
                     KnowledgeTagResponseSchema.from_domain_schema(schema=tag)
                     for tag in schema.item.tags

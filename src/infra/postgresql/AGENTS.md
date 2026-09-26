@@ -14,6 +14,9 @@ These rules apply to SQLAlchemy models, PostgreSQL storages, and Alembic migrati
   behavior before writing them inline. Prefer an existing project mixin, a small new project mixin,
   or a suitable third-party mixin from `sqlalchemy_dev_utils` when the same columns, constraints,
   indexes, conversion helpers, or lifecycle behavior appear across multiple models.
+- In ORM `__table_args__`, use mapped column objects and SQLAlchemy expressions for indexes and
+  predicates when supported. Reserve column-name strings and `text()` for cases the typed API
+  cannot express; compare the resulting DDL with the matching migration.
 
 ## Storages
 

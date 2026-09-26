@@ -119,6 +119,7 @@ files at the project root. Shared runtime and deployment infrastructure belongs 
 ## Code Style
 
 - Use `pyproject.toml` as the source for formatting, lint, and typing configuration.
+- Add a trailing comma after the final argument of a multiline function or constructor call.
 - No docstrings unless interface is non-obvious from types
 - Comments: only for non-obvious WHY, never WHAT
 - No Python class name may start with a leading underscore anywhere in the project, including
@@ -198,6 +199,11 @@ files at the project root. Shared runtime and deployment infrastructure belongs 
 
 ## HTTP and Schemas
 
+- Name Litestar route modules `endpoints.py`. Keep only `Controller` classes, route handlers, and
+  router registration in them; place transport schemas in `schemas.py`, access checks in
+  `guards.py`, and request dependencies in `dependencies.py`. Use controllers for ordinary HTTP
+  endpoints. Expose side-effect-free reads with GET; document the contract reason for another
+  method when GET is unsuitable.
 - Controllers must receive dependencies through `FromDishka[...]`, typed as the concrete use case
   class registered in Dishka.
 - Endpoint/controller modules must not define `@staticmethod`, `@classmethod`, or private helper

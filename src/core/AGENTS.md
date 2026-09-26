@@ -54,7 +54,9 @@ event_dispatchers.py    # Domain event/reporting interfaces; concrete transports
 - Use cases contain orchestration, straightforward field checks, storage reads, and DB-derived
   decisions. Do not add private/static helpers or collection-transformation loops. Put entity
   checks on domain objects, construction/conversion in schema classmethods, and shared behavior
-  in domain services.
+  in domain services. Put values derived entirely from a domain object's own fields, such as an
+  invitation URL, on that object as a property or named method; use cases pass the source fields
+  instead of repeating the formatting.
 - When an operation has both a target entity identifier and a current actor identifier, the public
   use-case method must read both domain entities when actor permissions are relevant, then call a
   public permission/check method on the actor or target domain schema. Do not encode actor-vs-target

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Enum, Index, String, text
+from sqlalchemy import BigInteger, Enum, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy_dev_utils.types.datetime import UTCDateTime
 
@@ -49,16 +49,22 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
     __table_args__ = (
         Index(
             "telegram_connection_active_user_uidx",
-            "telegram_user_id",
+            telegram_user_id,
             unique=True,
-            postgresql_where=text("state = 'ACTIVE'"),
+            postgresql_where=state == TelegramConnectionState.ACTIVE,
         ),
         Index(
             "telegram_connection_live_owner_user_uidx",
-            "owner_username",
-            "telegram_user_id",
+            owner_username,
+            telegram_user_id,
             unique=True,
-            postgresql_where=text("state IN ('PENDING', 'ACTIVE', 'BLOCKED')"),
+            postgresql_where=state.in_(
+                (
+                    TelegramConnectionState.PENDING,
+                    TelegramConnectionState.ACTIVE,
+                    TelegramConnectionState.BLOCKED,
+                ),
+            ),
         ),
     )
 

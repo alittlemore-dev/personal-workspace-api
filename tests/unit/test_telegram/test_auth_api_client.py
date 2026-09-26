@@ -28,9 +28,11 @@ async def test_settings_reader_uses_internal_auth_api_and_service_secret() -> No
         result = await reader.is_enabled(owner_username="anna")
 
     assert result
+    assert captured[0].method == "GET"
     assert captured[0].headers["X-Telegram-Service-Secret"] == "test-service-secret"
     assert captured[0].url.path == "/api/auth/internal/telegram/personal-workspace/settings"
-    assert b'"ownerUsername":"anna"' in captured[0].content
+    assert captured[0].url.params["ownerUsername"] == "anna"
+    assert captured[0].content == b""
 
 
 @pytest.mark.asyncio

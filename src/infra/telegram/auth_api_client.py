@@ -19,10 +19,10 @@ class TelegramAuthApiSettingsReader(TelegramAccountSettingsReader):
 
     async def is_enabled(self, *, owner_username: str) -> bool:
         try:
-            response = await self.http_client.post(
+            response = await self.http_client.get(
                 self.config.url,
                 headers={"X-Telegram-Service-Secret": self.config.service_secret},
-                json={"ownerUsername": owner_username},
+                params={"ownerUsername": owner_username},
             )
         except httpx.RequestError as exc:
             raise TelegramServiceError from exc

@@ -65,14 +65,14 @@ def upgrade() -> None:
         "telegram__telegram_connection_model",
         ["telegram_user_id"],
         unique=True,
-        postgresql_where=sa.text("state = 'ACTIVE'"),
+        postgresql_where=sa.column("state") == "ACTIVE",
     )
     op.create_index(
         "telegram_connection_live_owner_user_uidx",
         "telegram__telegram_connection_model",
         ["owner_username", "telegram_user_id"],
         unique=True,
-        postgresql_where=sa.text("state IN ('PENDING', 'ACTIVE', 'BLOCKED')"),
+        postgresql_where=sa.column("state").in_(("PENDING", "ACTIVE", "BLOCKED")),
     )
     op.create_table(
         "telegram__telegram_invitation_model",

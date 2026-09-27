@@ -1,19 +1,19 @@
 {
   "profile": "realistic",
-  "sourceSha": "workspace-sha256:bda4e9e99ce52064d0061c11d41831f90e48875e893d2044b42aec2892d49cc8",
+  "sourceSha": "workspace-sha256:d07822617374a715d4e529b926038a29516033b230799324d37a7d056be1d94d",
   "sampleCount": 5,
   "queries": {
-    "knowledge_date_backlinks__001": 0.036,
-    "knowledge_dates_page__001": 0.23,
-    "knowledge_dates_page__002": 0.118,
-    "knowledge_item_detail__001": 0.011,
-    "knowledge_item_detail__002": 0.116,
-    "knowledge_item_files__001": 0.044,
-    "knowledge_tags_list__001": 0.111,
-    "people_page__001": 0.166,
-    "people_page__002": 0.118,
-    "people_relationships__001": 0.08,
-    "resumes_list__001": 0.026,
-    "resumes_list__002": 0.045
+    "knowledge_date_backlinks__001": 0.062,
+    "knowledge_dates_page__001": 0.414,
+    "knowledge_dates_page__002": 0.16,
+    "knowledge_item_detail__001": 0.021,
+    "knowledge_item_detail__002": 0.146,
+    "knowledge_item_files__001": 0.06,
+    "knowledge_tags_list__001": 0.153,
+    "people_page__001": 0.33,
+    "people_page__002": 0.135,
+    "people_relationships__001": 0.108,
+    "resumes_list__001": 0.042,
+    "resumes_list__002": 0.08
   }
 }

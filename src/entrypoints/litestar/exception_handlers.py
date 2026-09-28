@@ -17,8 +17,11 @@ from verbose_http_exceptions.ext.litestar import (
 )
 from verbose_http_exceptions.ext.litestar.types import LitestarExceptionHandlersMap
 
+from core.account_time_zone.clients import AccountTimeZoneUnavailableError
+from core.events.exceptions import InvalidEventDataError
 from core.exceptions import DomainError, EntryNotFoundError
 from core.files.exceptions import FileClientInternalError, FileInUseError, InvalidFileDataError
+from core.important_info.exceptions import InvalidImportantInfoOrderError
 from core.knowledge.exceptions import InvalidKnowledgeDataError, KnowledgeConflictError
 from core.telegram.exceptions import (
     TelegramAccessError,
@@ -34,11 +37,14 @@ DOMAIN_ERROR_MAPPING: dict[type[DomainError], type[BaseVerboseHTTPException]] = 
     FileInUseError: BadRequestHTTPException,
     FileClientInternalError: InternalServerErrorHTTPException,
     InvalidKnowledgeDataError: BadRequestHTTPException,
+    InvalidEventDataError: BadRequestHTTPException,
+    InvalidImportantInfoOrderError: BadRequestHTTPException,
     KnowledgeConflictError: ConflictHTTPException,
     TelegramAccessError: ForbiddenHTTPException,
     TelegramInvitationError: BadRequestHTTPException,
     TelegramLimitError: BadRequestHTTPException,
     TelegramServiceError: ServiceUnavailableHTTPException,
+    AccountTimeZoneUnavailableError: ServiceUnavailableHTTPException,
 }
 
 

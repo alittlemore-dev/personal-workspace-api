@@ -137,7 +137,6 @@ class TestTelegramStorage(StorageTestCase):
         assert not connection.notify_birthday
         assert not connection.notify_memorable_date
         assert connection.language == LanguageEnum.EN
-        assert connection.time_zone == "UTC"
         use_case = TelegramUseCase(
             storage=storage,
             settings_reader=AsyncMock(),
@@ -154,7 +153,6 @@ class TestTelegramStorage(StorageTestCase):
             notify_birthday=True,
             notify_memorable_date=True,
             language=LanguageEnum.RU,
-            time_zone="Asia/Yerevan",
         )
         with pytest.raises(TelegramAccessError):
             await use_case.set_connection_settings(
@@ -170,5 +168,4 @@ class TestTelegramStorage(StorageTestCase):
         assert updated.notify_birthday
         assert updated.notify_memorable_date
         assert updated.language == LanguageEnum.RU
-        assert updated.time_zone == "Asia/Yerevan"
         assert await storage.get_connection(connection_id=connection.id) == updated

@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -91,6 +92,122 @@ async def test_concurrent_planners_create_one_pending_delivery_and_claim_once(
     )
     assert second_claim is not None
     assert second_claim.attempts == 2
+
+
+async def test_zone_change_replans_unsent_delivery_and_preserves_done_dedup(
+    session: AsyncSession,
+) -> None:
+    now = datetime(2026, 12, 25, 8, tzinfo=UTC)
+    key = ReminderDeliveryKey(
+        connection_id="c" * 32,
+        kind=ReminderKind.BIRTHDAY,
+        item_id="i" * 32,
+        occurrence_date=date(2027, 1, 1),
+        lead_days=7,
+    )
+    storage = ReminderDatabaseStorage(session=session)
+    first_send = now + timedelta(hours=1)
+    shifted_send = now + timedelta(hours=6)
+    first_expiry = now + timedelta(hours=16)
+    shifted_expiry = now + timedelta(hours=21)
+
+    assert await storage.plan(key=key, now=now, send_at=first_send, expires_at=first_expiry)
+    assert not await storage.plan(key=key, now=now, send_at=first_send, expires_at=first_expiry)
+    assert await storage.plan(key=key, now=now, send_at=shifted_send, expires_at=shifted_expiry)
+    await session.commit()
+    model = await session.scalar(select(ReminderDeliveryModel))
+    assert model is not None
+    assert model.scheduled_at == shifted_send
+    assert model.next_attempt_at == shifted_send
+    assert model.expires_at == shifted_expiry
+
+    await storage.mark_canceled(key=key, now=now)
+    assert await storage.plan(key=key, now=now, send_at=shifted_send, expires_at=shifted_expiry)
+    await session.commit()
+    await session.refresh(model)
+    assert model.status == DeliveryStatus.PENDING
+
+    await storage.mark_done(key=key, now=shifted_send)
+    assert not await storage.plan(
+        key=key,
+        now=shifted_send,
+        send_at=first_send,
+        expires_at=first_expiry,
+    )
+    await session.commit()
+    await session.refresh(model)
+    assert await session.scalar(select(ReminderDeliveryModel.status)) == DeliveryStatus.DONE
+    assert model.scheduled_at == shifted_send
+
+
+async def test_replanner_does_not_take_over_claimed_delivery(session: AsyncSession) -> None:
+    now = datetime(2026, 12, 25, 9, tzinfo=UTC)
+    key = ReminderDeliveryKey(
+        connection_id="c" * 32,
+        kind=ReminderKind.BIRTHDAY,
+        item_id="i" * 32,
+        occurrence_date=date(2027, 1, 1),
+        lead_days=7,
+    )
+    storage = ReminderDatabaseStorage(session=session)
+    assert await storage.plan(
+        key=key,
+        now=now,
+        send_at=now,
+        expires_at=now + timedelta(hours=15),
+    )
+    assert await storage.claim_due(
+        now=now,
+        lease_until=now + timedelta(minutes=5),
+        max_attempts=3,
+    )
+    assert not await storage.plan(
+        key=key,
+        now=now,
+        send_at=now + timedelta(hours=5),
+        expires_at=now + timedelta(hours=20),
+    )
+    model = await session.scalar(select(ReminderDeliveryModel))
+    assert model is not None
+    assert model.status == DeliveryStatus.IN_PROGRESS
+
+
+async def test_auth_outage_defers_claim_without_spending_telegram_attempt(
+    session: AsyncSession,
+) -> None:
+    now = datetime(2026, 12, 25, 9, tzinfo=UTC)
+    key = ReminderDeliveryKey(
+        connection_id="c" * 32,
+        kind=ReminderKind.BIRTHDAY,
+        item_id="i" * 32,
+        occurrence_date=date(2027, 1, 1),
+        lead_days=7,
+    )
+    storage = ReminderDatabaseStorage(session=session)
+    assert await storage.plan(
+        key=key,
+        now=now,
+        send_at=now,
+        expires_at=now + timedelta(hours=15),
+    )
+    claimed = await storage.claim_due(
+        now=now,
+        lease_until=now + timedelta(minutes=5),
+        max_attempts=3,
+    )
+    assert claimed is not None
+    assert claimed.attempts == 1
+    await storage.defer_without_attempt(
+        key=key,
+        now=now,
+        next_attempt_at=now + timedelta(minutes=15),
+    )
+    await session.commit()
+    model = await session.scalar(select(ReminderDeliveryModel))
+    assert model is not None
+    assert model.status == DeliveryStatus.RETRY
+    assert model.attempts == 0
+    assert model.next_attempt_at == now + timedelta(minutes=15)
 
 
 async def test_dispatchers_cannot_claim_the_same_pending_delivery(
@@ -299,7 +416,6 @@ async def test_reminder_sources_are_owner_scoped_and_include_related_people(
             notify_birthday=False,
             notify_memorable_date=True,
             language=LanguageEnum.EN,
-            time_zone="UTC",
         ),
     )
     key = ReminderDeliveryKey(
@@ -314,6 +430,7 @@ async def test_reminder_sources_are_owner_scoped_and_include_related_people(
             key=key,
             now=datetime(2026, 12, 25, 9, tzinfo=UTC),
             local_send_time=time(9),
+            time_zone=ZoneInfo("UTC"),
         )
         is not None
     )
@@ -327,6 +444,7 @@ async def test_reminder_sources_are_owner_scoped_and_include_related_people(
             key=key,
             now=datetime(2026, 12, 25, 9, tzinfo=UTC),
             local_send_time=time(9),
+            time_zone=ZoneInfo("UTC"),
         )
         is None
     )

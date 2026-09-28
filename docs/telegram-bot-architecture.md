@@ -123,9 +123,10 @@ deployment secret and is never entered by the owner in web settings. The UI must
 from a single-use invitation token.
 
 The bot has a separate `notify` switch in Auth API, defaulting to off. Each connection stores
-`notify_birthday`, `notify_memorable_date`, `language` (`ru` or `en`), and an IANA `time_zone`.
-New connections start with both types off, `en`, and `UTC`. There is no connection-wide
-notification switch. A person's `notifications_enabled` switch controls birthday reminders;
+`notify_birthday`, `notify_memorable_date`, and `language` (`ru` or `en`). New connections start
+with both types off and `en`. Reminder scheduling uses the owner's account time zone from Auth
+API, shared by every connection in that Workspace. There is no connection-wide notification
+switch. A person's `notifications_enabled` switch controls birthday reminders;
 a memorable date has its own switch. Both card switches default to on and can suppress future
 channels as well. If the owner configures which quick-add flows appear, that selection applies
 to the Workspace and includes only implemented flows; it does not create hidden per-participant
@@ -212,13 +213,13 @@ relevance deadline are skipped rather than sent in a backlog burst.
 
 Three TaskIQ schedules handle calendar reminders. Every minute, the planner creates unique
 `PENDING` records for birthdays and memorable dates due in 7 or 1 day, scheduled for 09:00 in
-the recipient's local time. The sender separately claims ready records, rechecks bot, connection, and
+the owner's account time zone. The sender separately claims ready records, rechecks bot, connection, and
 card settings, and sends each private message. It records `DONE`, `RETRY`, `CANCELED`, `EXPIRED`,
 or `FAILED`; temporary failures have at most three attempts before the local day ends. An hourly
 cleanup marks overdue records `EXPIRED` and removes terminal records after 90 days. The delivery
 key includes connection, type, card, occurrence date, and lead interval. February 29 is skipped
-in nonleap years. The finance tracker retains its own time zone for month boundaries, as defined
-in the finance architecture. A change of connection time zone affects future reminders.
+in nonleap years. Changing the owner's account time zone reschedules pending reminders to 09:00
+in the new zone; completed delivery keys remain deduplicated.
 
 ## 9. Data and implementation boundaries
 
@@ -226,13 +227,14 @@ Account state in `auth-api` PostgreSQL:
 
 - `UserModel.settings.telegram_bots`: per-bot enabled and notify switches, keyed by the
   `TelegramBotId` enum.
+- `UserModel.settings.time_zone`: the IANA time zone used for calendar events and reminders.
 
 Bot domain state in `personal-workspace` PostgreSQL:
 
 - Telegram invitations: owner username, token hash, expiry, use/cancellation state, and label;
 - Telegram connections: owner username, Telegram user ID and private chat ID, state, label,
   profile snapshot, and connection timestamps;
-- Connection subscriptions, language, time zone, and reminder delivery records live here;
+- Connection subscriptions, language, and reminder delivery records live here;
   product events and update receipts can be added with later features.
 
 The owner username is a cross-service identity and has no database foreign key to an auth table.
@@ -244,8 +246,9 @@ invitation tokens are never persisted.
 `auth-api` exposes `GET /api/auth/account/me` and `PUT /api/auth/account/me/settings`
 for the complete account settings object, including `telegramBots`. The bot reads the switch
 through the service-secret-protected internal GET
-`/api/auth/internal/telegram/{telegram_bot_id}/settings?ownerUsername=...`, using
-`personal-workspace` as its bot ID. The public edge blocks this route.
+`/api/auth/internal/account/{username}/settings`, using the `personal-workspace` entry
+in `telegramBots`. The same response supplies the account time zone for calendar events and
+reminders. The public edge blocks this route.
 `personal-workspace` exposes authenticated invitation and connection management and the bot
 webhook at `/api/personal-workspace/telegram`. Connection preferences are replaced through
 `PUT /api/personal-workspace/telegram/connections/{id}/settings`. The Angular interface lives
@@ -337,9 +340,9 @@ money, and delivery need focused integration regressions.
   explicit active-Workspace choice in each flow and a revised uniqueness rule.
 - Should the owner be able to limit the financial detail shown to individual participants?
   Initially the message format is the same for all subscribed participants.
-- What exact delivery times and relevance deadlines should birthdays, dates, and events use?
-  This design establishes per-connection time and time zone; product values are selected before
-  scheduler implementation.
+- Should the owner be able to change the reminder delivery time? Birthday and memorable-date
+  reminders currently use 09:00 in the account time zone, with the local day as their relevance
+  deadline. Other event notifications need their own delivery policy when implemented.
 - Should participants adjust their own notification settings inside the bot? For now the owner's
   web interface remains the source of truth; the bot may only display current settings.
 

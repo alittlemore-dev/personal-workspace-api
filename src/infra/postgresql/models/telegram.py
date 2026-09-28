@@ -53,7 +53,6 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
         Enum(LanguageEnum, name="telegram_notification_language_enum", native_enum=True),
         server_default=LanguageEnum.EN.name,
     )
-    time_zone: Mapped[str] = mapped_column(String(64), server_default="UTC")
 
     __table_args__ = (
         Index(
@@ -93,7 +92,6 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
             notify_birthday=self.notify_birthday,
             notify_memorable_date=self.notify_memorable_date,
             language=self.language,
-            time_zone=self.time_zone,
         )
 
     def to_reminder_recipient(self) -> ReminderRecipient:
@@ -104,5 +102,4 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
             notify_birthday=self.notify_birthday,
             notify_memorable_date=self.notify_memorable_date,
             language=self.language,
-            time_zone=self.time_zone,
         )

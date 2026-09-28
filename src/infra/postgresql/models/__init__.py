@@ -1,5 +1,7 @@
 from .base import BaseModel as BaseModel
+from .events import EventModel as EventModel
 from .files import FileModel as FileModel
+from .important_info import ImportantInfoModel as ImportantInfoModel
 from .knowledge import KnowledgeDateDetailsModel as KnowledgeDateDetailsModel
 from .knowledge import KnowledgeDatePersonModel as KnowledgeDatePersonModel
 from .knowledge import KnowledgeItemFileModel as KnowledgeItemFileModel

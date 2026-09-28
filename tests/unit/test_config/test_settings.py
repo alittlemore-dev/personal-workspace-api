@@ -98,7 +98,7 @@ class TestSettings:
 
 
 class TestTelegramSettings:
-    def test_telegram_requires_auth_api_connection_when_available(self) -> None:
+    def test_telegram_requires_service_secret_when_available(self) -> None:
         with pytest.raises(ValidationError):
             TelegramSettings(
                 _env_file=None,
@@ -106,7 +106,6 @@ class TestTelegramSettings:
                 bot_username="alittlemore_workspace_bot",
                 bot_token=SecretStrExtended("123456:BOT_TOKEN"),
                 webhook_secret=SecretStrExtended("WEBHOOK_SECRET"),
-                auth_api_url="http://auth-api:8080/api/auth/internal/telegram/personal-workspace/settings",
                 service_secret=SecretStrExtended(""),
             )
 

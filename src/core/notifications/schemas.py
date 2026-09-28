@@ -41,6 +41,7 @@ class ReminderDeliveryKey:
 class ReminderDelivery:
     key: ReminderDeliveryKey
     attempts: int
+    scheduled_at: datetime
     expires_at: datetime
 
 
@@ -61,19 +62,19 @@ class ReminderWindow:
     expires_at: datetime
 
     @classmethod
-    def for_connection(
+    def for_account(
         cls,
         *,
         now: datetime,
-        time_zone: str,
+        time_zone: ZoneInfo,
         local_send_time: time,
     ) -> ReminderWindow:
-        local = now.astimezone(ZoneInfo(time_zone))
-        send_at = datetime.combine(local.date(), local_send_time, tzinfo=ZoneInfo(time_zone))
+        local = now.astimezone(time_zone)
+        send_at = datetime.combine(local.date(), local_send_time, tzinfo=time_zone)
         next_midnight = datetime.combine(
             local.date() + timedelta(days=1),
             time.min,
-            tzinfo=ZoneInfo(time_zone),
+            tzinfo=time_zone,
         )
         return cls(
             local_date=local.date(),
@@ -91,7 +92,6 @@ class ReminderRecipient:
     notify_birthday: bool
     notify_memorable_date: bool
     language: LanguageEnum
-    time_zone: str
 
     def subscribes_to(self, *, kind: ReminderKind) -> bool:
         if kind == ReminderKind.BIRTHDAY:

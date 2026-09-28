@@ -6,6 +6,11 @@ from typing import Annotated
 from pydantic import Field
 
 from core.calendar.enums import CalendarEntryKind, CalendarEntryPeriod, CalendarWindow
+from core.calendar.occurrences import (
+    CalendarOccurrence,
+    CalendarOccurrences,
+    UnplacedAnnualEntry,
+)
 from core.calendar.schemas import (
     Calendar,
     CalendarAnnualDate,
@@ -99,5 +104,87 @@ class CalendarResponseSchema(CamelCaseSchema):
             entries=[
                 CalendarEntryResponseSchema.from_domain_schema(schema=entry)
                 for entry in schema.entries
+            ],
+        )
+
+
+class CalendarOccurrenceResponseSchema(CamelCaseSchema):
+    id: str
+    source_id: str
+    kind: str
+    display_name: str
+    all_day: bool
+    start: str
+    end: str
+    annual_date: CalendarAnnualDateResponseSchema | None
+    related_people: list[CalendarRelatedPersonResponseSchema]
+
+    @classmethod
+    def from_domain_schema(cls, *, schema: CalendarOccurrence) -> CalendarOccurrenceResponseSchema:
+        return cls.model_construct(
+            id=schema.id,
+            source_id=schema.source_id,
+            kind=schema.kind,
+            display_name=schema.display_name,
+            all_day=schema.all_day,
+            start=schema.start.isoformat().replace("+00:00", "Z"),
+            end=schema.end.isoformat().replace("+00:00", "Z"),
+            annual_date=(
+                CalendarAnnualDateResponseSchema.from_domain_schema(schema=schema.annual_date)
+                if schema.annual_date is not None
+                else None
+            ),
+            related_people=[
+                CalendarRelatedPersonResponseSchema.from_domain_schema(schema=person)
+                for person in schema.related_people
+            ],
+        )
+
+
+class UnplacedAnnualEntryResponseSchema(CamelCaseSchema):
+    source_id: str
+    kind: CalendarEntryKind
+    display_name: str
+    annual_date: CalendarAnnualDateResponseSchema
+    related_people: list[CalendarRelatedPersonResponseSchema]
+
+    @classmethod
+    def from_domain_schema(
+        cls,
+        *,
+        schema: UnplacedAnnualEntry,
+    ) -> UnplacedAnnualEntryResponseSchema:
+        return cls.model_construct(
+            source_id=schema.source_id,
+            kind=schema.kind,
+            display_name=schema.display_name,
+            annual_date=CalendarAnnualDateResponseSchema.from_domain_schema(
+                schema=schema.annual_date,
+            ),
+            related_people=[
+                CalendarRelatedPersonResponseSchema.from_domain_schema(schema=person)
+                for person in schema.related_people
+            ],
+        )
+
+
+class CalendarOccurrencesResponseSchema(CamelCaseSchema):
+    entries: list[CalendarOccurrenceResponseSchema]
+    unplaced_annual_entries: list[UnplacedAnnualEntryResponseSchema]
+
+    @classmethod
+    def from_domain_schema(
+        cls,
+        *,
+        schema: CalendarOccurrences,
+    ) -> CalendarOccurrencesResponseSchema:
+        return cls.model_construct(
+            entries=[
+                CalendarOccurrenceResponseSchema.from_domain_schema(schema=entry)
+                for entry in schema.entries
+            ],
+            unplaced_annual_entries=[
+                UnplacedAnnualEntryResponseSchema.from_domain_schema(schema=entry)
+                for entry in schema.unplaced_annual_entries
             ],
         )

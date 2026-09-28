@@ -5,9 +5,14 @@ from aiogram import Bot
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.account_time_zone.clients import AccountTimeZoneReader
 from core.notifications.clients import ReminderSender
 from core.notifications.schemas import ReminderSchedule
-from core.notifications.services import ReminderDeliveryService, ReminderTextFormatter
+from core.notifications.services import (
+    ReminderDeliveryService,
+    ReminderProcessingService,
+    ReminderTextFormatter,
+)
 from core.notifications.storages import ReminderStorage
 from core.notifications.use_cases import (
     PlanRemindersUseCase,
@@ -65,25 +70,46 @@ class NotificationsProvider(Provider):
         return ReminderDatabaseStorage(session=session)
 
     @provide(scope=Scope.REQUEST)
+    def provide_processing_service(
+        self,
+        storage: ReminderStorage,
+        delivery_service: ReminderDeliveryService,
+        schedule: ReminderSchedule,
+        account_time_zone_reader: AccountTimeZoneReader,
+    ) -> ReminderProcessingService:
+        return ReminderProcessingService(
+            storage=storage,
+            delivery_service=delivery_service,
+            schedule=schedule,
+            account_time_zone_reader=account_time_zone_reader,
+        )
+
+    @provide(scope=Scope.REQUEST)
     def provide_planner(
         self,
         storage: ReminderStorage,
         transaction: TelegramTransaction,
         schedule: ReminderSchedule,
+        account_time_zone_reader: AccountTimeZoneReader,
     ) -> PlanRemindersUseCase:
-        return PlanRemindersUseCase(storage=storage, transaction=transaction, schedule=schedule)
+        return PlanRemindersUseCase(
+            storage=storage,
+            transaction=transaction,
+            schedule=schedule,
+            account_time_zone_reader=account_time_zone_reader,
+        )
 
     @provide(scope=Scope.REQUEST)
     def provide_sender_use_case(
         self,
         storage: ReminderStorage,
-        delivery_service: ReminderDeliveryService,
+        processing_service: ReminderProcessingService,
         transaction: TelegramTransaction,
         schedule: ReminderSchedule,
     ) -> SendRemindersUseCase:
         return SendRemindersUseCase(
             storage=storage,
-            delivery_service=delivery_service,
+            processing_service=processing_service,
             transaction=transaction,
             schedule=schedule,
         )

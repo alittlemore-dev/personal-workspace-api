@@ -2,11 +2,12 @@ import hmac
 from datetime import datetime
 from typing import Any
 
-from backend_sdk import RoleEnum
-from backend_sdk.integrations.litestar import RequireRole
+from backend_sdk import Principal, RoleEnum
+from backend_sdk.integrations.litestar import AuthContext, RequireRole
 from dishka import FromDishka
 from dishka.integrations.litestar import DishkaRouter
 from litestar import Controller, Request, delete, get, post, put, status_codes
+from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 
 from core.telegram.enums import TelegramConnectionState
@@ -33,7 +34,7 @@ class TelegramApiController(Controller):
     @get("", name="telegram-settings", status_code=status_codes.HTTP_200_OK)
     async def get_settings(
         self,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> TelegramSettingsResponse:
@@ -61,7 +62,7 @@ class TelegramApiController(Controller):
     async def create_invitation(
         self,
         data: TelegramLabelRequest,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> TelegramIssuedInvitationResponse:
@@ -80,7 +81,7 @@ class TelegramApiController(Controller):
     async def cancel_invitation(
         self,
         invitation_id: TelegramItemId,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> None:
@@ -98,7 +99,7 @@ class TelegramApiController(Controller):
     async def approve_connection(
         self,
         connection_id: TelegramItemId,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> TelegramConnectionResponse:
@@ -118,7 +119,7 @@ class TelegramApiController(Controller):
     async def revoke_connection(
         self,
         connection_id: TelegramItemId,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> TelegramConnectionResponse:
@@ -139,7 +140,7 @@ class TelegramApiController(Controller):
     async def block_connection(
         self,
         connection_id: TelegramItemId,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> TelegramConnectionResponse:
@@ -160,7 +161,7 @@ class TelegramApiController(Controller):
     async def unblock_connection(
         self,
         connection_id: TelegramItemId,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
         current_datetime: FromDishka[datetime],
     ) -> TelegramConnectionResponse:
@@ -178,7 +179,7 @@ class TelegramApiController(Controller):
         self,
         connection_id: TelegramItemId,
         data: TelegramLabelRequest,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
@@ -197,7 +198,7 @@ class TelegramApiController(Controller):
         self,
         connection_id: TelegramItemId,
         data: TelegramConnectionSettingsRequest,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(

@@ -22,6 +22,7 @@ class ReminderDeliveryModel(HexUuidIDMixin, BaseModel):
     )
     attempts: Mapped[int] = mapped_column(Integer)
     claimed_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    scheduled_at: Mapped[datetime] = mapped_column(UTCDateTime)
     next_attempt_at: Mapped[datetime] = mapped_column(UTCDateTime)
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)

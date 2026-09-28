@@ -84,6 +84,7 @@ class AuthSettings(ProjectBaseSettings):
     model_config = SettingsConfigDict(env_prefix="AUTH_")
 
     verify_url: str
+    account_settings_url: str
     timeout_seconds: PositiveFloat
     cache_ttl_seconds: NonNegativeFloat
     max_cache_entries: PositiveInt
@@ -160,7 +161,6 @@ class TelegramSettings(ProjectBaseSettings):
     bot_username: str = ""
     bot_token: SecretStrExtended = SecretStrExtended("")
     webhook_secret: SecretStrExtended = SecretStrExtended("")
-    auth_api_url: str = ""
     service_secret: SecretStrExtended = SecretStrExtended("")
 
     @model_validator(mode="after")
@@ -172,7 +172,6 @@ class TelegramSettings(ProjectBaseSettings):
                     self.bot_username,
                     self.bot_token.get_secret_value(),
                     self.webhook_secret.get_secret_value(),
-                    self.auth_api_url,
                     self.service_secret.get_secret_value(),
                 ),
             )

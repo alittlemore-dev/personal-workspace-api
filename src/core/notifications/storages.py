@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from core.notifications.enums import ReminderKind
 from core.notifications.schemas import (
@@ -13,6 +14,9 @@ from core.notifications.schemas import (
 class ReminderStorage(ABC):
     @abstractmethod
     async def list_recipients(self, *, after_id: str, limit: int) -> list[ReminderRecipient]: ...
+
+    @abstractmethod
+    async def get_recipient(self, *, connection_id: str) -> ReminderRecipient | None: ...
 
     @abstractmethod
     async def list_sources(
@@ -64,6 +68,25 @@ class ReminderStorage(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def reschedule(
+        self,
+        *,
+        key: ReminderDeliveryKey,
+        now: datetime,
+        send_at: datetime,
+        expires_at: datetime,
+    ) -> None: ...
+
+    @abstractmethod
+    async def defer_without_attempt(
+        self,
+        *,
+        key: ReminderDeliveryKey,
+        now: datetime,
+        next_attempt_at: datetime,
+    ) -> None: ...
+
+    @abstractmethod
     async def expire_and_prune(self, *, now: datetime, retention: timedelta) -> int: ...
 
     @abstractmethod
@@ -73,4 +96,5 @@ class ReminderStorage(ABC):
         key: ReminderDeliveryKey,
         now: datetime,
         local_send_time: time,
+        time_zone: ZoneInfo,
     ) -> tuple[ReminderRecipient, ReminderSource] | None: ...

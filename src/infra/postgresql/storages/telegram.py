@@ -226,7 +226,6 @@ class TelegramDatabaseStorage(TelegramStorage):
             notify_birthday=False,
             notify_memorable_date=False,
             language=LanguageEnum.EN,
-            time_zone="UTC",
         )
         self.session.add(model)
         try:
@@ -286,7 +285,6 @@ class TelegramDatabaseStorage(TelegramStorage):
                 notify_birthday=settings.notify_birthday,
                 notify_memorable_date=settings.notify_memorable_date,
                 language=settings.language,
-                time_zone=settings.time_zone,
             )
             .returning(TelegramConnectionModel),
         )

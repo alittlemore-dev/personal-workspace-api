@@ -3,11 +3,14 @@ from collections.abc import Iterable
 from dishka import Provider
 from dishka.integrations.litestar import LitestarProvider
 
+from infra.ioc.prodivers.account_time_zone_provider import AccountTimeZoneProvider
 from infra.ioc.prodivers.calendar_provider import CalendarProvider
 from infra.ioc.prodivers.database_provider import DatabaseProvider
+from infra.ioc.prodivers.events_provider import EventsProvider
 from infra.ioc.prodivers.files_provider import FilesProvider
 from infra.ioc.prodivers.general_provider import GeneralProvider
 from infra.ioc.prodivers.healthcheck_provider import HealthcheckProvider
+from infra.ioc.prodivers.important_info_provider import ImportantInfoProvider
 from infra.ioc.prodivers.knowledge import (
     KnowledgeDatesProvider,
     KnowledgeFilesProvider,
@@ -27,7 +30,10 @@ def get_providers() -> Iterable[Provider]:
         FilesProvider(),
         DatabaseProvider(),
         LitestarProvider(),
+        AccountTimeZoneProvider(),
         CalendarProvider(),
+        EventsProvider(),
+        ImportantInfoProvider(),
         ResumesProvider(),
         TelegramProvider(),
         NotificationsProvider(),

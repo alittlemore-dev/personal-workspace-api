@@ -5,12 +5,16 @@ from unittest.mock import Mock
 
 from dishka import AsyncContainer
 
+from core.account_time_zone.clients import AccountTimeZoneReader
 from core.cache_tools.schemas import CacheToolsPolicy
 from core.cache_tools.use_cases import CacheToolsUseCase
+from core.calendar.occurrences import CalendarOccurrencesUseCase
 from core.calendar.use_cases import CalendarUseCase
+from core.events.use_cases import EventsUseCase
 from core.files.file_name_generators import FileNameGenerator
 from core.files.services import FileService
 from core.generators import HexUuidIdGenerator
+from core.important_info.use_cases import ImportantInfoUseCase
 from core.knowledge.dates.use_cases import KnowledgeDatesUseCase
 from core.knowledge.files.clients import KnowledgeFileObjectCleaner, KnowledgeFileRollbackRegistrar
 from core.knowledge.files.use_cases import KnowledgeFilesUseCase
@@ -64,6 +68,22 @@ class IocContainerHelper:
 
     async def get_calendar_use_case(self) -> Mock:
         use_case = await self.container.get(CalendarUseCase)
+        return cast("Mock", use_case)
+
+    async def get_account_time_zone_reader(self) -> Mock:
+        reader = await self.container.get(AccountTimeZoneReader)
+        return cast("Mock", reader)
+
+    async def get_calendar_occurrences_use_case(self) -> Mock:
+        use_case = await self.container.get(CalendarOccurrencesUseCase)
+        return cast("Mock", use_case)
+
+    async def get_events_use_case(self) -> Mock:
+        use_case = await self.container.get(EventsUseCase)
+        return cast("Mock", use_case)
+
+    async def get_important_info_use_case(self) -> Mock:
+        use_case = await self.container.get(ImportantInfoUseCase)
         return cast("Mock", use_case)
 
     async def get_knowledge_dates_use_case(self) -> Mock:

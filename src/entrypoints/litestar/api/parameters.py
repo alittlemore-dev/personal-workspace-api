@@ -140,6 +140,32 @@ CalendarWindowQuery: TypeAlias = Annotated[
         max_items=None,
     ),
 ]
+CalendarStartDateQuery: TypeAlias = Annotated[
+    date,
+    api_query_parameter(
+        name="startDate",
+        title="Range start date",
+        description="First included calendar date.",
+        examples=("2026-07-01",),
+        ge=None,
+        le=None,
+        min_items=None,
+        max_items=None,
+    ),
+]
+CalendarEndDateQuery: TypeAlias = Annotated[
+    date,
+    api_query_parameter(
+        name="endDate",
+        title="Range end date",
+        description="First excluded calendar date.",
+        examples=("2026-08-01",),
+        ge=None,
+        le=None,
+        min_items=None,
+        max_items=None,
+    ),
+]
 PersonListSortQuery: TypeAlias = Annotated[
     PersonListSort,
     api_query_parameter(
@@ -233,6 +259,24 @@ KnowledgeDateIdPath: TypeAlias = Annotated[
         name="date_id",
         title="Knowledge date ID",
         description="Private memorable date identifier.",
+        examples=("00000000000000000000000000000001",),
+    ),
+]
+EventIdPath: TypeAlias = Annotated[
+    str,
+    api_path_parameter(
+        name="event_id",
+        title="Event ID",
+        description="Private event identifier.",
+        examples=("00000000000000000000000000000001",),
+    ),
+]
+ImportantInfoIdPath: TypeAlias = Annotated[
+    str,
+    api_path_parameter(
+        name="item_id",
+        title="Important info ID",
+        description="Private important info identifier.",
         examples=("00000000000000000000000000000001",),
     ),
 ]

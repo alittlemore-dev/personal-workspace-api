@@ -51,6 +51,47 @@ class APIHelper:
         }
         return self.client.get("/api/calendar", params=params)
 
+    def get_calendar_occurrences(
+        self,
+        *,
+        start_date: str,
+        end_date: str,
+    ) -> Response:
+        return self.client.get(
+            "/api/calendar/occurrences",
+            params={"startDate": start_date, "endDate": end_date},
+        )
+
+    def get_important_info(self) -> Response:
+        return self.client.get("/api/important-info")
+
+    def post_important_info(self, *, data: dict[str, Any]) -> Response:
+        return self.client.post("/api/important-info", json=data)
+
+    def put_important_info(self, *, item_id: str, data: dict[str, Any]) -> Response:
+        return self.client.put(f"/api/important-info/{item_id}", json=data)
+
+    def put_important_info_order(self, *, data: dict[str, Any]) -> Response:
+        return self.client.put("/api/important-info/order", json=data)
+
+    def delete_important_info(self, *, item_id: str) -> Response:
+        return self.client.delete(f"/api/important-info/{item_id}")
+
+    def get_events(self) -> Response:
+        return self.client.get("/api/events")
+
+    def post_event(self, *, data: dict[str, Any]) -> Response:
+        return self.client.post("/api/events", json=data)
+
+    def get_event(self, *, event_id: str) -> Response:
+        return self.client.get(f"/api/events/{event_id}")
+
+    def put_event(self, *, event_id: str, data: dict[str, Any]) -> Response:
+        return self.client.put(f"/api/events/{event_id}", json=data)
+
+    def delete_event(self, *, event_id: str) -> Response:
+        return self.client.delete(f"/api/events/{event_id}")
+
     def post_person(self, *, data: dict[str, Any]) -> Response:
         return self.client.post("/api/knowledge/people", json=data)
 

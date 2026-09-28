@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, delete, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
@@ -45,6 +46,16 @@ class ReminderDatabaseStorage(ReminderStorage):
             .limit(limit)
         )
         return [model.to_reminder_recipient() for model in await self.session.scalars(query)]
+
+    async def get_recipient(self, *, connection_id: str) -> ReminderRecipient | None:
+        model = await self.session.scalar(
+            select(TelegramConnectionModel)
+            .where(TelegramConnectionModel.id == connection_id)
+            .execution_options(populate_existing=True),
+        )
+        if model is None or model.state != TelegramConnectionState.ACTIVE:
+            return None
+        return model.to_reminder_recipient()
 
     async def list_sources(
         self,
@@ -169,13 +180,40 @@ class ReminderDatabaseStorage(ReminderStorage):
             status=DeliveryStatus.PENDING,
             attempts=0,
             claimed_until=None,
+            scheduled_at=send_at,
             next_attempt_at=send_at,
             expires_at=expires_at,
             updated_at=now,
             sent_at=None,
         )
-        planned = statement.on_conflict_do_nothing(
+        planned = statement.on_conflict_do_update(
             constraint="reminder_delivery_once_uniq",
+            set_={
+                "status": DeliveryStatus.PENDING,
+                "attempts": 0,
+                "claimed_until": None,
+                "scheduled_at": send_at,
+                "next_attempt_at": send_at,
+                "expires_at": expires_at,
+                "updated_at": now,
+            },
+            where=and_(
+                ReminderDeliveryModel.status.in_(
+                    (
+                        DeliveryStatus.PENDING,
+                        DeliveryStatus.RETRY,
+                        DeliveryStatus.CANCELED,
+                        DeliveryStatus.EXPIRED,
+                    ),
+                ),
+                or_(
+                    ReminderDeliveryModel.status.in_(
+                        (DeliveryStatus.CANCELED, DeliveryStatus.EXPIRED),
+                    ),
+                    ReminderDeliveryModel.scheduled_at != send_at,
+                    ReminderDeliveryModel.expires_at != expires_at,
+                ),
+            ),
         ).returning(ReminderDeliveryModel.id)
         return (await self.session.scalar(planned)) is not None
 
@@ -225,6 +263,7 @@ class ReminderDatabaseStorage(ReminderStorage):
                 lead_days=model.lead_days,
             ),
             attempts=model.attempts,
+            scheduled_at=model.scheduled_at,
             expires_at=model.expires_at,
         )
 
@@ -269,6 +308,47 @@ class ReminderDatabaseStorage(ReminderStorage):
             .values(status=DeliveryStatus.RETRY, next_attempt_at=next_attempt_at, updated_at=now),
         )
 
+    async def reschedule(
+        self,
+        *,
+        key: ReminderDeliveryKey,
+        now: datetime,
+        send_at: datetime,
+        expires_at: datetime,
+    ) -> None:
+        await self.session.execute(
+            update(ReminderDeliveryModel)
+            .where(self.key_filter(key), ReminderDeliveryModel.status == DeliveryStatus.IN_PROGRESS)
+            .values(
+                status=DeliveryStatus.PENDING,
+                attempts=0,
+                claimed_until=None,
+                scheduled_at=send_at,
+                next_attempt_at=send_at,
+                expires_at=expires_at,
+                updated_at=now,
+            ),
+        )
+
+    async def defer_without_attempt(
+        self,
+        *,
+        key: ReminderDeliveryKey,
+        now: datetime,
+        next_attempt_at: datetime,
+    ) -> None:
+        await self.session.execute(
+            update(ReminderDeliveryModel)
+            .where(self.key_filter(key), ReminderDeliveryModel.status == DeliveryStatus.IN_PROGRESS)
+            .values(
+                status=DeliveryStatus.RETRY,
+                attempts=func.greatest(ReminderDeliveryModel.attempts - 1, 0),
+                claimed_until=None,
+                next_attempt_at=next_attempt_at,
+                updated_at=now,
+            ),
+        )
+
     async def expire_and_prune(self, *, now: datetime, retention: timedelta) -> int:
         terminal = (
             DeliveryStatus.DONE,
@@ -300,6 +380,7 @@ class ReminderDatabaseStorage(ReminderStorage):
         key: ReminderDeliveryKey,
         now: datetime,
         local_send_time: time,
+        time_zone: ZoneInfo,
     ) -> tuple[ReminderRecipient, ReminderSource] | None:
         model = await self.session.scalar(
             select(TelegramConnectionModel)
@@ -309,9 +390,9 @@ class ReminderDatabaseStorage(ReminderStorage):
         if model is None or model.state != TelegramConnectionState.ACTIVE:
             return None
         current = model.to_reminder_recipient()
-        window = ReminderWindow.for_connection(
+        window = ReminderWindow.for_account(
             now=now,
-            time_zone=current.time_zone,
+            time_zone=time_zone,
             local_send_time=local_send_time,
         )
         if (

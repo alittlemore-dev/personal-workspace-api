@@ -61,12 +61,11 @@ class TestTelegramManagementApi(ApiTestCase):
 
     def test_connection_settings_require_complete_valid_payload(self) -> None:
         for payload in (
-            {"notifyBirthday": True, "notifyMemorableDate": False, "language": "en"},
+            {"notifyBirthday": True, "notifyMemorableDate": False},
             {
                 "notifyBirthday": True,
                 "notifyMemorableDate": False,
-                "language": "en",
-                "timeZone": "Not/AZone",
+                "language": "invalid",
             },
         ):
             response = self.api.client.put(

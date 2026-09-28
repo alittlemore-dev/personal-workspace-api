@@ -1,9 +1,15 @@
 from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
+from typing import cast
 from unittest.mock import AsyncMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
+from core.account_time_zone.clients import (
+    AccountTimeZoneReader,
+    AccountTimeZoneUnavailableError,
+)
 from core.i18n.enums import LanguageEnum
 from core.notifications.clients import ReminderSender, RetryableReminderSendError
 from core.notifications.enums import ReminderKind
@@ -15,7 +21,11 @@ from core.notifications.schemas import (
     ReminderSource,
     ReminderWindow,
 )
-from core.notifications.services import ReminderDeliveryService, ReminderTextFormatter
+from core.notifications.services import (
+    ReminderDeliveryService,
+    ReminderProcessingService,
+    ReminderTextFormatter,
+)
 from core.notifications.storages import ReminderStorage
 from core.notifications.use_cases import (
     PlanRemindersUseCase,
@@ -35,7 +45,6 @@ def recipient(*, notify_birthday: bool = True) -> ReminderRecipient:
         notify_birthday=notify_birthday,
         notify_memorable_date=False,
         language=LanguageEnum.RU,
-        time_zone="UTC",
     )
 
 
@@ -79,10 +88,13 @@ def setup_planner(
     )
     storage.plan.return_value = True
     transaction = AsyncMock(spec=TelegramTransaction)
+    account_time_zone_reader = AsyncMock(spec=AccountTimeZoneReader)
+    account_time_zone_reader.get_time_zone.return_value = ZoneInfo("UTC")
     use_case = PlanRemindersUseCase(
         storage=storage,
         transaction=transaction,
         schedule=SCHEDULE,
+        account_time_zone_reader=account_time_zone_reader,
     )
     return use_case, storage, transaction
 
@@ -103,21 +115,30 @@ def setup_sender(
                 lead_days=7,
             ),
             attempts=attempts,
+            scheduled_at=NOW,
             expires_at=expires_at,
         ),
         None,
     ]
     storage.get_current.return_value = (recipient(), source())
+    storage.get_recipient.return_value = recipient()
     reader = AsyncMock(spec=TelegramAccountSettingsReader)
     reader.can_notify.return_value = True
+    account_time_zone_reader = AsyncMock(spec=AccountTimeZoneReader)
+    account_time_zone_reader.get_time_zone.return_value = ZoneInfo("UTC")
     sender = AsyncMock(spec=ReminderSender)
     transaction = AsyncMock(spec=TelegramTransaction)
     use_case = SendRemindersUseCase(
         storage=storage,
-        delivery_service=ReminderDeliveryService(
-            settings_reader=reader,
-            sender=sender,
-            formatter=ReminderTextFormatter(description_limit=300),
+        processing_service=ReminderProcessingService(
+            storage=storage,
+            delivery_service=ReminderDeliveryService(
+                settings_reader=reader,
+                sender=sender,
+                formatter=ReminderTextFormatter(description_limit=300),
+            ),
+            schedule=SCHEDULE,
+            account_time_zone_reader=account_time_zone_reader,
         ),
         transaction=transaction,
         schedule=SCHEDULE,
@@ -147,6 +168,34 @@ async def test_before_nine_plans_delivery_for_nine() -> None:
     use_case, storage, _ = setup_planner()
     assert await use_case.run(now=NOW - timedelta(minutes=1)) == 1
     assert storage.plan.await_args.kwargs["send_at"] == NOW
+
+
+@pytest.mark.asyncio
+async def test_one_account_zone_plans_all_recipients_at_same_local_nine() -> None:
+    use_case, storage, _ = setup_planner()
+    storage.list_recipients.return_value = [
+        recipient(),
+        replace(recipient(), connection_id="d" * 32),
+    ]
+    reader = cast("AsyncMock", use_case.account_time_zone_reader)
+    reader.get_time_zone.return_value = ZoneInfo("America/New_York")
+
+    assert await use_case.run(now=NOW) == 2
+    assert storage.plan.await_count == 2
+    assert all(
+        call.kwargs["send_at"] == datetime(2026, 12, 25, 14, tzinfo=UTC)
+        for call in storage.plan.await_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_account_zone_unavailable_skips_planning_without_utc_fallback() -> None:
+    use_case, storage, _ = setup_planner()
+    reader = cast("AsyncMock", use_case.account_time_zone_reader)
+    reader.get_time_zone.side_effect = AccountTimeZoneUnavailableError()
+
+    assert await use_case.run(now=NOW) == 0
+    storage.plan.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -187,6 +236,63 @@ async def test_source_changed_after_claim_is_canceled() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stale_queued_delivery_moves_to_new_account_local_nine() -> None:
+    use_case, storage, _, sender, _ = setup_sender()
+    reader = cast("AsyncMock", use_case.processing_service.account_time_zone_reader)
+    reader.get_time_zone.return_value = ZoneInfo("America/New_York")
+
+    assert await use_case.run(now=NOW) == 0
+    storage.reschedule.assert_awaited_once_with(
+        key=ReminderDeliveryKey(
+            connection_id="c" * 32,
+            kind=ReminderKind.BIRTHDAY,
+            item_id="i" * 32,
+            occurrence_date=date(2027, 1, 1),
+            lead_days=7,
+        ),
+        now=NOW,
+        send_at=datetime(2026, 12, 25, 14, tzinfo=UTC),
+        expires_at=datetime(2026, 12, 26, 5, tzinfo=UTC),
+    )
+    storage.mark_canceled.assert_not_awaited()
+    sender.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_zone_change_to_previous_local_day_cancels_old_occurrence_key() -> None:
+    use_case, storage, _, sender, _ = setup_sender()
+    reader = cast("AsyncMock", use_case.processing_service.account_time_zone_reader)
+    reader.get_time_zone.return_value = ZoneInfo("Pacific/Honolulu")
+
+    assert await use_case.run(now=NOW) == 0
+    storage.mark_canceled.assert_awaited_once()
+    storage.reschedule.assert_not_awaited()
+    sender.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_account_zone_read_failure_never_sends_queued_delivery() -> None:
+    use_case, storage, _, sender, _ = setup_sender(attempts=3)
+    reader = cast("AsyncMock", use_case.processing_service.account_time_zone_reader)
+    reader.get_time_zone.side_effect = AccountTimeZoneUnavailableError()
+
+    assert await use_case.run(now=NOW) == 0
+    storage.defer_without_attempt.assert_awaited_once_with(
+        key=ReminderDeliveryKey(
+            connection_id="c" * 32,
+            kind=ReminderKind.BIRTHDAY,
+            item_id="i" * 32,
+            occurrence_date=date(2027, 1, 1),
+            lead_days=7,
+        ),
+        now=NOW,
+        next_attempt_at=NOW + timedelta(minutes=15),
+    )
+    storage.mark_failed.assert_not_awaited()
+    sender.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_transient_telegram_error_schedules_bounded_retry() -> None:
     use_case, storage, _, sender, _ = setup_sender()
     sender.send.side_effect = RetryableReminderSendError(retry_after_seconds=1800)
@@ -201,9 +307,9 @@ async def test_retry_stops_at_attempt_limit_or_local_midnight() -> None:
     assert await use_case.run(now=NOW) == 0
     storage.mark_failed.assert_awaited_once()
 
-    use_case, storage, _, sender, _ = setup_sender(expires_at=NOW + timedelta(minutes=10))
+    use_case, storage, _, sender, _ = setup_sender()
     sender.send.side_effect = RetryableReminderSendError(retry_after_seconds=0)
-    assert await use_case.run(now=NOW) == 0
+    assert await use_case.run(now=NOW + timedelta(hours=14, minutes=50)) == 0
     storage.mark_expired.assert_awaited_once()
 
 
@@ -282,9 +388,9 @@ def test_local_nine_follows_dst_and_local_day(
     send_hour_utc: int,
     eligible: bool,
 ) -> None:
-    window = ReminderWindow.for_connection(
+    window = ReminderWindow.for_account(
         now=instant,
-        time_zone="America/New_York",
+        time_zone=ZoneInfo("America/New_York"),
         local_send_time=time(9),
     )
     assert window.local_date == local_day

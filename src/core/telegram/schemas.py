@@ -77,7 +77,6 @@ class TelegramConnection:
     notify_birthday: bool
     notify_memorable_date: bool
     language: LanguageEnum
-    time_zone: str
 
     def require_owner(self, *, owner_username: str) -> None:
         if self.owner_username != owner_username:
@@ -89,4 +88,3 @@ class TelegramConnectionSettings:
     notify_birthday: bool
     notify_memorable_date: bool
     language: LanguageEnum
-    time_zone: str

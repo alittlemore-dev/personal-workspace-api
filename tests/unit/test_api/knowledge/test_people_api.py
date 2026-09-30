@@ -5,15 +5,12 @@ import pytest_asyncio
 from httpx import codes
 
 from core.knowledge.exceptions import KnowledgeItemNotFoundError
-from core.knowledge.items.enums import KnowledgeItemKind
-from core.knowledge.items.schemas import KnowledgeItem
 from core.knowledge.people.enums import PersonListSort
 from core.knowledge.people.schemas import (
     PeoplePage,
-    Person,
-    PersonDetails,
     PersonFilters,
     PersonQuickCreateParams,
+    PersonTargetParams,
     PersonUpdateParams,
 )
 from entrypoints.litestar.api.knowledge.people.endpoints import PeopleApiController
@@ -21,36 +18,6 @@ from tests.test_cases import ApiTestCase
 from tests.unit.conftest import TEST_USERNAME
 
 CURRENT_DATETIME = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
-
-
-def person_response(*, person_id: str = "1" * 32) -> Person:
-    return Person(
-        item=KnowledgeItem(
-            id=person_id,
-            kind=KnowledgeItemKind.PERSON,
-            author_username="test",
-            display_name="Ivanov Ivan",
-            description="",
-            tags=[],
-            created_at=CURRENT_DATETIME,
-            updated_at=CURRENT_DATETIME,
-        ),
-        details=PersonDetails(
-            item_id=person_id,
-            last_name="Ivanov",
-            first_name="Ivan",
-            middle_name="",
-            email="",
-            phone="",
-            telegram="",
-            birthday=None,
-            notifications_enabled=True,
-        ),
-        relationships=[],
-        related_dates=[],
-        photo=None,
-        attachments=[],
-    )
 
 
 def update_payload() -> dict[str, object]:
@@ -134,7 +101,7 @@ class TestPeopleApi(ApiTestCase):
         )
 
     def test_quick_create_maps_names_and_current_author(self) -> None:
-        self.use_case.create_person.return_value = person_response()
+        self.use_case.create_person.return_value = self.factory.core.person(now=CURRENT_DATETIME)
 
         response = self.api.post_person(
             data={"firstName": "Ivan", "lastName": "Ivanov"},
@@ -168,7 +135,7 @@ class TestPeopleApi(ApiTestCase):
         self.use_case.create_person.assert_not_awaited()
 
     def test_update_maps_explicit_relationship_batch(self) -> None:
-        self.use_case.update_person.return_value = person_response()
+        self.use_case.update_person.return_value = self.factory.core.person(now=CURRENT_DATETIME)
         payload = update_payload()
         payload["relationshipChanges"] = {
             "create": [
@@ -186,12 +153,12 @@ class TestPeopleApi(ApiTestCase):
         response = self.api.put_person(person_id=1, data=payload)
 
         self.asserts.status(response=response, expected_status=codes.OK)
-        call = self.use_case.update_person.await_args.kwargs
-        assert call["person_id"] == "0" * 31 + "1"
-        assert call["author_username"] == TEST_USERNAME
-        assert isinstance(call["params"], PersonUpdateParams)
-        assert call["params"].relationship_changes.delete_ids == ["4" * 32]
-        assert call["params"].relationship_changes.create[0].related_person_id == "2" * 32
+        call = self.use_case.update_person.await_args.kwargs["params"]
+        assert call.person_id == "0" * 31 + "1"
+        assert call.author_username == TEST_USERNAME
+        assert isinstance(call.data, PersonUpdateParams)
+        assert call.data.relationship_changes.delete_ids == ["4" * 32]
+        assert call.data.relationship_changes.create[0].related_person_id == "2" * 32
 
     @pytest.mark.parametrize(
         ("birthday", "expected_status"),
@@ -209,7 +176,7 @@ class TestPeopleApi(ApiTestCase):
         birthday: dict[str, int | None] | None,
         expected_status: int,
     ) -> None:
-        self.use_case.update_person.return_value = person_response()
+        self.use_case.update_person.return_value = self.factory.core.person(now=CURRENT_DATETIME)
         payload = update_payload()
         payload["birthday"] = birthday
 
@@ -248,8 +215,10 @@ class TestPeopleApi(ApiTestCase):
             expected_message=KnowledgeItemNotFoundError.message,
         )
         self.use_case.get_person.assert_awaited_once_with(
-            person_id=self.factory.core.hex_id(404),
-            author_username=TEST_USERNAME,
+            params=PersonTargetParams(
+                person_id=self.factory.core.hex_id(404),
+                author_username=TEST_USERNAME,
+            ),
         )
 
     def test_delete_forwards_request_datetime(self) -> None:
@@ -258,10 +227,10 @@ class TestPeopleApi(ApiTestCase):
         response = self.api.delete_person(person_id=1)
 
         self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
-        call = self.use_case.delete_person.await_args.kwargs
-        assert call["person_id"] == self.factory.core.hex_id(1)
-        assert call["author_username"] == TEST_USERNAME
-        assert isinstance(call["current_datetime"], datetime)
+        call = self.use_case.delete_person.await_args.kwargs["params"]
+        assert call.person_id == self.factory.core.hex_id(1)
+        assert call.author_username == TEST_USERNAME
+        assert isinstance(call.current_datetime, datetime)
 
     def test_private_controller_is_hidden_and_uncached(self) -> None:
         assert PeopleApiController.include_in_schema is False

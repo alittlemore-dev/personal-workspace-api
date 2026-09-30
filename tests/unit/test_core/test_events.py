@@ -7,33 +7,14 @@ import pytest
 
 from core.account_time_zone.clients import AccountTimeZoneReader
 from core.calendar.occurrences import CalendarOccurrencesUseCase
+from core.calendar.schemas import GetCalendarOccurrencesParams
 from core.events.enums import EventFrequency
-from core.events.schemas import Event, EventDraft, EventRecurrence
+from core.events.schemas import Event
 from core.knowledge.dates.schemas import KnowledgeDateDetails, KnowledgeDateValue
 from core.knowledge.items.enums import KnowledgeItemKind
 from core.knowledge.items.schemas import KnowledgeItem
 from core.knowledge.people.schemas import PersonBirthday, PersonDetails
-
-
-def event(  # noqa: PLR0913
-    *,
-    start: date | datetime,
-    end: date | datetime,
-    frequency: EventFrequency,
-    until_date: date | None,
-    all_day: bool,
-    time_zone: str,
-) -> Event:
-    draft = EventDraft(
-        title="Meeting",
-        description="",
-        anchor_time_zone=ZoneInfo(time_zone),
-        all_day=all_day,
-        start=start,
-        end=end,
-        recurrence=EventRecurrence(frequency=frequency, until_date=until_date),
-    )
-    return Event.from_draft(event_id="a" * 32, draft=draft)
+from tests.helpers.factories.core import CoreFactoryHelper
 
 
 def use_case(*, events: list[Event]) -> CalendarOccurrencesUseCase:
@@ -61,7 +42,7 @@ def use_case(*, events: list[Event]) -> CalendarOccurrencesUseCase:
 async def test_monthly_recurrence_clamps_from_original_day() -> None:
     calendar = use_case(
         events=[
-            event(
+            CoreFactoryHelper.event(
                 start=date(2026, 1, 31),
                 end=date(2026, 2, 2),
                 frequency=EventFrequency.MONTHLY,
@@ -73,9 +54,11 @@ async def test_monthly_recurrence_clamps_from_original_day() -> None:
     )
 
     result = await calendar.get_occurrences(
-        start_date=date(2026, 2, 1),
-        end_date=date(2026, 4, 1),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 4, 1),
+            author_username="owner",
+        ),
     )
 
     assert [(entry.start, entry.end) for entry in result.entries] == [
@@ -89,7 +72,7 @@ async def test_monthly_recurrence_clamps_from_original_day() -> None:
 async def test_yearly_february_29_event_clamps_to_february_28() -> None:
     calendar = use_case(
         events=[
-            event(
+            CoreFactoryHelper.event(
                 start=date(2024, 2, 29),
                 end=date(2024, 3, 1),
                 frequency=EventFrequency.YEARLY,
@@ -100,9 +83,11 @@ async def test_yearly_february_29_event_clamps_to_february_28() -> None:
         ],
     )
     result = await calendar.get_occurrences(
-        start_date=date(2025, 2, 1),
-        end_date=date(2025, 3, 2),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2025, 2, 1),
+            end_date=date(2025, 3, 2),
+            author_username="owner",
+        ),
     )
     assert [(entry.start, entry.end) for entry in result.entries] == [
         (date(2025, 2, 28), date(2025, 3, 1)),
@@ -113,7 +98,7 @@ async def test_yearly_february_29_event_clamps_to_february_28() -> None:
 async def test_daily_timed_event_keeps_wall_time_through_dst() -> None:
     calendar = use_case(
         events=[
-            event(
+            CoreFactoryHelper.event(
                 start=datetime(2026, 3, 28, 9, tzinfo=UTC),
                 end=datetime(2026, 3, 28, 10, tzinfo=UTC),
                 frequency=EventFrequency.DAILY,
@@ -124,9 +109,11 @@ async def test_daily_timed_event_keeps_wall_time_through_dst() -> None:
         ],
     )
     result = await calendar.get_occurrences(
-        start_date=date(2026, 3, 28),
-        end_date=date(2026, 3, 31),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2026, 3, 28),
+            end_date=date(2026, 3, 31),
+            author_username="owner",
+        ),
     )
     assert [entry.start for entry in result.entries] == [
         datetime(2026, 3, 28, 9, tzinfo=UTC),
@@ -141,7 +128,7 @@ async def test_daily_timed_event_keeps_wall_time_through_dst() -> None:
 
 
 def test_ambiguous_fall_time_keeps_original_start_and_end_clocks() -> None:
-    fall_event = event(
+    fall_event = CoreFactoryHelper.event(
         start=datetime(2026, 10, 24, 0, 30, tzinfo=UTC),
         end=datetime(2026, 10, 24, 1, 30, tzinfo=UTC),
         frequency=EventFrequency.DAILY,
@@ -154,7 +141,7 @@ def test_ambiguous_fall_time_keeps_original_start_and_end_clocks() -> None:
         datetime(2026, 10, 25, 2, 30, tzinfo=UTC),
     )
 
-    multiday_event = event(
+    multiday_event = CoreFactoryHelper.event(
         start=datetime(2026, 3, 27, 21, tzinfo=UTC),
         end=datetime(2026, 3, 29, 7, tzinfo=UTC),
         frequency=EventFrequency.WEEKLY,
@@ -169,7 +156,7 @@ def test_ambiguous_fall_time_keeps_original_start_and_end_clocks() -> None:
 
 
 def test_timed_month_end_multiday_keeps_original_wall_day_span() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 1, 30, 22, tzinfo=UTC),
         end=datetime(2026, 2, 1, 9, tzinfo=UTC),
         frequency=EventFrequency.MONTHLY,
@@ -188,7 +175,7 @@ def test_timed_month_end_multiday_keeps_original_wall_day_span() -> None:
 
 
 def test_first_timed_occurrence_preserves_fall_fold_one_instant() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 11, 1, 6, 30, tzinfo=UTC),
         end=datetime(2026, 11, 1, 7, 30, tzinfo=UTC),
         frequency=EventFrequency.DAILY,
@@ -203,7 +190,7 @@ def test_first_timed_occurrence_preserves_fall_fold_one_instant() -> None:
 
 
 def test_account_zone_retimes_existing_recurring_wall_clock_but_not_one_off() -> None:
-    recurring = event(
+    recurring = CoreFactoryHelper.event(
         start=datetime(2026, 1, 1, 8, tzinfo=UTC),
         end=datetime(2026, 1, 1, 9, tzinfo=UTC),
         frequency=EventFrequency.DAILY,
@@ -219,7 +206,7 @@ def test_account_zone_retimes_existing_recurring_wall_clock_but_not_one_off() ->
         datetime(2026, 1, 2, 5, tzinfo=UTC),
         datetime(2026, 1, 2, 6, tzinfo=UTC),
     )
-    one_off = event(
+    one_off = CoreFactoryHelper.event(
         start=recurring.start,
         end=recurring.end,
         frequency=EventFrequency.NONE,
@@ -237,7 +224,7 @@ def test_account_zone_retimes_existing_recurring_wall_clock_but_not_one_off() ->
 async def test_calendar_view_zone_does_not_set_recurring_schedule_zone() -> None:
     calendar = use_case(
         events=[
-            event(
+            CoreFactoryHelper.event(
                 start=datetime(2026, 1, 1, 8, tzinfo=UTC),
                 end=datetime(2026, 1, 1, 9, tzinfo=UTC),
                 frequency=EventFrequency.DAILY,
@@ -251,9 +238,11 @@ async def test_calendar_view_zone_does_not_set_recurring_schedule_zone() -> None
     reader.get_time_zone.return_value = ZoneInfo("Asia/Yerevan")
 
     result = await calendar.get_occurrences(
-        start_date=date(2026, 1, 1),
-        end_date=date(2026, 1, 3),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 3),
+            author_username="owner",
+        ),
     )
 
     assert [entry.start for entry in result.entries] == [
@@ -266,7 +255,7 @@ async def test_calendar_view_zone_does_not_set_recurring_schedule_zone() -> None
 async def test_calendar_range_uses_account_day_boundaries() -> None:
     calendar = use_case(
         events=[
-            event(
+            CoreFactoryHelper.event(
                 start=datetime(2026, 1, 1, 20, 30, tzinfo=UTC),
                 end=datetime(2026, 1, 1, 21, 30, tzinfo=UTC),
                 frequency=EventFrequency.NONE,
@@ -280,9 +269,11 @@ async def test_calendar_range_uses_account_day_boundaries() -> None:
     reader.get_time_zone.return_value = ZoneInfo("Asia/Yerevan")
 
     result = await calendar.get_occurrences(
-        start_date=date(2026, 1, 2),
-        end_date=date(2026, 1, 3),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2026, 1, 2),
+            end_date=date(2026, 1, 3),
+            author_username="owner",
+        ),
     )
 
     assert [entry.start for entry in result.entries] == [
@@ -291,7 +282,7 @@ async def test_calendar_range_uses_account_day_boundaries() -> None:
 
 
 def test_later_ambiguous_start_reuses_original_fold() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 11, 1, 6, 30, tzinfo=UTC),
         end=datetime(2026, 11, 1, 7, 30, tzinfo=UTC),
         frequency=EventFrequency.WEEKLY,
@@ -306,7 +297,7 @@ def test_later_ambiguous_start_reuses_original_fold() -> None:
 
 
 def test_one_off_event_spanning_repeated_hour_keeps_original_utc_endpoints() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 11, 1, 5, 30, tzinfo=UTC),
         end=datetime(2026, 11, 1, 6, 45, tzinfo=UTC),
         frequency=EventFrequency.NONE,
@@ -322,7 +313,7 @@ def test_one_off_event_spanning_repeated_hour_keeps_original_utc_endpoints() -> 
 
 @pytest.mark.asyncio
 async def test_range_keeps_one_off_event_spanning_repeated_hour() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 11, 1, 5, 30, tzinfo=UTC),
         end=datetime(2026, 11, 1, 6, 45, tzinfo=UTC),
         frequency=EventFrequency.NONE,
@@ -332,9 +323,11 @@ async def test_range_keeps_one_off_event_spanning_repeated_hour() -> None:
     )
     calendar = use_case(events=[value])
     result = await calendar.get_occurrences(
-        start_date=date(2026, 11, 1),
-        end_date=date(2026, 11, 2),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2026, 11, 1),
+            end_date=date(2026, 11, 2),
+            author_username="owner",
+        ),
     )
     assert [(entry.start, entry.end) for entry in result.entries] == [
         (value.start, value.end),
@@ -342,7 +335,7 @@ async def test_range_keeps_one_off_event_spanning_repeated_hour() -> None:
 
 
 def test_spring_gap_moves_forward_and_preserves_elapsed_duration() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 3, 7, 7, 30, tzinfo=UTC),
         end=datetime(2026, 3, 7, 8, 30, tzinfo=UTC),
         frequency=EventFrequency.DAILY,
@@ -357,7 +350,7 @@ def test_spring_gap_moves_forward_and_preserves_elapsed_duration() -> None:
 
 
 def test_timed_monthly_recurrence_clamps_from_original_day_and_clock() -> None:
-    value = event(
+    value = CoreFactoryHelper.event(
         start=datetime(2026, 1, 31, 9, tzinfo=UTC),
         end=datetime(2026, 1, 31, 10, 30, tzinfo=UTC),
         frequency=EventFrequency.MONTHLY,
@@ -379,7 +372,7 @@ def test_timed_monthly_recurrence_clamps_from_original_day_and_clock() -> None:
 async def test_timed_event_starting_before_range_is_included_when_it_overlaps() -> None:
     calendar = use_case(
         events=[
-            event(
+            CoreFactoryHelper.event(
                 start=datetime(2026, 5, 1, 23, tzinfo=UTC),
                 end=datetime(2026, 5, 3, 1, tzinfo=UTC),
                 frequency=EventFrequency.NONE,
@@ -390,9 +383,11 @@ async def test_timed_event_starting_before_range_is_included_when_it_overlaps() 
         ],
     )
     result = await calendar.get_occurrences(
-        start_date=date(2026, 5, 2),
-        end_date=date(2026, 5, 3),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2026, 5, 2),
+            end_date=date(2026, 5, 3),
+            author_username="owner",
+        ),
     )
     assert len(result.entries) == 1
     assert result.entries[0].start == datetime(2026, 5, 1, 23, tzinfo=UTC)
@@ -448,9 +443,11 @@ async def test_legacy_february_29_annual_sources_remain_unplaced_in_nonleap_year
     )
 
     result = await calendar.get_occurrences(
-        start_date=date(2025, 2, 1),
-        end_date=date(2025, 3, 1),
-        author_username="owner",
+        params=GetCalendarOccurrencesParams(
+            start_date=date(2025, 2, 1),
+            end_date=date(2025, 3, 1),
+            author_username="owner",
+        ),
     )
 
     assert result.entries == []

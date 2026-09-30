@@ -155,9 +155,11 @@ class KnowledgeFilesProvider(Provider):
         item_storage: KnowledgeItemsStorage,
         file_storage: KnowledgeFilesStorage,
         file_service: KnowledgeFileCrudService,
+        rollback_registrar: KnowledgeFileRollbackRegistrar,
     ) -> KnowledgeFilesUseCase:
         return KnowledgeFilesUseCase(
             item_storage=item_storage,
             file_storage=file_storage,
             file_service=file_service,
+            rollback_registrar=rollback_registrar,
         )

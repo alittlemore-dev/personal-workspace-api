@@ -28,89 +28,23 @@ from core.knowledge.people.enums import (
     PersonRelationshipDirection,
 )
 from core.knowledge.people.schemas import (
-    PersonDetails,
+    DeletePersonParams,
     PersonFilters,
-    PersonRelationship,
     PersonRelationshipChanges,
     PersonRelationshipCreateParams,
-    PersonRelationshipType,
     PersonRelationshipTypeUpdateParams,
     PersonRelationshipUpdateParams,
+    PersonTargetParams,
     PersonUpdateParams,
+    UpdatePersonParams,
+    UpdatePersonRelationshipTypeParams,
+    ValidatePersonRelationshipChangesParams,
 )
 from core.knowledge.people.storages import PeopleStorage
 from core.knowledge.people.use_cases import PeopleUseCase, PersonRelationshipTypesUseCase
 from tests.test_cases import TestCase
 
 CURRENT_DATETIME = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
-
-
-def knowledge_item(
-    *,
-    item_id: str,
-    display_name: str,
-    author_username: str = "owner",
-) -> KnowledgeItem:
-    return KnowledgeItem(
-        id=item_id,
-        kind=KnowledgeItemKind.PERSON,
-        author_username=author_username,
-        display_name=display_name,
-        description="",
-        tags=[],
-        created_at=CURRENT_DATETIME,
-        updated_at=CURRENT_DATETIME,
-    )
-
-
-def person_details(
-    *,
-    item_id: str,
-    last_name: str = "Иванов",
-    telegram: str = "",
-) -> PersonDetails:
-    return PersonDetails(
-        item_id=item_id,
-        last_name=last_name,
-        first_name="Иван",
-        middle_name="",
-        email="",
-        phone="",
-        telegram=telegram,
-        birthday=None,
-        notifications_enabled=True,
-    )
-
-
-def relationship_type(*, relationship_type_id: str) -> PersonRelationshipType:
-    return PersonRelationshipType(
-        id=relationship_type_id,
-        author_username="owner",
-        is_symmetric=False,
-        forward_name="руководитель",
-        reverse_name="подчинённый",
-        created_at=CURRENT_DATETIME,
-        updated_at=CURRENT_DATETIME,
-    )
-
-
-def relationship(
-    *,
-    relationship_id: str,
-    source_person_id: str,
-    target_person_id: str,
-    type_schema: PersonRelationshipType,
-) -> PersonRelationship:
-    return PersonRelationship(
-        id=relationship_id,
-        author_username="owner",
-        source_person_id=source_person_id,
-        target_person_id=target_person_id,
-        relationship_type=type_schema,
-        note="",
-        created_at=CURRENT_DATETIME,
-        updated_at=CURRENT_DATETIME,
-    )
 
 
 class TestKnowledgeItemCrudService(TestCase):
@@ -120,7 +54,7 @@ class TestKnowledgeItemCrudService(TestCase):
         self.service = KnowledgeItemCrudService(storage=self.storage)
 
     async def test_update_item_replaces_tags_after_typed_item_update(self) -> None:
-        item = knowledge_item(
+        item = self.factory.core.knowledge_item(
             item_id=self.factory.core.hex_id(1),
             display_name="Иванов Иван",
         )
@@ -174,7 +108,7 @@ class TestPeopleUseCase(TestCase):
         person_id = self.factory.core.hex_id(1)
         january_id = self.factory.core.hex_id(2)
         december_id = self.factory.core.hex_id(3)
-        item = knowledge_item(item_id=person_id, display_name="Иванов Иван")
+        item = self.factory.core.knowledge_item(item_id=person_id, display_name="Иванов Иван")
         january_item = KnowledgeItem(
             id=january_id,
             kind=KnowledgeItemKind.DATE,
@@ -196,7 +130,9 @@ class TestPeopleUseCase(TestCase):
             updated_at=CURRENT_DATETIME,
         )
         self.item_service.get_item.return_value = item
-        self.people_storage.get_details.return_value = person_details(item_id=person_id)
+        self.people_storage.get_details.return_value = self.factory.core.person_details(
+            item_id=person_id,
+        )
         self.people_storage.list_relationships.return_value = []
         self.item_storage.get_items_by_ids.side_effect = [
             [],
@@ -220,8 +156,10 @@ class TestPeopleUseCase(TestCase):
         ]
 
         person = await self.use_case.get_person(
-            person_id=person_id,
-            author_username="owner",
+            params=PersonTargetParams(
+                person_id=person_id,
+                author_username="owner",
+            ),
         )
 
         assert [value.id for value in person.related_dates] == [january_id, december_id]
@@ -242,14 +180,18 @@ class TestPeopleUseCase(TestCase):
             created_at=CURRENT_DATETIME,
             updated_at=CURRENT_DATETIME,
         )
-        first_item = knowledge_item(item_id=first_id, display_name="Alpha")
-        second_item = knowledge_item(item_id=second_id, display_name="Beta")
+        first_item = self.factory.core.knowledge_item(item_id=first_id, display_name="Alpha")
+        second_item = self.factory.core.knowledge_item(item_id=second_id, display_name="Beta")
         self.item_storage.get_tags_by_ids.return_value = [tag]
         self.people_storage.list_person_page.return_value = ([second_id, first_id], 2)
         self.item_storage.get_items_by_ids.return_value = [first_item, second_item]
         self.people_storage.list_details.return_value = [
-            person_details(item_id=first_id, last_name="Alpha"),
-            person_details(item_id=second_id, last_name="Beta", telegram="@beta"),
+            self.factory.core.person_details(item_id=first_id, last_name="Alpha"),
+            self.factory.core.person_details(
+                item_id=second_id,
+                last_name="Beta",
+                telegram="@beta",
+            ),
         ]
         filters = PersonFilters(
             page=2,
@@ -309,20 +251,24 @@ class TestPeopleUseCase(TestCase):
         new_related_id = self.factory.core.hex_id(3)
         relationship_id = self.factory.core.hex_id(4)
         relationship_type_id = self.factory.core.hex_id(5)
-        item = knowledge_item(item_id=person_id, display_name="Иванов Иван")
-        new_related_item = knowledge_item(
+        item = self.factory.core.knowledge_item(item_id=person_id, display_name="Иванов Иван")
+        new_related_item = self.factory.core.knowledge_item(
             item_id=new_related_id,
             display_name="Петров Пётр",
         )
-        type_schema = relationship_type(relationship_type_id=relationship_type_id)
-        old_relationship = relationship(
+        type_schema = self.factory.core.person_relationship_type(
+            relationship_type_id=relationship_type_id,
+        )
+        old_relationship = self.factory.core.person_relationship(
             relationship_id=relationship_id,
             source_person_id=person_id,
             target_person_id=old_related_id,
             type_schema=type_schema,
         )
         self.item_service.get_item.return_value = item
-        self.people_storage.get_details.return_value = person_details(item_id=person_id)
+        self.people_storage.get_details.return_value = self.factory.core.person_details(
+            item_id=person_id,
+        )
         self.people_storage.get_relationships_by_ids.return_value = [old_relationship]
         self.people_storage.get_relationship_types_by_ids.return_value = [type_schema]
         self.item_storage.get_items_by_ids.side_effect = [[new_related_item], []]
@@ -354,10 +300,12 @@ class TestPeopleUseCase(TestCase):
         )
 
         await self.use_case.update_person(
-            person_id=person_id,
-            params=params,
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
+            params=UpdatePersonParams(
+                person_id=person_id,
+                data=params,
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         touch_call = self.item_storage.touch_items.await_args
@@ -369,7 +317,7 @@ class TestPeopleUseCase(TestCase):
         person_id = self.factory.core.hex_id(1)
         related_person_id = self.factory.core.hex_id(2)
         related_date_id = self.factory.core.hex_id(3)
-        self.item_service.get_item.return_value = knowledge_item(
+        self.item_service.get_item.return_value = self.factory.core.knowledge_item(
             item_id=person_id,
             display_name="Иванов Иван",
         )
@@ -377,9 +325,11 @@ class TestPeopleUseCase(TestCase):
         self.dates_storage.list_date_ids_for_person.return_value = [related_date_id]
 
         await self.use_case.delete_person(
-            person_id=person_id,
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
+            params=DeletePersonParams(
+                person_id=person_id,
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert self.item_storage.touch_items.await_count == 2
@@ -406,7 +356,7 @@ class TestPeopleUseCase(TestCase):
             created_at=CURRENT_DATETIME,
             updated_at=CURRENT_DATETIME,
         )
-        self.item_service.get_item.return_value = knowledge_item(
+        self.item_service.get_item.return_value = self.factory.core.knowledge_item(
             item_id=person_id,
             display_name="Иванов Иван",
         )
@@ -419,9 +369,11 @@ class TestPeopleUseCase(TestCase):
         mutations.attach_mock(self.item_service.delete_item, "delete_item")
 
         object_names = await self.use_case.delete_person(
-            person_id=person_id,
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
+            params=DeletePersonParams(
+                person_id=person_id,
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert object_names == ("person-photos/photo.webp",)
@@ -451,7 +403,7 @@ class TestPeopleUseCase(TestCase):
             created_at=CURRENT_DATETIME,
             updated_at=CURRENT_DATETIME,
         )
-        self.item_service.get_item.return_value = knowledge_item(
+        self.item_service.get_item.return_value = self.factory.core.knowledge_item(
             item_id=person_id,
             display_name="Иванов Иван",
         )
@@ -461,9 +413,11 @@ class TestPeopleUseCase(TestCase):
         self.file_service.delete_files.return_value = ()
 
         object_names = await self.use_case.delete_person(
-            person_id=person_id,
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
+            params=DeletePersonParams(
+                person_id=person_id,
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert object_names == ()
@@ -486,9 +440,11 @@ class TestPeopleUseCase(TestCase):
 
         with pytest.raises(InvalidKnowledgeDataError):
             await self.use_case.validate_relationship_changes(
-                person_id=person_id,
-                changes=changes,
-                author_username="owner",
+                params=ValidatePersonRelationshipChangesParams(
+                    person_id=person_id,
+                    changes=changes,
+                    author_username="owner",
+                ),
             )
 
     async def test_validate_relationship_changes_rejects_foreign_person_or_type(self) -> None:
@@ -510,13 +466,15 @@ class TestPeopleUseCase(TestCase):
 
         with pytest.raises(PersonRelationshipNotFoundError):
             await self.use_case.validate_relationship_changes(
-                person_id=person_id,
-                changes=changes,
-                author_username="owner",
+                params=ValidatePersonRelationshipChangesParams(
+                    person_id=person_id,
+                    changes=changes,
+                    author_username="owner",
+                ),
             )
 
         self.item_storage.get_items_by_ids.return_value = [
-            knowledge_item(
+            self.factory.core.knowledge_item(
                 item_id=self.factory.core.hex_id(2),
                 display_name="Петров Пётр",
             ),
@@ -525,9 +483,11 @@ class TestPeopleUseCase(TestCase):
 
         with pytest.raises(PersonRelationshipTypeNotFoundError):
             await self.use_case.validate_relationship_changes(
-                person_id=person_id,
-                changes=changes,
-                author_username="owner",
+                params=ValidatePersonRelationshipChangesParams(
+                    person_id=person_id,
+                    changes=changes,
+                    author_username="owner",
+                ),
             )
 
     async def test_validate_relationship_changes_rejects_duplicate_pair_and_type(self) -> None:
@@ -547,17 +507,21 @@ class TestPeopleUseCase(TestCase):
         )
         self.people_storage.get_relationships_by_ids.return_value = []
         self.item_storage.get_items_by_ids.return_value = [
-            knowledge_item(item_id=related_id, display_name="Петров Пётр"),
+            self.factory.core.knowledge_item(item_id=related_id, display_name="Петров Пётр"),
         ]
         self.people_storage.get_relationship_types_by_ids.return_value = [
-            relationship_type(relationship_type_id=relationship_type_id),
+            self.factory.core.person_relationship_type(
+                relationship_type_id=relationship_type_id,
+            ),
         ]
 
         with pytest.raises(KnowledgeConflictError):
             await self.use_case.validate_relationship_changes(
-                person_id=person_id,
-                changes=changes,
-                author_username="owner",
+                params=ValidatePersonRelationshipChangesParams(
+                    person_id=person_id,
+                    changes=changes,
+                    author_username="owner",
+                ),
             )
 
 
@@ -569,19 +533,23 @@ class TestPersonRelationshipTypesUseCase(TestCase):
 
     async def test_update_reuses_supplied_datetime_for_validation_and_storage(self) -> None:
         relationship_type_id = self.factory.core.hex_id(1)
-        existing = relationship_type(relationship_type_id=relationship_type_id)
+        existing = self.factory.core.person_relationship_type(
+            relationship_type_id=relationship_type_id,
+        )
         self.storage.get_relationship_type.return_value = existing
         self.storage.update_relationship_type.return_value = existing
 
         await self.use_case.update_relationship_type(
-            relationship_type_id=relationship_type_id,
-            params=PersonRelationshipTypeUpdateParams(
-                is_symmetric=False,
-                forward_name="руководитель",
-                reverse_name="подчинённый",
+            params=UpdatePersonRelationshipTypeParams(
+                relationship_type_id=relationship_type_id,
+                data=PersonRelationshipTypeUpdateParams(
+                    is_symmetric=False,
+                    forward_name="руководитель",
+                    reverse_name="подчинённый",
+                ),
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
             ),
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
         )
 
         assert (

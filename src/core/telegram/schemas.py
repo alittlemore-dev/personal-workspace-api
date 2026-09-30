@@ -88,3 +88,59 @@ class TelegramConnectionSettings:
     notify_birthday: bool
     notify_memorable_date: bool
     language: LanguageEnum
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateTelegramInvitationParams:
+    owner_username: str
+    label: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListTelegramInvitationsParams:
+    owner_username: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CancelTelegramInvitationParams:
+    owner_username: str
+    invitation_id: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RequestTelegramConnectionParams:
+    token: InvitationToken
+    participant: TelegramParticipant
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ApproveTelegramConnectionParams:
+    owner_username: str
+    connection_id: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ChangeTelegramConnectionStateParams:
+    owner_username: str
+    connection_id: str
+    state: TelegramConnectionState
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RenameTelegramConnectionParams:
+    owner_username: str
+    connection_id: str
+    label: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SetTelegramConnectionSettingsParams:
+    owner_username: str
+    connection_id: str
+    settings: TelegramConnectionSettings

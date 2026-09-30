@@ -4,6 +4,7 @@ These rules apply to SQLAlchemy models, PostgreSQL storages, and Alembic migrati
 
 ## Data Models
 
+- Use `BaseModel`'s table-name mixin; do not override `__tablename__` in individual ORM models.
 - Every SQLAlchemy datetime column, including nullable columns and matching Alembic column
   definitions, must use `sqlalchemy_dev_utils.types.datetime.UTCDateTime`; do not use raw
   `sqlalchemy.DateTime` for persisted timestamps.
@@ -17,6 +18,9 @@ These rules apply to SQLAlchemy models, PostgreSQL storages, and Alembic migrati
 - In ORM `__table_args__`, use mapped column objects and SQLAlchemy expressions for indexes and
   predicates when supported. Reserve column-name strings and `text()` for cases the typed API
   cannot express; compare the resulting DDL with the matching migration.
+- Persist fixed-shape JSON through an explicit Pydantic schema and the existing `PydanticType`.
+  Keep corresponding core snapshots precisely typed with standard-library `TypedDict` or
+  dataclass contracts.
 
 ## Storages
 
@@ -27,6 +31,10 @@ These rules apply to SQLAlchemy models, PostgreSQL storages, and Alembic migrati
 
 ## Migrations
 
+- Do not modify an Alembic revision that may have been applied. Represent later changes in a new
+  generated revision and test populated known starting schemas. If an applied revision was
+  previously edited, inspect the actual schema read-only and cover each known starting shape in
+  migration tests.
 - Do not hand-write new Alembic revision files from scratch. Generate new migrations with the
   project's Alembic autogeneration Make target first, then edit the generated revision only for
   intentional data updates, naming cleanup, operation ordering, or other explicit refinements.

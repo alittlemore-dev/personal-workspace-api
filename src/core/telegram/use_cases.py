@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from core.telegram.enums import TelegramConnectionState
 from core.telegram.exceptions import (
@@ -9,12 +9,17 @@ from core.telegram.exceptions import (
 )
 from core.telegram.generators import InvitationTokenGenerator
 from core.telegram.schemas import (
-    InvitationToken,
+    ApproveTelegramConnectionParams,
+    CancelTelegramInvitationParams,
+    ChangeTelegramConnectionStateParams,
+    CreateTelegramInvitationParams,
     IssuedTelegramInvitation,
+    ListTelegramInvitationsParams,
+    RenameTelegramConnectionParams,
+    RequestTelegramConnectionParams,
+    SetTelegramConnectionSettingsParams,
     TelegramConnection,
-    TelegramConnectionSettings,
     TelegramInvitation,
-    TelegramParticipant,
     TelegramUseCaseConfig,
 )
 from core.telegram.storages import (
@@ -35,28 +40,26 @@ class TelegramUseCase:
     async def create_invitation(
         self,
         *,
-        owner_username: str,
-        label: str,
-        now: datetime,
+        params: CreateTelegramInvitationParams,
     ) -> IssuedTelegramInvitation:
         if not self.config.available or not await self.settings_reader.is_enabled(
-            owner_username=owner_username,
+            owner_username=params.owner_username,
         ):
             raise TelegramAccessError
         count = await self.storage.count_recent_invitations(
-            owner_username=owner_username,
-            since=now - timedelta(hours=1),
+            owner_username=params.owner_username,
+            since=params.now - timedelta(hours=1),
         )
         if count >= self.config.invitation_limit:
             raise TelegramLimitError
         token = self.token_generator.generate()
-        expires_at = now + timedelta(minutes=15)
+        expires_at = params.now + timedelta(minutes=15)
         await self.storage.replace_invitation(
-            owner_username=owner_username,
+            owner_username=params.owner_username,
             token_hash=token.hash,
-            label=label,
+            label=params.label,
             expires_at=expires_at,
-            now=now,
+            now=params.now,
         )
         return IssuedTelegramInvitation(
             token=token,
@@ -67,59 +70,49 @@ class TelegramUseCase:
     async def list_invitations(
         self,
         *,
-        owner_username: str,
-        now: datetime,
+        params: ListTelegramInvitationsParams,
     ) -> list[TelegramInvitation]:
-        return await self.storage.list_invitations(owner_username=owner_username, now=now)
-
-    async def cancel_invitation(
-        self,
-        *,
-        owner_username: str,
-        invitation_id: str,
-        now: datetime,
-    ) -> None:
-        await self.storage.cancel_invitation(
-            owner_username=owner_username,
-            invitation_id=invitation_id,
-            now=now,
+        return await self.storage.list_invitations(
+            owner_username=params.owner_username,
+            now=params.now,
         )
 
-    async def request_connection(
-        self,
-        *,
-        token: InvitationToken,
-        participant: TelegramParticipant,
-        now: datetime,
-    ) -> str:
+    async def cancel_invitation(self, *, params: CancelTelegramInvitationParams) -> None:
+        await self.storage.cancel_invitation(
+            owner_username=params.owner_username,
+            invitation_id=params.invitation_id,
+            now=params.now,
+        )
+
+    async def request_connection(self, *, params: RequestTelegramConnectionParams) -> str:
         if not self.config.available:
             raise TelegramAccessError
         if self.limiter is not None and not await self.limiter.allow_attempt(
-            telegram_user_id=participant.user_id,
+            telegram_user_id=params.participant.user_id,
         ):
             raise TelegramLimitError
         invitation = await self.storage.get_invitation(
-            token_hash=token.hash,
+            token_hash=params.token.hash,
             lock=True,
         )
         if invitation is None:
             raise TelegramInvitationError
-        invitation.require_usable(now=now)
+        invitation.require_usable(now=params.now)
         if not await self.settings_reader.is_enabled(owner_username=invitation.owner_username):
             raise TelegramAccessError
         existing = await self.storage.get_connection_for_user(
             owner_username=invitation.owner_username,
-            telegram_user_id=participant.user_id,
+            telegram_user_id=params.participant.user_id,
         )
         if (
             existing is not None
             and existing.state == TelegramConnectionState.PENDING
-            and existing.requested_at + timedelta(hours=24) <= now
+            and existing.requested_at + timedelta(hours=24) <= params.now
         ):
             await self.storage.set_connection_state(
                 connection_id=existing.id,
                 state=TelegramConnectionState.REVOKED,
-                now=now,
+                now=params.now,
             )
             existing = None
         if existing is not None and existing.state in (
@@ -128,21 +121,21 @@ class TelegramUseCase:
             TelegramConnectionState.ACTIVE,
         ):
             raise TelegramAccessError
-        if await self.storage.has_active_connection(telegram_user_id=participant.user_id):
+        if await self.storage.has_active_connection(telegram_user_id=params.participant.user_id):
             raise TelegramAccessError
         count = await self.storage.count_live_connections(
             owner_username=invitation.owner_username,
-            pending_since=now - timedelta(hours=24),
+            pending_since=params.now - timedelta(hours=24),
         )
         if count >= self.config.connection_limit:
             raise TelegramLimitError
         await self.storage.create_pending_connection(
             owner_username=invitation.owner_username,
-            participant=participant,
+            participant=params.participant,
             label=invitation.label,
-            now=now,
+            now=params.now,
         )
-        await self.storage.consume_invitation(invitation_id=invitation.id, now=now)
+        await self.storage.consume_invitation(invitation_id=invitation.id, now=params.now)
         return "pending"
 
     async def list_connections(self, *, owner_username: str) -> list[TelegramConnection]:
@@ -151,107 +144,101 @@ class TelegramUseCase:
     async def approve_connection(
         self,
         *,
-        owner_username: str,
-        connection_id: str,
-        now: datetime,
+        params: ApproveTelegramConnectionParams,
     ) -> TelegramConnection:
-        connection = await self.storage.get_connection(connection_id=connection_id)
+        connection = await self.storage.get_connection(connection_id=params.connection_id)
         if connection is None:
             raise TelegramAccessError
-        connection.require_owner(owner_username=owner_username)
+        connection.require_owner(owner_username=params.owner_username)
         if not self.config.available or not await self.settings_reader.is_enabled(
-            owner_username=owner_username,
+            owner_username=params.owner_username,
         ):
             raise TelegramAccessError
         if (
             connection.state != TelegramConnectionState.PENDING
-            or connection.requested_at + timedelta(hours=24) <= now
+            or connection.requested_at + timedelta(hours=24) <= params.now
         ):
             raise TelegramAccessError
         if await self.storage.has_active_connection(telegram_user_id=connection.telegram_user_id):
             raise TelegramAccessError
         return await self.storage.set_connection_state(
-            connection_id=connection_id,
+            connection_id=params.connection_id,
             state=TelegramConnectionState.ACTIVE,
-            now=now,
+            now=params.now,
         )
 
     async def change_connection_state(
         self,
         *,
-        owner_username: str,
-        connection_id: str,
-        state: TelegramConnectionState,
-        now: datetime,
+        params: ChangeTelegramConnectionStateParams,
     ) -> TelegramConnection:
-        connection = await self.storage.get_connection(connection_id=connection_id)
+        connection = await self.storage.get_connection(connection_id=params.connection_id)
         if connection is None:
             raise TelegramAccessError
-        connection.require_owner(owner_username=owner_username)
-        if state == TelegramConnectionState.ACTIVE:
+        connection.require_owner(owner_username=params.owner_username)
+        if params.state == TelegramConnectionState.ACTIVE:
             raise TelegramAccessError
-        if state == TelegramConnectionState.PENDING:
+        if params.state == TelegramConnectionState.PENDING:
             raise TelegramAccessError
         if (
             connection.state == TelegramConnectionState.BLOCKED
-            and state == TelegramConnectionState.REVOKED
+            and params.state == TelegramConnectionState.REVOKED
         ):
             return await self.storage.set_connection_state(
-                connection_id=connection_id,
-                state=state,
-                now=now,
+                connection_id=params.connection_id,
+                state=params.state,
+                now=params.now,
             )
         if connection.state in (
             TelegramConnectionState.PENDING,
             TelegramConnectionState.ACTIVE,
-        ) and state in (TelegramConnectionState.REVOKED, TelegramConnectionState.BLOCKED):
+        ) and params.state in (TelegramConnectionState.REVOKED, TelegramConnectionState.BLOCKED):
             return await self.storage.set_connection_state(
-                connection_id=connection_id,
-                state=state,
-                now=now,
+                connection_id=params.connection_id,
+                state=params.state,
+                now=params.now,
             )
         if (
             connection.state == TelegramConnectionState.REVOKED
-            and state == TelegramConnectionState.BLOCKED
+            and params.state == TelegramConnectionState.BLOCKED
         ):
             live_connection = await self.storage.get_connection_for_user(
-                owner_username=owner_username,
+                owner_username=params.owner_username,
                 telegram_user_id=connection.telegram_user_id,
             )
             if live_connection is not None:
                 raise TelegramAccessError
             return await self.storage.set_connection_state(
-                connection_id=connection_id,
-                state=state,
-                now=now,
+                connection_id=params.connection_id,
+                state=params.state,
+                now=params.now,
             )
         raise TelegramAccessError
 
     async def rename_connection(
         self,
         *,
-        owner_username: str,
-        connection_id: str,
-        label: str,
+        params: RenameTelegramConnectionParams,
     ) -> TelegramConnection:
-        connection = await self.storage.get_connection(connection_id=connection_id)
+        connection = await self.storage.get_connection(connection_id=params.connection_id)
         if connection is None:
             raise TelegramAccessError
-        connection.require_owner(owner_username=owner_username)
-        return await self.storage.set_connection_label(connection_id=connection_id, label=label)
+        connection.require_owner(owner_username=params.owner_username)
+        return await self.storage.set_connection_label(
+            connection_id=params.connection_id,
+            label=params.label,
+        )
 
     async def set_connection_settings(
         self,
         *,
-        owner_username: str,
-        connection_id: str,
-        settings: TelegramConnectionSettings,
+        params: SetTelegramConnectionSettingsParams,
     ) -> TelegramConnection:
-        connection = await self.storage.get_connection(connection_id=connection_id)
+        connection = await self.storage.get_connection(connection_id=params.connection_id)
         if connection is None:
             raise TelegramAccessError
-        connection.require_owner(owner_username=owner_username)
+        connection.require_owner(owner_username=params.owner_username)
         return await self.storage.set_connection_settings(
-            connection_id=connection_id,
-            settings=settings,
+            connection_id=params.connection_id,
+            settings=params.settings,
         )

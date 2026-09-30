@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from core.telegram.exceptions import TelegramAccessError
-from core.telegram.schemas import InvitationToken, TelegramUseCaseConfig
+from core.telegram.schemas import (
+    CreateTelegramInvitationParams,
+    InvitationToken,
+    TelegramUseCaseConfig,
+)
 from core.telegram.use_cases import TelegramUseCase
 
 NOW = datetime(2026, 9, 26, 12, tzinfo=UTC)
@@ -31,7 +35,13 @@ async def test_issues_single_use_invitation_only_for_enabled_owner() -> None:
         limiter=None,
     )
 
-    issued = await use_case.create_invitation(owner_username="anna", label="Family", now=NOW)
+    issued = await use_case.create_invitation(
+        params=CreateTelegramInvitationParams(
+            owner_username="anna",
+            label="Family",
+            now=NOW,
+        ),
+    )
 
     assert issued.url == "https://t.me/alittlemore_workspace_bot?start=secret"
     reader.is_enabled.assert_awaited_once_with(owner_username="anna")
@@ -42,4 +52,10 @@ async def test_issues_single_use_invitation_only_for_enabled_owner() -> None:
 
     reader.is_enabled.return_value = False
     with pytest.raises(TelegramAccessError):
-        await use_case.create_invitation(owner_username="anna", label="Family", now=NOW)
+        await use_case.create_invitation(
+            params=CreateTelegramInvitationParams(
+                owner_username="anna",
+                label="Family",
+                now=NOW,
+            ),
+        )

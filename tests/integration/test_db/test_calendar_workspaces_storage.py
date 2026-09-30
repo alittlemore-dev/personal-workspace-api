@@ -7,6 +7,12 @@ from core.events.enums import EventFrequency
 from core.events.exceptions import EventNotFoundError
 from core.events.schemas import EventDraft, EventRecurrence
 from core.important_info.exceptions import ImportantInfoNotFoundError
+from core.important_info.schemas import (
+    CreateImportantInfoParams,
+    ImportantInfoTargetParams,
+    SetImportantInfoOrderParams,
+    UpdateImportantInfoParams,
+)
 from core.important_info.use_cases import ImportantInfoUseCase
 from infra.postgresql.storages.events import EventsDatabaseStorage
 from infra.postgresql.storages.important_info import ImportantInfoDatabaseStorage
@@ -18,8 +24,18 @@ class TestCalendarWorkspacesStorage(StorageTestCase):
         use_case = ImportantInfoUseCase(
             storage=ImportantInfoDatabaseStorage(session=self.db_session),
         )
-        first = await use_case.create_item(text="", author_username="owner")
-        second = await use_case.create_item(text="", author_username="owner")
+        first = await use_case.create_item(
+            params=CreateImportantInfoParams(
+                text="",
+                author_username="owner",
+            ),
+        )
+        second = await use_case.create_item(
+            params=CreateImportantInfoParams(
+                text="",
+                author_username="owner",
+            ),
+        )
 
         assert first.id != second.id
         assert [
@@ -33,23 +49,54 @@ class TestCalendarWorkspacesStorage(StorageTestCase):
     async def test_important_info_is_author_scoped_and_reorders_only_own_items(self) -> None:
         storage = ImportantInfoDatabaseStorage(session=self.db_session)
         use_case = ImportantInfoUseCase(storage=storage)
-        first = await use_case.create_item(text="First", author_username="owner")
-        second = await use_case.create_item(text="Second", author_username="owner")
-        foreign = await use_case.create_item(text="Foreign", author_username="another")
+        first = await use_case.create_item(
+            params=CreateImportantInfoParams(
+                text="First",
+                author_username="owner",
+            ),
+        )
+        second = await use_case.create_item(
+            params=CreateImportantInfoParams(
+                text="Second",
+                author_username="owner",
+            ),
+        )
+        foreign = await use_case.create_item(
+            params=CreateImportantInfoParams(
+                text="Foreign",
+                author_username="another",
+            ),
+        )
 
         assert [item.text for item in await use_case.list_items(author_username="owner")] == [
             "First",
             "Second",
         ]
-        ordered = await use_case.set_order(ids=[second.id, first.id], author_username="owner")
+        ordered = await use_case.set_order(
+            params=SetImportantInfoOrderParams(
+                ids=[second.id, first.id],
+                author_username="owner",
+            ),
+        )
         assert [(item.id, item.position) for item in ordered] == [(second.id, 0), (first.id, 1)]
         assert [item.id for item in await use_case.list_items(author_username="another")] == [
             foreign.id,
         ]
         with pytest.raises(ImportantInfoNotFoundError):
-            await use_case.update_item(item_id=foreign.id, text="Stolen", author_username="owner")
+            await use_case.update_item(
+                params=UpdateImportantInfoParams(
+                    item_id=foreign.id,
+                    text="Stolen",
+                    author_username="owner",
+                ),
+            )
         with pytest.raises(ImportantInfoNotFoundError):
-            await use_case.delete_item(item_id=foreign.id, author_username="owner")
+            await use_case.delete_item(
+                params=ImportantInfoTargetParams(
+                    item_id=foreign.id,
+                    author_username="owner",
+                ),
+            )
         assert (
             await storage.get_item(item_id=foreign.id, author_username="another")
         ).text == "Foreign"

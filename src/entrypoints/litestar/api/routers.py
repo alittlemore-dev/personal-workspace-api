@@ -5,6 +5,7 @@ from litestar import Router
 from entrypoints.litestar.api.calendar.endpoints import api_router as calendar_router
 from entrypoints.litestar.api.events.endpoints import api_router as events_router
 from entrypoints.litestar.api.files.endpoints import api_router as files_router
+from entrypoints.litestar.api.finance.endpoints import api_router as finance_router
 from entrypoints.litestar.api.healthcheck.endpoints import api_router as healthcheck_router
 from entrypoints.litestar.api.important_info.endpoints import api_router as important_info_router
 from entrypoints.litestar.api.knowledge.router import api_router as knowledge_router
@@ -19,6 +20,7 @@ protected_api_router = Router(
         tools_router,
         calendar_router,
         events_router,
+        finance_router,
         important_info_router,
         files_router,
         resumes_router,

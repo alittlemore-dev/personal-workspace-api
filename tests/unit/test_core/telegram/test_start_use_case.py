@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from core.telegram.exceptions import TelegramLimitError
-from core.telegram.schemas import InvitationToken, TelegramParticipant, TelegramUseCaseConfig
+from core.telegram.schemas import (
+    InvitationToken,
+    RequestTelegramConnectionParams,
+    TelegramParticipant,
+    TelegramUseCaseConfig,
+)
 from core.telegram.use_cases import TelegramUseCase
 
 
@@ -28,14 +33,16 @@ async def test_rate_limit_prevents_invitation_lookup() -> None:
 
     with pytest.raises(TelegramLimitError):
         await use_case.request_connection(
-            token=InvitationToken("token"),
-            participant=TelegramParticipant(
-                user_id=42,
-                private_chat_id=42,
-                first_name="Boris",
-                username="boris",
+            params=RequestTelegramConnectionParams(
+                token=InvitationToken("token"),
+                participant=TelegramParticipant(
+                    user_id=42,
+                    private_chat_id=42,
+                    first_name="Boris",
+                    username="boris",
+                ),
+                now=datetime(2026, 9, 26, tzinfo=UTC),
             ),
-            now=datetime(2026, 9, 26, tzinfo=UTC),
         )
 
     storage.get_invitation.assert_not_awaited()

@@ -9,6 +9,7 @@ from core.calendar.schemas import (
     CalendarSources,
     CalendarSummary,
     CalendarWindowSelection,
+    GetCalendarParams,
 )
 from core.calendar.use_cases import CalendarUseCase
 from core.knowledge.dates.schemas import (
@@ -18,31 +19,12 @@ from core.knowledge.dates.schemas import (
 )
 from core.knowledge.dates.storages import KnowledgeDatesStorage
 from core.knowledge.items.enums import KnowledgeItemKind
-from core.knowledge.items.schemas import KnowledgeItem
 from core.knowledge.items.storages import KnowledgeItemsStorage
 from core.knowledge.people.schemas import PersonBirthday, PersonDetails
 from core.knowledge.people.storages import PeopleStorage
 from tests.test_cases import TestCase
 
 CURRENT_DATETIME = datetime(2026, 7, 31, 12, tzinfo=UTC)
-
-
-def knowledge_item(
-    *,
-    item_id: str,
-    kind: KnowledgeItemKind,
-    display_name: str,
-) -> KnowledgeItem:
-    return KnowledgeItem(
-        id=item_id,
-        kind=kind,
-        author_username="owner",
-        display_name=display_name,
-        description="",
-        tags=[],
-        created_at=CURRENT_DATETIME,
-        updated_at=CURRENT_DATETIME,
-    )
 
 
 class TestCalendarSchema(TestCase):
@@ -105,29 +87,34 @@ class TestCalendarSchema(TestCase):
                 ),
             ],
             date_items=[
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=current_date_id,
                     kind=KnowledgeItemKind.DATE,
                     display_name="Текущая дата",
                 ),
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=next_date_id,
                     kind=KnowledgeItemKind.DATE,
                     display_name="Следующая дата",
                 ),
             ],
             people=[
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=current_birthday_id,
                     kind=KnowledgeItemKind.PERSON,
                     display_name="Текущий день рождения",
                 ),
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=next_birthday_id,
                     kind=KnowledgeItemKind.PERSON,
                     display_name="Следующий день рождения",
                 ),
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=related_person_id,
                     kind=KnowledgeItemKind.PERSON,
                     display_name="Кого поздравить",
@@ -188,12 +175,14 @@ class TestCalendarSchema(TestCase):
             sources=sources,
             links=[],
             date_items=[
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=december_id,
                     kind=KnowledgeItemKind.DATE,
                     display_name="Декабрь",
                 ),
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=january_id,
                     kind=KnowledgeItemKind.DATE,
                     display_name="Январь",
@@ -228,7 +217,8 @@ class TestCalendarSchema(TestCase):
             sources=sources,
             links=[],
             date_items=[
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=date_id,
                     kind=KnowledgeItemKind.DATE,
                     display_name="29 февраля",
@@ -269,9 +259,11 @@ class TestCalendarUseCase(TestCase):
         self.people_storage.list_birthday_details_for_months.return_value = []
 
         calendar = await self.use_case.get_calendar(
-            reference_date=date(2026, 7, 31),
-            window=window,
-            author_username="owner",
+            params=GetCalendarParams(
+                reference_date=date(2026, 7, 31),
+                window=window,
+                author_username="owner",
+            ),
         )
 
         assert calendar == Calendar.empty(
@@ -320,19 +312,22 @@ class TestCalendarUseCase(TestCase):
         ]
         self.item_storage.get_items_by_ids.side_effect = [
             [
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=date_id,
                     kind=KnowledgeItemKind.DATE,
                     display_name="Годовщина",
                 ),
             ],
             [
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=birthday_id,
                     kind=KnowledgeItemKind.PERSON,
                     display_name="Иван Иванов",
                 ),
-                knowledge_item(
+                self.factory.core.knowledge_item(
+                    now=CURRENT_DATETIME,
                     item_id=related_person_id,
                     kind=KnowledgeItemKind.PERSON,
                     display_name="Анна",
@@ -341,9 +336,11 @@ class TestCalendarUseCase(TestCase):
         ]
 
         calendar = await self.use_case.get_calendar(
-            reference_date=date(2026, 7, 31),
-            window=CalendarWindow.MONTH,
-            author_username="owner",
+            params=GetCalendarParams(
+                reference_date=date(2026, 7, 31),
+                window=CalendarWindow.MONTH,
+                author_username="owner",
+            ),
         )
 
         assert calendar.summary == CalendarSummary(

@@ -26,6 +26,7 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
   - [ ] Initial balance amount
   - [ ] Set limits to expences (no solid limits, only soft notifications about limits overdraft)
   - [ ] Shows limits overdraft 
+  - [ ] Add a restricted formula editor for category limits with suggestions after `=`: percentage, multiplier, and difference based on selected income or expense categories (for example, a children's allowance of 5% of salary), with typed rules and dependency-cycle validation instead of arbitrary spreadsheet formulas.
 - [ ] Workspace
   - [ ] Statistic
     - [ ] Main page

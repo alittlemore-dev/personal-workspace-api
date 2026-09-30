@@ -2,7 +2,7 @@
 
 Date: September 22, 2026
 
-Status: design under review
+Status: architecture with staged delivery
 
 ## 1. Context
 
@@ -11,8 +11,9 @@ without reproducing a general-purpose spreadsheet engine. It maintains one aggre
 monthly income and expense plans, actual transactions, soft limit visibility, and historical data
 that can be recalculated in different currencies.
 
-Telegram is the primary transaction-entry interface. The web application provides the current
-month overview, configuration, corrections, audit access, and Telegram access management.
+The first delivery uses the web application for current-month entry, overview, configuration,
+corrections, and audit access. Telegram transaction entry and historical analytics follow in
+later deliveries.
 
 The expected data volume is small. The system is therefore designed as a relational module inside
 the existing Personal Workspace modular monolith rather than as a separate service or analytical
@@ -33,8 +34,8 @@ platform.
 - The first exchange-rate provider is the Bank of Russia. Rates are daily and checked every four
   hours.
 - Transaction corrections use current-state rows plus immutable revisions and soft deletion.
-- The current month is created lazily and atomically on first web access or first confirmed
-  Telegram transaction.
+- The current month is created lazily and atomically when the web page calls the protected ensure
+  operation. Telegram entry is a later delivery.
 - One Personal Workspace owner may connect multiple trusted Telegram users to the same tracker.
   Telegram participants have no roles and can only append transactions.
 - The shared Personal Workspace bot owns Telegram connections, invites, and notification settings;
@@ -99,14 +100,21 @@ allows cross-month analytics to follow the same category through renames.
 Archiving a category stops new transactions and prevents it from being copied into future months.
 Existing monthly snapshots and transactions remain intact.
 
+Permanent deletion removes the stable category and all of its monthly snapshots, including
+historical snapshots. Existing transactions retain their amount, currency, occurrence time,
+income/expense kind, version, deletion state, and revisions. Their category association becomes
+absent, and their category name is represented by an empty string. Month totals continue to include
+active transactions without a category. Snapshot lineage references are cleared when their source
+is removed; subsequent month creation cannot copy the deleted category.
+
 ### 4.4. Transaction
 
-A transaction has a positive amount. Its direction comes from the category kind rather than the
-sign of the amount. The transaction stores:
+A transaction has a positive amount. Its stored direction is selected from the category kind when
+the transaction is created or explicitly assigned to another category. The transaction stores:
 
 - original amount and currency;
 - actual occurrence timestamp;
-- monthly category;
+- income/expense kind and an optional monthly category association;
 - optional description represented as a non-null string;
 - creation source and author;
 - the exchange-rate set applied to the occurrence date;
@@ -147,7 +155,7 @@ erDiagram
     FINANCE_TRACKER ||--o{ FINANCE_CATEGORY : owns
     FINANCE_MONTH ||--o{ FINANCE_MONTH_CATEGORY : snapshots
     FINANCE_CATEGORY ||--o{ FINANCE_MONTH_CATEGORY : continues_as
-    FINANCE_MONTH_CATEGORY ||--o{ FINANCE_TRANSACTION : classifies
+    FINANCE_MONTH_CATEGORY |o--o{ FINANCE_TRANSACTION : classifies
     FINANCE_TRANSACTION ||--o{ FINANCE_TRANSACTION_REVISION : has
     EXCHANGE_RATE_SET ||--|{ EXCHANGE_RATE : contains
     EXCHANGE_RATE_SET ||--o{ FINANCE_TRANSACTION : values
@@ -205,7 +213,7 @@ it matches the immutable category kind.
 
 ### 5.5. `finance_transaction`
 
-- `id`, `month_id`, `month_category_id`;
+- `id`, `month_id`, optional `month_category_id`, required `kind`;
 - `original_amount`, `original_currency`;
 - `amount_rub`;
 - `exchange_rate_set_id`;
@@ -306,13 +314,10 @@ supported currencies requires no external provider call.
 
 ### 6.1. Rate selection
 
-For an operation date, the rate resolver selects the latest persisted set whose `effective_on` is
-not later than the local operation date. This naturally applies the most recent official rate on
-weekends and holidays.
-
-If no eligible set exists locally, the Bank of Russia adapter requests historical data and
-persists an immutable set before the financial write begins. A provider request must not hold a
-month or transaction database lock.
+For an operation date, the rate resolver first reuses a persisted set effective on that exact local
+date. Otherwise, the Bank of Russia adapter requests historical data and persists an immutable set
+before the financial write begins. On weekends and holidays, the provider may return the preceding
+official effective date. A provider request must not hold a month or transaction database lock.
 
 If the provider is unavailable, the latest eligible persisted set may still be used, retaining its
 actual effective date. If no eligible set exists, the financial mutation fails without partial
@@ -336,17 +341,21 @@ Official provider references:
 
 ### 7.1. Initial month
 
-The first month cannot be inferred from production defaults. Tracker initialization supplies an
-explicit time zone, month currency, opening balance, and initial income and expense categories with
-their planned amounts.
+The first web visit sends the selected interface language to an idempotent protected ensure
+operation. The tracker copies the account time zone, and the first month starts in RUB for Russian
+or USD for English. The initial opening balance is zero. A migration-backed bilingual category
+template provides editable names and ordering; all category plans are unset, distinct from an
+explicit zero. The template never imports amounts or transactions from the reference spreadsheet.
+Changing the interface language later does not change an existing month's currency.
 
-Until initialization completes, Telegram transaction creation is unavailable because there is no
-valid month or category context.
+Until the first web initialization completes, future Telegram transaction creation has no valid
+tracker and category context.
 
 ### 7.2. Lazy month creation
 
-The current month is created when the web application first requests it or a Telegram participant
-first confirms a transaction after a month boundary. No midnight scheduler is required.
+In the first delivery, the current month is created when the web application calls ensure on page
+entry. No midnight scheduler is required. A later Telegram delivery may call the same use case
+after the tracker has been initialized on the web.
 
 Creation runs as an idempotent transaction:
 
@@ -354,11 +363,12 @@ Creation runs as an idempotent transaction:
 2. Lock month creation for the tracker and period.
 3. Copy the previous month's currency.
 4. Calculate and copy the previous month's closing balance.
-5. Copy active categories, names, ordering, and planned amounts.
+5. Copy active categories, names, ordering, and planned amounts. If several calendar months were
+   skipped, create each missing month in order without copying transactions.
 6. Persist the transferred closing-balance snapshot.
 7. Rely on `(tracker_id, period_start)` uniqueness as the final race guard.
 
-The same use case is called from the web and Telegram paths.
+The web path uses this operation now; the Telegram path is planned for a later delivery.
 
 ### 7.3. Historical corrections
 
@@ -428,7 +438,18 @@ Protected web capabilities are mounted under `/api/finance` and use the existing
 `request.user.username` and `core.identity` boundary. Storage queries are always scoped by tracker
 owner; possession of another entity's identifier is insufficient for access.
 
-The protected API exposes domain-oriented operations rather than database-shaped CRUD:
+`DELETE /api/finance/current-month/categories/{category_id}` archives the current monthly category.
+`DELETE /api/finance/current-month/categories/{category_id}/permanent` permanently deletes its
+stable category and snapshots and returns the updated current month with HTTP 200. Both operations
+require an owned current-month category identifier. Permanent deletion and other tracker writes
+share the month-creation transaction lock, so rollover and transaction writes cannot race deletion.
+Transaction create/update requests continue to require a valid category; read responses expose
+`categoryId: null` and `categoryName: ""` after permanent deletion.
+
+The protected API exposes domain-oriented operations rather than database-shaped CRUD. The first
+web delivery implements current-month ensure/read, opening balance and currency changes, category
+management, and transaction create/update/soft-delete/restore with revision reads. It does not add
+a statistics page or Telegram transaction form. The broader architecture includes:
 
 - tracker initialization and current-month retrieval;
 - idempotent current-month creation;

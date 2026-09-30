@@ -17,7 +17,11 @@ from core.telegram.exceptions import (
     TelegramLimitError,
     TelegramServiceError,
 )
-from core.telegram.schemas import InvitationToken, TelegramParticipant
+from core.telegram.schemas import (
+    InvitationToken,
+    RequestTelegramConnectionParams,
+    TelegramParticipant,
+)
 from core.telegram.storages import TelegramTransaction
 from core.telegram.use_cases import TelegramUseCase
 
@@ -38,14 +42,16 @@ async def handle_start(
         return
     try:
         await use_case.request_connection(
-            token=InvitationToken(value),
-            participant=TelegramParticipant(
-                user_id=message.from_user.id,
-                private_chat_id=message.chat.id,
-                first_name=message.from_user.first_name,
-                username=message.from_user.username or "",
+            params=RequestTelegramConnectionParams(
+                token=InvitationToken(value),
+                participant=TelegramParticipant(
+                    user_id=message.from_user.id,
+                    private_chat_id=message.chat.id,
+                    first_name=message.from_user.first_name,
+                    username=message.from_user.username or "",
+                ),
+                now=current_datetime,
             ),
-            now=current_datetime,
         )
         await transaction.commit()
     except TelegramInvitationError, TelegramAccessError, TelegramLimitError:

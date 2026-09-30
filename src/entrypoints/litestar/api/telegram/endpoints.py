@@ -1,5 +1,4 @@
 import hmac
-from datetime import datetime
 from typing import Any
 
 from backend_sdk import Principal, RoleEnum
@@ -8,17 +7,37 @@ from dishka import FromDishka
 from dishka.integrations.litestar import DishkaRouter
 from litestar import Controller, Request, delete, get, post, put, status_codes
 from litestar.datastructures import State
+from litestar.di import (
+    NamedDependency,
+    Provide,
+)
 from litestar.exceptions import HTTPException
 
-from core.telegram.enums import TelegramConnectionState
+from core.telegram.schemas import (
+    ApproveTelegramConnectionParams,
+    CancelTelegramInvitationParams,
+    ChangeTelegramConnectionStateParams,
+    CreateTelegramInvitationParams,
+    ListTelegramInvitationsParams,
+    RenameTelegramConnectionParams,
+    SetTelegramConnectionSettingsParams,
+)
 from core.telegram.use_cases import TelegramUseCase
+from entrypoints.litestar.api.telegram.dependencies import (
+    provide_approve_connection_params,
+    provide_block_connection_params,
+    provide_cancel_invitation_params,
+    provide_create_invitation_params,
+    provide_get_settings_params,
+    provide_rename_connection_params,
+    provide_revoke_connection_params,
+    provide_unblock_connection_params,
+    provide_update_connection_settings_params,
+)
 from entrypoints.litestar.api.telegram.schemas import (
     TelegramConnectionResponse,
-    TelegramConnectionSettingsRequest,
     TelegramInvitationResponse,
     TelegramIssuedInvitationResponse,
-    TelegramItemId,
-    TelegramLabelRequest,
     TelegramSettingsResponse,
 )
 from infra.config.settings import settings
@@ -31,12 +50,19 @@ class TelegramApiController(Controller):
     response_headers = {"Cache-Control": "no-store"}
     guards = [RequireRole(RoleEnum.USER)]
 
-    @get("", name="telegram-settings", status_code=status_codes.HTTP_200_OK)
+    @get(
+        "",
+        name="telegram-settings",
+        status_code=status_codes.HTTP_200_OK,
+        dependencies={
+            "params": Provide(provide_get_settings_params),
+        },
+    )
     async def get_settings(
         self,
         request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[ListTelegramInvitationsParams],
     ) -> TelegramSettingsResponse:
         owner = request.user.username
         return TelegramSettingsResponse(
@@ -44,8 +70,7 @@ class TelegramApiController(Controller):
             invitations=[
                 TelegramInvitationResponse.from_domain_schema(item)
                 for item in await use_case.list_invitations(
-                    owner_username=owner,
-                    now=current_datetime,
+                    params=params,
                 )
             ],
             connections=[
@@ -58,18 +83,15 @@ class TelegramApiController(Controller):
         "/invitations",
         name="telegram-issue-invitation",
         status_code=status_codes.HTTP_201_CREATED,
+        dependencies={"params": Provide(provide_create_invitation_params)},
     )
     async def create_invitation(
         self,
-        data: TelegramLabelRequest,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[CreateTelegramInvitationParams],
     ) -> TelegramIssuedInvitationResponse:
         issued = await use_case.create_invitation(
-            owner_username=request.user.username,
-            label=data.label,
-            now=current_datetime,
+            params=params,
         )
         return TelegramIssuedInvitationResponse(url=issued.url, expires_at=issued.expires_at)
 
@@ -77,37 +99,31 @@ class TelegramApiController(Controller):
         "/invitations/{invitation_id:str}",
         name="telegram-cancel-invitation",
         status_code=status_codes.HTTP_204_NO_CONTENT,
+        dependencies={"params": Provide(provide_cancel_invitation_params)},
     )
     async def cancel_invitation(
         self,
-        invitation_id: TelegramItemId,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[CancelTelegramInvitationParams],
     ) -> None:
         await use_case.cancel_invitation(
-            owner_username=request.user.username,
-            invitation_id=invitation_id,
-            now=current_datetime,
+            params=params,
         )
 
     @post(
         "/connections/{connection_id:str}/approve",
         name="telegram-approve-connection",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_approve_connection_params)},
     )
     async def approve_connection(
         self,
-        connection_id: TelegramItemId,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[ApproveTelegramConnectionParams],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
             await use_case.approve_connection(
-                owner_username=request.user.username,
-                connection_id=connection_id,
-                now=current_datetime,
+                params=params,
             ),
         )
 
@@ -115,20 +131,16 @@ class TelegramApiController(Controller):
         "/connections/{connection_id:str}/revoke",
         name="telegram-revoke-connection",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_revoke_connection_params)},
     )
     async def revoke_connection(
         self,
-        connection_id: TelegramItemId,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[ChangeTelegramConnectionStateParams],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
             await use_case.change_connection_state(
-                owner_username=request.user.username,
-                connection_id=connection_id,
-                state=TelegramConnectionState.REVOKED,
-                now=current_datetime,
+                params=params,
             ),
         )
 
@@ -136,20 +148,16 @@ class TelegramApiController(Controller):
         "/connections/{connection_id:str}/block",
         name="telegram-block-connection",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_block_connection_params)},
     )
     async def block_connection(
         self,
-        connection_id: TelegramItemId,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[ChangeTelegramConnectionStateParams],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
             await use_case.change_connection_state(
-                owner_username=request.user.username,
-                connection_id=connection_id,
-                state=TelegramConnectionState.BLOCKED,
-                now=current_datetime,
+                params=params,
             ),
         )
 
@@ -157,55 +165,52 @@ class TelegramApiController(Controller):
         "/connections/{connection_id:str}/unblock",
         name="telegram-unblock-connection",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_unblock_connection_params)},
     )
     async def unblock_connection(
         self,
-        connection_id: TelegramItemId,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[ChangeTelegramConnectionStateParams],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
             await use_case.change_connection_state(
-                owner_username=request.user.username,
-                connection_id=connection_id,
-                state=TelegramConnectionState.REVOKED,
-                now=current_datetime,
+                params=params,
             ),
         )
 
-    @put("/connections/{connection_id:str}/label", name="telegram-rename-connection")
+    @put(
+        "/connections/{connection_id:str}/label",
+        name="telegram-rename-connection",
+        dependencies={
+            "params": Provide(provide_rename_connection_params, sync_to_thread=False),
+        },
+    )
     async def rename_connection(
         self,
-        connection_id: TelegramItemId,
-        data: TelegramLabelRequest,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
+        params: NamedDependency[RenameTelegramConnectionParams],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
             await use_case.rename_connection(
-                owner_username=request.user.username,
-                connection_id=connection_id,
-                label=data.label,
+                params=params,
             ),
         )
 
     @put(
         "/connections/{connection_id:str}/settings",
         name="telegram-update-connection-settings",
+        dependencies={
+            "params": Provide(provide_update_connection_settings_params, sync_to_thread=False),
+        },
     )
     async def update_connection_settings(
         self,
-        connection_id: TelegramItemId,
-        data: TelegramConnectionSettingsRequest,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[TelegramUseCase],
+        params: NamedDependency[SetTelegramConnectionSettingsParams],
     ) -> TelegramConnectionResponse:
         return TelegramConnectionResponse.from_domain_schema(
             await use_case.set_connection_settings(
-                owner_username=request.user.username,
-                connection_id=connection_id,
-                settings=data.to_domain_schema(),
+                params=params,
             ),
         )
 

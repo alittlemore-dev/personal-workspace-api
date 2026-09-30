@@ -117,3 +117,46 @@ class KnowledgeFileContent:
 class KnowledgeFileMutationResult:
     file: KnowledgeFile | None
     object_names_to_delete: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UploadKnowledgeAttachmentParams:
+    data: KnowledgeFileUploadParams
+    processing: KnowledgeFileProcessing
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReplacePersonPhotoParams:
+    data: KnowledgeFileUploadParams
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RenameKnowledgeAttachmentParams:
+    item_id: str
+    file_id: str
+    author_username: str
+    data: KnowledgeFileUpdateParams
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteKnowledgeAttachmentParams:
+    item_id: str
+    file_id: str
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeletePersonPhotoParams:
+    person_id: str
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class KnowledgeFileTargetParams:
+    file_id: str
+    author_username: str

@@ -1,11 +1,56 @@
 import hashlib
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
+from unittest.mock import AsyncMock, Mock
+from zoneinfo import ZoneInfo
 
+from core.cache_tools.enums import CacheWarmOperationStatusEnum
+from core.cache_tools.schemas import CacheToolsStatus, CacheWarmOperation, CacheWarmSummary
+from core.calendar.enums import CalendarEntryKind, CalendarEntryPeriod, CalendarWindow
+from core.calendar.schemas import (
+    Calendar,
+    CalendarAnnualDate,
+    CalendarEntry,
+    CalendarRelatedPerson,
+    CalendarSummary,
+)
+from core.events.enums import EventFrequency
+from core.events.schemas import Event, EventDraft, EventRecurrence
 from core.files.enums import FilePurpose
 from core.files.schemas import FileRead, StoredFile
 from core.files.types import Namespace
+from core.finance.clients import FinanceRateClient
+from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
+from core.finance.exceptions import FinanceRateUnavailableError
+from core.finance.schemas import (
+    Amount,
+    FinanceCategory,
+    FinanceCategoryName,
+    FinanceMonth,
+    FinanceRateSet,
+    FinanceRevisions,
+    FinanceTransaction,
+    FinanceTransactionDraft,
+    FinanceTransactionPricing,
+    FinanceTransactionRevision,
+    FinanceTransactions,
+    FinanceTransactionSnapshot,
+)
+from core.finance.storages import FinanceStorage
+from core.finance.use_cases import FinanceUseCase
 from core.i18n.enums import LanguageEnum
+from core.knowledge.dates.schemas import KnowledgeDate, KnowledgeDateDetails, KnowledgeDateValue
+from core.knowledge.items.enums import KnowledgeItemKind
+from core.knowledge.items.schemas import KnowledgeItem
+from core.knowledge.people.schemas import (
+    Person,
+    PersonDetails,
+    PersonRelationship,
+    PersonRelationshipType,
+)
+from core.notifications.enums import ReminderKind
+from core.notifications.schemas import ReminderRecipient, ReminderSource
 from core.resumes.enums import ResumeCurrentStatusEnum
 from core.resumes.schemas import (
     Resume,
@@ -26,6 +71,410 @@ from core.types import SearchName
 
 
 class CoreFactoryHelper:
+    @classmethod
+    def knowledge_item(
+        cls,
+        *,
+        item_id: str,
+        display_name: str,
+        kind: KnowledgeItemKind = KnowledgeItemKind.PERSON,
+        author_username: str = "owner",
+        now: datetime = datetime(2026, 7, 27, 12, tzinfo=UTC),
+    ) -> KnowledgeItem:
+        return KnowledgeItem(
+            id=item_id,
+            kind=kind,
+            author_username=author_username,
+            display_name=display_name,
+            description="",
+            tags=[],
+            created_at=now,
+            updated_at=now,
+        )
+
+    @classmethod
+    def person_details(
+        cls,
+        *,
+        item_id: str,
+        last_name: str = "Иванов",
+        first_name: str = "Иван",
+        telegram: str = "",
+    ) -> PersonDetails:
+        return PersonDetails(
+            item_id=item_id,
+            last_name=last_name,
+            first_name=first_name,
+            middle_name="",
+            email="",
+            phone="",
+            telegram=telegram,
+            birthday=None,
+            notifications_enabled=True,
+        )
+
+    @classmethod
+    def person_relationship_type(
+        cls,
+        *,
+        relationship_type_id: str,
+        now: datetime = datetime(2026, 7, 27, 12, tzinfo=UTC),
+    ) -> PersonRelationshipType:
+        return PersonRelationshipType(
+            id=relationship_type_id,
+            author_username="owner",
+            is_symmetric=False,
+            forward_name="руководитель",
+            reverse_name="подчинённый",
+            created_at=now,
+            updated_at=now,
+        )
+
+    @classmethod
+    def person_relationship(
+        cls,
+        *,
+        relationship_id: str,
+        source_person_id: str,
+        target_person_id: str,
+        type_schema: PersonRelationshipType,
+        now: datetime = datetime(2026, 7, 27, 12, tzinfo=UTC),
+    ) -> PersonRelationship:
+        return PersonRelationship(
+            id=relationship_id,
+            author_username="owner",
+            source_person_id=source_person_id,
+            target_person_id=target_person_id,
+            relationship_type=type_schema,
+            note="",
+            created_at=now,
+            updated_at=now,
+        )
+
+    @classmethod
+    def knowledge_date(
+        cls,
+        *,
+        date_id: str = "1" * 32,
+        now: datetime = datetime(2026, 7, 30, 12, tzinfo=UTC),
+    ) -> KnowledgeDate:
+        return KnowledgeDate(
+            item=cls.knowledge_item(
+                item_id=date_id,
+                kind=KnowledgeItemKind.DATE,
+                author_username="test",
+                display_name="Anniversary",
+                now=now,
+            ),
+            details=KnowledgeDateDetails(
+                item_id=date_id,
+                date=KnowledgeDateValue(day=29, month=2, year=None),
+                notifications_enabled=True,
+            ),
+            related_people=[],
+            attachments=[],
+        )
+
+    @classmethod
+    def person(
+        cls,
+        *,
+        person_id: str = "1" * 32,
+        now: datetime = datetime(2026, 7, 27, 12, tzinfo=UTC),
+    ) -> Person:
+        return Person(
+            item=cls.knowledge_item(
+                item_id=person_id,
+                author_username="test",
+                display_name="Ivanov Ivan",
+                now=now,
+            ),
+            details=cls.person_details(
+                item_id=person_id,
+                last_name="Ivanov",
+                first_name="Ivan",
+            ),
+            relationships=[],
+            related_dates=[],
+            photo=None,
+            attachments=[],
+        )
+
+    @classmethod
+    def event(
+        cls,
+        *,
+        start: date | datetime,
+        end: date | datetime,
+        frequency: EventFrequency,
+        until_date: date | None,
+        all_day: bool,
+        time_zone: str,
+    ) -> Event:
+        return Event.from_draft(
+            event_id="a" * 32,
+            draft=EventDraft(
+                title="Meeting",
+                description="",
+                anchor_time_zone=ZoneInfo(time_zone),
+                all_day=all_day,
+                start=start,
+                end=end,
+                recurrence=EventRecurrence(frequency=frequency, until_date=until_date),
+            ),
+        )
+
+    @classmethod
+    def reminder_recipient(cls, *, notify_birthday: bool = True) -> ReminderRecipient:
+        return ReminderRecipient(
+            connection_id="c" * 32,
+            owner_username="owner",
+            private_chat_id=42,
+            notify_birthday=notify_birthday,
+            notify_memorable_date=False,
+            language=LanguageEnum.RU,
+        )
+
+    @classmethod
+    def reminder_source(cls) -> ReminderSource:
+        return ReminderSource(
+            owner_username="owner",
+            item_id="i" * 32,
+            kind=ReminderKind.BIRTHDAY,
+            title="Анна",
+            day=1,
+            month=1,
+            year=2000,
+            description="",
+            related_people=(),
+            notifications_enabled=True,
+        )
+
+    @classmethod
+    def calendar(cls) -> Calendar:
+        return Calendar(
+            reference_date=date(2026, 7, 31),
+            window=CalendarWindow.CURRENT_AND_NEXT_MONTHS,
+            summary=CalendarSummary(memorable_date_count=1, birthday_count=0),
+            entries=[
+                CalendarEntry(
+                    id="1" * 32,
+                    kind=CalendarEntryKind.MEMORABLE_DATE,
+                    display_name="Годовщина",
+                    annual_date=CalendarAnnualDate(day=2, month=8, year=2020),
+                    period=CalendarEntryPeriod.NEXT_MONTH,
+                    occurrence_year=2026,
+                    related_people=[CalendarRelatedPerson(id="2" * 32, display_name="Анна")],
+                ),
+            ],
+        )
+
+    @classmethod
+    def cache_tools_status(
+        cls,
+        *,
+        queued_at: datetime = datetime(2026, 7, 16, 12, tzinfo=UTC),
+    ) -> CacheToolsStatus:
+        return CacheToolsStatus(
+            enabled=True,
+            configured_ttl_seconds=86_400,
+            scheduled_warm_interval_seconds=3_600,
+            domains=(),
+            last_manual_warm_operation=CacheWarmOperation(
+                operation_id="previous-operation",
+                status=CacheWarmOperationStatusEnum.SUCCEEDED,
+                queued_at=queued_at,
+                summary=CacheWarmSummary(attempted=3, written=3, skipped=0),
+            ),
+        )
+
+    @classmethod
+    def finance_use_case(
+        cls,
+        storage: FinanceStorage,
+        rate_client: FinanceRateClient | None = None,
+    ) -> FinanceUseCase:
+        if rate_client is None:
+            client = Mock(spec=FinanceRateClient)
+            client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
+            rate_client = client
+        return FinanceUseCase(storage=storage, rate_client=rate_client)
+
+    @classmethod
+    def finance_rate_set(cls, on_date: date = date(2026, 9, 15)) -> FinanceRateSet:
+        return FinanceRateSet(
+            effective_on=on_date,
+            fetched_at=datetime.combine(on_date, datetime.min.time(), tzinfo=UTC),
+            rates={
+                FinanceCurrency.AMD: Decimal("0.2"),
+                FinanceCurrency.RUB: Decimal(1),
+                FinanceCurrency.USD: Decimal(80),
+                FinanceCurrency.EUR: Decimal(90),
+            },
+            nominals={
+                FinanceCurrency.AMD: 100,
+                FinanceCurrency.RUB: 1,
+                FinanceCurrency.USD: 1,
+                FinanceCurrency.EUR: 1,
+            },
+            payload_hash=f"hash-{on_date.isoformat()}",
+        )
+
+    @classmethod
+    def finance_transaction_draft(
+        cls,
+        category_id: str = "category",
+        amount: str | Decimal = "10",
+        currency: FinanceCurrency = FinanceCurrency.USD,
+        occurred_at: datetime = datetime(2026, 9, 15, 12, tzinfo=UTC),
+        description: str = "Meal",
+    ) -> FinanceTransactionDraft:
+        return FinanceTransactionDraft(
+            category_id=category_id,
+            amount=Amount(amount),
+            currency=currency,
+            occurred_at=occurred_at,
+            description=description,
+        )
+
+    @classmethod
+    def finance_category(
+        cls,
+        category_id: str = "category",
+        stable_id: str = "stable-category",
+        kind: FinanceKind = FinanceKind.EXPENSE,
+        name: str = "Food",
+        planned_amount: str | Decimal | None = None,
+        actual_amount: str | Decimal = "0",
+        difference: str | Decimal | None = None,
+        position: int = 0,
+        archived: bool = False,
+    ) -> FinanceCategory:
+        return FinanceCategory(
+            id=category_id,
+            stable_id=stable_id,
+            kind=kind,
+            name=FinanceCategoryName(name),
+            planned_amount=Amount(planned_amount) if planned_amount is not None else None,
+            actual_amount=Amount(actual_amount),
+            difference=Amount(difference) if difference is not None else None,
+            position=position,
+            archived=archived,
+        )
+
+    @classmethod
+    def finance_month(
+        cls,
+        month_id: str = "month",
+        tracker_id: str = "tracker",
+        period_start: date = date(2026, 9, 1),
+        time_zone: ZoneInfo = ZoneInfo("UTC"),
+        currency: FinanceCurrency = FinanceCurrency.USD,
+        opening_balance: str | Decimal = "0",
+        actual_income: str | Decimal = "0",
+        actual_expense: str | Decimal = "10",
+        planned_income: str | Decimal | None = None,
+        planned_expense: str | Decimal | None = None,
+        closing_balance: str | Decimal = "-10",
+        categories: list[FinanceCategory] | None = None,
+    ) -> FinanceMonth:
+        return FinanceMonth(
+            id=month_id,
+            tracker_id=tracker_id,
+            period_start=period_start,
+            time_zone=time_zone,
+            currency=currency,
+            opening_balance=Amount(opening_balance),
+            actual_income=Amount(actual_income),
+            actual_expense=Amount(actual_expense),
+            planned_income=Amount(planned_income) if planned_income is not None else None,
+            planned_expense=Amount(planned_expense) if planned_expense is not None else None,
+            closing_balance=Amount(closing_balance),
+            categories=categories if categories is not None else [],
+        )
+
+    @classmethod
+    def finance_transaction(
+        cls,
+        transaction_id: str = "transaction",
+        category_id: str | None = "category",
+        category_name: str = "Food",
+        kind: FinanceKind = FinanceKind.EXPENSE,
+        amount: str | Decimal = "10",
+        currency: FinanceCurrency = FinanceCurrency.USD,
+        converted_amount: str | Decimal = "10",
+        occurred_at: datetime = datetime(2026, 9, 15, 12, tzinfo=UTC),
+        description: str = "Meal",
+        rate_effective_on: date = date(2026, 9, 15),
+        version: int = 1,
+        deleted: bool = False,
+        pricing: FinanceTransactionPricing | None = None,
+    ) -> FinanceTransaction:
+        return FinanceTransaction(
+            id=transaction_id,
+            category_id=category_id,
+            category_name=category_name,
+            kind=kind,
+            amount=Amount(amount),
+            currency=currency,
+            converted_amount=Amount(converted_amount),
+            occurred_at=occurred_at,
+            description=description,
+            rate_effective_on=rate_effective_on,
+            version=version,
+            deleted=deleted,
+            pricing=pricing
+            if pricing is not None
+            else FinanceTransactionPricing(
+                rate_set_id="rate-set",
+                amount_rub=Amount(Amount(amount) * cls.finance_rate_set().rates[currency]),
+            ),
+        )
+
+    @classmethod
+    def finance_transaction_revision(
+        cls,
+        number: int = 1,
+        action: FinanceRevisionAction = FinanceRevisionAction.UPDATE,
+        previous_state: FinanceTransactionSnapshot | None = None,
+        actor_username: str = "owner",
+        changed_at: datetime = datetime(2026, 9, 15, 12, tzinfo=UTC),
+    ) -> FinanceTransactionRevision:
+        return FinanceTransactionRevision(
+            number=number,
+            action=action,
+            previous_state=previous_state
+            if previous_state is not None
+            else {
+                "categoryId": "category",
+                "kind": "expense",
+                "amount": "10",
+                "currency": "USD",
+                "amountRub": "800",
+                "rateSetId": "rate-set",
+                "occurredAt": changed_at.isoformat(),
+                "description": "Meal",
+                "version": number,
+                "deleted": False,
+            },
+            actor_username=actor_username,
+            changed_at=changed_at,
+        )
+
+    @classmethod
+    def finance_transactions(
+        cls,
+        transactions: list[FinanceTransaction] | None = None,
+    ) -> FinanceTransactions:
+        return FinanceTransactions(transactions=transactions if transactions is not None else [])
+
+    @classmethod
+    def finance_revisions(
+        cls,
+        revisions: list[FinanceTransactionRevision] | None = None,
+    ) -> FinanceRevisions:
+        return FinanceRevisions(revisions=revisions if revisions is not None else [])
+
     @classmethod
     def hex_id(cls, value: int | str = 1) -> str:
         if isinstance(value, str):
@@ -258,6 +707,24 @@ class CoreFactoryHelper:
             file=file or cls.stored_file(),
             access_url=access_url,
             markdown_url=markdown_url,
+        )
+
+    @classmethod
+    def stored_pdf(
+        cls,
+        *,
+        file_id: str = "file-id",
+        purpose: FilePurpose = FilePurpose.ATTACHMENT,
+        orphaned_at: datetime | None = datetime(2026, 7, 3, 10, tzinfo=UTC),
+    ) -> StoredFile:
+        return cls.stored_file(
+            file_id=file_id,
+            purpose=purpose,
+            relative_path=f"attachments/{file_id}.pdf",
+            mime_type="application/pdf",
+            original_name="original.pdf",
+            original_sha256=hashlib.sha256(b"data").hexdigest(),
+            orphaned_at=orphaned_at,
         )
 
     @classmethod

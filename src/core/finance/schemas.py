@@ -1,0 +1,591 @@
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from typing import Self, TypedDict
+from zoneinfo import ZoneInfo
+
+from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
+from core.finance.exceptions import (
+    FinanceConflictError,
+    FinanceNotFoundError,
+    InvalidFinanceDataError,
+)
+from core.i18n.enums import LanguageEnum
+from core.utils import next_month
+
+MONEY_QUANTUM = {
+    FinanceCurrency.AMD: Decimal(1),
+    FinanceCurrency.RUB: Decimal("0.01"),
+    FinanceCurrency.USD: Decimal("0.01"),
+    FinanceCurrency.EUR: Decimal("0.01"),
+}
+CATEGORY_NAME_MAX_LENGTH = 255
+TRANSACTION_DESCRIPTION_MAX_LENGTH = 2000
+AMOUNT_MAX_INTEGER_DIGITS = 18
+
+
+class Amount(Decimal):
+    __slots__ = ()
+
+    def validate_range(self) -> None:
+        if not self.is_finite() or self.adjusted() >= AMOUNT_MAX_INTEGER_DIGITS:
+            raise InvalidFinanceDataError
+
+    def validate_precision(self, currency: FinanceCurrency) -> None:
+        self.validate_range()
+        try:
+            if self % MONEY_QUANTUM[currency] != 0:
+                raise InvalidFinanceDataError
+        except InvalidOperation as error:
+            raise InvalidFinanceDataError from error
+
+    def rounded(self, currency: FinanceCurrency) -> Amount:
+        return Amount(self.quantize(MONEY_QUANTUM[currency], rounding=ROUND_HALF_UP))
+
+    def converted(self, currency: FinanceCurrency, factor: Decimal) -> Amount:
+        converted = Amount(self * factor)
+        converted.validate_range()
+        rounded = converted.rounded(currency)
+        rounded.validate_precision(currency)
+        return rounded
+
+
+class FinanceCategoryName(str):
+    __slots__ = ()
+
+    def __new__(cls, value: str) -> Self:
+        normalized = " ".join(value.split())
+        if (
+            not normalized
+            or len(normalized) > CATEGORY_NAME_MAX_LENGTH
+            or len(normalized.casefold()) > CATEGORY_NAME_MAX_LENGTH
+        ):
+            raise InvalidFinanceDataError
+        return super().__new__(cls, normalized)
+
+    @property
+    def normalized(self) -> str:
+        return self.casefold()
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCategory:
+    id: str
+    stable_id: str
+    kind: FinanceKind
+    name: FinanceCategoryName
+    planned_amount: Amount | None
+    actual_amount: Amount
+    difference: Amount | None
+    position: int
+    archived: bool
+
+    def check_active(self) -> None:
+        if self.archived:
+            raise FinanceConflictError
+
+    def check_accepting_transaction(self, existing_category_id: str | None) -> None:
+        if self.archived and self.id != existing_category_id:
+            raise FinanceConflictError
+
+    @classmethod
+    def from_snapshot(
+        cls,
+        snapshot: FinanceCategorySnapshot,
+        currency: FinanceCurrency,
+        actual_amount: Amount,
+    ) -> FinanceCategory:
+        difference = (
+            Amount(
+                snapshot.planned_amount - actual_amount
+                if snapshot.kind == FinanceKind.EXPENSE
+                else actual_amount - snapshot.planned_amount,
+            ).rounded(currency)
+            if snapshot.planned_amount is not None
+            else None
+        )
+        return cls(
+            id=snapshot.id,
+            stable_id=snapshot.stable_id,
+            kind=snapshot.kind,
+            name=snapshot.name,
+            planned_amount=snapshot.planned_amount,
+            actual_amount=actual_amount.rounded(currency),
+            difference=difference,
+            position=snapshot.position,
+            archived=snapshot.archived,
+        )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceMonth:
+    id: str
+    tracker_id: str
+    period_start: date
+    time_zone: ZoneInfo
+    currency: FinanceCurrency
+    opening_balance: Amount
+    actual_income: Amount
+    actual_expense: Amount
+    planned_income: Amount | None
+    planned_expense: Amount | None
+    closing_balance: Amount
+    categories: list[FinanceCategory]
+
+    @classmethod
+    def compose(cls, snapshot: FinanceMonthSnapshot, actuals: FinanceActuals) -> FinanceMonth:
+        categories = [
+            FinanceCategory.from_snapshot(
+                category,
+                snapshot.currency,
+                actuals.by_category.get(category.id, Amount(0)),
+            )
+            for category in snapshot.categories
+        ]
+        return cls(
+            id=snapshot.id,
+            tracker_id=snapshot.tracker_id,
+            period_start=snapshot.period_start,
+            time_zone=snapshot.time_zone,
+            currency=snapshot.currency,
+            opening_balance=snapshot.opening_balance,
+            actual_income=actuals.income.rounded(snapshot.currency),
+            actual_expense=actuals.expense.rounded(snapshot.currency),
+            planned_income=snapshot.planned_total(FinanceKind.INCOME),
+            planned_expense=snapshot.planned_total(FinanceKind.EXPENSE),
+            closing_balance=Amount(
+                snapshot.opening_balance + actuals.income - actuals.expense,
+            ).rounded(snapshot.currency),
+            categories=categories,
+        )
+
+    def get_category(self, category_id: str) -> FinanceCategory:
+        for category in self.categories:
+            if category.id == category_id:
+                return category
+        raise FinanceNotFoundError
+
+    def check_category_name(
+        self,
+        kind: FinanceKind,
+        name: FinanceCategoryName,
+        excluded_id: str | None,
+    ) -> None:
+        if any(
+            category.kind == kind
+            and category.name.normalized == name.normalized
+            and category.id != excluded_id
+            for category in self.categories
+        ):
+            raise FinanceConflictError
+
+    def next_category_position(self, kind: FinanceKind) -> int:
+        return (
+            max(
+                (category.position for category in self.categories if category.kind == kind),
+                default=-1,
+            )
+            + 1
+        )
+
+    def convert_amounts(
+        self,
+        currency: FinanceCurrency,
+        factor: Decimal,
+    ) -> FinanceCurrencyConversion:
+        return FinanceCurrencyConversion(
+            opening_balance=self.opening_balance.converted(currency, factor),
+            plans={
+                category.id: category.planned_amount.converted(currency, factor)
+                for category in self.categories
+                if category.planned_amount is not None
+            },
+        )
+
+    def amount_snapshot(self) -> FinanceCurrencyConversion:
+        return FinanceCurrencyConversion(
+            opening_balance=self.opening_balance,
+            plans={
+                category.id: category.planned_amount
+                for category in self.categories
+                if category.planned_amount is not None
+            },
+        )
+
+    def rollover(self, excluded_stable_ids: set[str]) -> FinanceMonthRollover:
+        self.closing_balance.validate_precision(self.currency)
+        return FinanceMonthRollover(
+            period_start=next_month(self.period_start),
+            currency=self.currency,
+            opening_balance=self.closing_balance,
+            previous_month_id=self.id,
+            categories=[
+                category
+                for category in self.categories
+                if not category.archived and category.stable_id not in excluded_stable_ids
+            ],
+        )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCategorySnapshot:
+    id: str
+    stable_id: str
+    kind: FinanceKind
+    name: FinanceCategoryName
+    planned_amount: Amount | None
+    position: int
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceMonthSnapshot:
+    id: str
+    tracker_id: str
+    period_start: date
+    time_zone: ZoneInfo
+    currency: FinanceCurrency
+    opening_balance: Amount
+    categories: list[FinanceCategorySnapshot]
+
+    def planned_total(self, kind: FinanceKind) -> Amount | None:
+        active = [
+            category
+            for category in self.categories
+            if category.kind == kind and not category.archived
+        ]
+        if any(category.planned_amount is None for category in active):
+            return None
+        return Amount(sum((category.planned_amount or Amount(0) for category in active), Amount(0)))
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceActuals:
+    income: Amount
+    expense: Amount
+    by_category: dict[str, Amount]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCurrencyConversion:
+    opening_balance: Amount
+    plans: dict[str, Amount]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceMonthRollover:
+    period_start: date
+    currency: FinanceCurrency
+    opening_balance: Amount
+    previous_month_id: str
+    categories: list[FinanceCategory]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTemplateCategory:
+    kind: FinanceKind
+    name: FinanceCategoryName
+    position: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTracker:
+    id: str
+    time_zone: ZoneInfo
+
+    def current_period(self, now: datetime) -> date:
+        local = now.astimezone(self.time_zone)
+        return date(local.year, local.month, 1)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionDraft:
+    category_id: str
+    amount: Amount
+    currency: FinanceCurrency
+    occurred_at: datetime
+    description: str
+
+    def validate(self, *, period_start: date, time_zone: ZoneInfo) -> None:
+        self.currency.validate_money(self.amount, positive=True)
+        if self.occurred_at.tzinfo is None:
+            raise InvalidFinanceDataError
+        local_date = self.occurred_at.astimezone(time_zone).date()
+        if local_date.year != period_start.year or local_date.month != period_start.month:
+            raise InvalidFinanceDataError
+        if len(self.description) > TRANSACTION_DESCRIPTION_MAX_LENGTH:
+            raise InvalidFinanceDataError
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransaction:
+    id: str
+    category_id: str | None
+    category_name: str
+    kind: FinanceKind
+    amount: Amount
+    currency: FinanceCurrency
+    converted_amount: Amount
+    occurred_at: datetime
+    description: str
+    rate_effective_on: date
+    version: int
+    deleted: bool
+    pricing: FinanceTransactionPricing
+
+    def check_updatable(self, version: int) -> None:
+        if self.version != version or self.deleted:
+            raise FinanceConflictError
+
+    def has_monetary_change(self, draft: FinanceTransactionDraft, time_zone: ZoneInfo) -> bool:
+        return (
+            self.amount != draft.amount
+            or self.currency != draft.currency
+            or self.occurred_at.astimezone(time_zone).date()
+            != draft.occurred_at.astimezone(time_zone).date()
+        )
+
+    def check_deletion_change(self, version: int, *, deleted: bool) -> None:
+        if self.version != version or self.deleted == deleted:
+            raise FinanceConflictError
+
+    def snapshot(self) -> FinanceTransactionSnapshot:
+        return {
+            "categoryId": self.category_id,
+            "kind": self.kind.value,
+            "amount": str(self.amount),
+            "currency": self.currency.value,
+            "amountRub": str(self.pricing.amount_rub),
+            "rateSetId": self.pricing.rate_set_id,
+            "occurredAt": self.occurred_at.isoformat(),
+            "description": self.description,
+            "version": self.version,
+            "deleted": self.deleted,
+        }
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionPricing:
+    rate_set_id: str
+    amount_rub: Amount
+
+    @classmethod
+    def from_draft(
+        cls,
+        draft: FinanceTransactionDraft,
+        rate_set_id: str,
+        rate_set: FinanceRateSet,
+    ) -> FinanceTransactionPricing:
+        amount_rub = Amount(draft.amount * rate_set.rates[draft.currency])
+        amount_rub.validate_range()
+        return cls(
+            rate_set_id=rate_set_id,
+            amount_rub=amount_rub,
+        )
+
+
+class FinanceTransactionSnapshot(TypedDict):
+    categoryId: str | None
+    kind: str
+    amount: str
+    currency: str
+    amountRub: str
+    rateSetId: str
+    occurredAt: str
+    description: str
+    version: int
+    deleted: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionRevision:
+    number: int
+    action: FinanceRevisionAction
+    previous_state: FinanceTransactionSnapshot
+    actor_username: str
+    changed_at: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceRateSet:
+    effective_on: date
+    fetched_at: datetime
+    rates: dict[FinanceCurrency, Decimal]
+    nominals: dict[FinanceCurrency, int]
+    payload_hash: str
+
+    def conversion_factor(self, source: FinanceCurrency, target: FinanceCurrency) -> Decimal:
+        return self.rates[source] / self.rates[target]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCurrencyChange:
+    month_id: str
+    time_zone: ZoneInfo
+    previous_currency: FinanceCurrency
+    new_currency: FinanceCurrency
+    rate_set_id: str
+    before: FinanceCurrencyConversion
+    after: FinanceCurrencyConversion
+    actor_username: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactions:
+    transactions: list[FinanceTransaction]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceRevisions:
+    revisions: list[FinanceTransactionRevision]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceMonthParams:
+    owner_username: str
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EnsureFinanceMonthParams(FinanceMonthParams):
+    time_zone: ZoneInfo
+    language: LanguageEnum
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateOpeningBalanceParams(FinanceMonthParams):
+    amount: Amount
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ChangeFinanceCurrencyParams(FinanceMonthParams):
+    currency: FinanceCurrency
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateFinanceCategoryParams(FinanceMonthParams):
+    kind: FinanceKind
+    name: FinanceCategoryName
+    planned_amount: Amount | None
+
+    def validate(self, currency: FinanceCurrency) -> None:
+        if self.planned_amount is not None:
+            currency.validate_money(self.planned_amount, positive=False)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateFinanceCategoryParams(FinanceMonthParams):
+    category_id: str
+    name: FinanceCategoryName
+    planned_amount: Amount | None
+    position: int
+
+    def validate(self, currency: FinanceCurrency) -> None:
+        if self.planned_amount is not None:
+            currency.validate_money(self.planned_amount, positive=False)
+        if self.position < 0:
+            raise InvalidFinanceDataError
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SetFinanceCategoryArchivedParams(FinanceMonthParams):
+    category_id: str
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteFinanceCategoryParams(FinanceMonthParams):
+    category_id: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListFinanceTransactionsParams(FinanceMonthParams):
+    include_deleted: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateFinanceTransactionParams(FinanceMonthParams):
+    draft: FinanceTransactionDraft
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateFinanceTransactionParams(FinanceMonthParams):
+    transaction_id: str
+    draft: FinanceTransactionDraft
+    version: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SetFinanceTransactionDeletedParams(FinanceMonthParams):
+    transaction_id: str
+    version: int
+    deleted: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionRevisionsParams(FinanceMonthParams):
+    transaction_id: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceOpeningBalanceUpdate:
+    month: FinanceMonth
+    params: UpdateOpeningBalanceParams
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCategoryCreation:
+    month: FinanceMonth
+    params: CreateFinanceCategoryParams
+    position: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCategoryUpdate:
+    month: FinanceMonth
+    category: FinanceCategory
+    params: UpdateFinanceCategoryParams
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCategoryArchival:
+    month: FinanceMonth
+    category: FinanceCategory
+    params: SetFinanceCategoryArchivedParams
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceCategoryDeletion:
+    month: FinanceMonth
+    category: FinanceCategory
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionCreation:
+    month: FinanceMonth
+    category: FinanceCategory
+    params: CreateFinanceTransactionParams
+    pricing: FinanceTransactionPricing
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionUpdate:
+    month: FinanceMonth
+    category: FinanceCategory
+    transaction: FinanceTransaction
+    params: UpdateFinanceTransactionParams
+    pricing: FinanceTransactionPricing | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionDeletionChange:
+    month: FinanceMonth
+    transaction: FinanceTransaction
+    params: SetFinanceTransactionDeletedParams
+
+    @property
+    def action(self) -> FinanceRevisionAction:
+        return (
+            FinanceRevisionAction.DELETE if self.params.deleted else FinanceRevisionAction.RESTORE
+        )

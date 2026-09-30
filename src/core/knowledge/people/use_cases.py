@@ -1,5 +1,4 @@
 from dataclasses import dataclass, replace
-from datetime import datetime
 
 from core.knowledge.dates.schemas import KnowledgeDateReference
 from core.knowledge.dates.storages import KnowledgeDatesStorage
@@ -21,18 +20,23 @@ from core.knowledge.items.schemas import (
 from core.knowledge.items.services import KnowledgeItemCrudService
 from core.knowledge.items.storages import KnowledgeItemsStorage
 from core.knowledge.people.schemas import (
+    CreatePersonRelationshipTypeParams,
+    DeletePersonParams,
     PeoplePage,
     Person,
     PersonFilters,
     PersonQuickCreateParams,
     PersonRelationship,
-    PersonRelationshipChanges,
     PersonRelationshipType,
     PersonRelationshipTypeCreateParams,
+    PersonRelationshipTypeTargetParams,
     PersonRelationshipTypeUpdateParams,
     PersonRelationshipView,
     PersonSummary,
-    PersonUpdateParams,
+    PersonTargetParams,
+    UpdatePersonParams,
+    UpdatePersonRelationshipTypeParams,
+    ValidatePersonRelationshipChangesParams,
 )
 from core.knowledge.people.storages import PeopleStorage
 
@@ -102,37 +106,34 @@ class PeopleUseCase:
             page_size=effective_filters.page_size,
         )
 
-    async def get_person(self, *, person_id: str, author_username: str) -> Person:
+    async def get_person(self, *, params: PersonTargetParams) -> Person:
         item = await self.item_service.get_item(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         details = await self.people_storage.get_details(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
         )
         relationships = await self.people_storage.list_relationships(
-            person_id=person_id,
-            author_username=author_username,
+            person_id=params.person_id,
+            author_username=params.author_username,
         )
         related_ids = {
-            relationship.related_person_id_for(person_id=person_id)
+            relationship.related_person_id_for(person_id=params.person_id)
             for relationship in relationships
         }
         related_items = await self.item_storage.get_items_by_ids(
             item_ids=related_ids,
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         display_names = {related.id: related.display_name for related in related_items}
-        related_dates = await self.list_related_dates(
-            person_id=person_id,
-            author_username=author_username,
-        )
+        related_dates = await self.list_related_dates(params=params)
         files = await self.file_storage.list_item_files(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
         )
         return Person(
             item=item,
@@ -140,13 +141,15 @@ class PeopleUseCase:
             relationships=[
                 PersonRelationshipView(
                     id=relationship.id,
-                    related_person_id=relationship.related_person_id_for(person_id=person_id),
+                    related_person_id=relationship.related_person_id_for(
+                        person_id=params.person_id,
+                    ),
                     related_person_display_name=display_names[
-                        relationship.related_person_id_for(person_id=person_id)
+                        relationship.related_person_id_for(person_id=params.person_id)
                     ],
                     relationship_type=relationship.relationship_type,
-                    direction=relationship.direction_for(person_id=person_id),
-                    label=relationship.label_for(person_id=person_id),
+                    direction=relationship.direction_for(person_id=params.person_id),
+                    label=relationship.label_for(person_id=params.person_id),
                     note=relationship.note,
                     created_at=relationship.created_at,
                     updated_at=relationship.updated_at,
@@ -164,23 +167,22 @@ class PeopleUseCase:
     async def list_related_dates(
         self,
         *,
-        person_id: str,
-        author_username: str,
+        params: PersonTargetParams,
     ) -> list[KnowledgeDateReference]:
         date_ids = await self.dates_storage.list_date_ids_for_person(
-            person_id=person_id,
-            author_username=author_username,
+            person_id=params.person_id,
+            author_username=params.author_username,
         )
         if not date_ids:
             return []
         items = await self.item_storage.get_items_by_ids(
             item_ids=set(date_ids),
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
         )
         details = await self.dates_storage.list_details(
             item_ids=date_ids,
-            author_username=author_username,
+            author_username=params.author_username,
         )
         items_by_id = {item.id: item for item in items}
         details_by_id = {value.item_id: value for value in details}
@@ -216,105 +218,107 @@ class PeopleUseCase:
             author_username=params.author_username,
         )
         return await self.get_person(
-            person_id=item.id,
-            author_username=params.author_username,
+            params=PersonTargetParams(
+                person_id=item.id,
+                author_username=params.author_username,
+            ),
         )
 
-    async def update_person(
-        self,
-        *,
-        person_id: str,
-        params: PersonUpdateParams,
-        author_username: str,
-        current_datetime: datetime,
-    ) -> Person:
+    async def update_person(self, *, params: UpdatePersonParams) -> Person:
         item = await self.item_service.get_item(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
-        details = params.to_details(item_id=person_id)
+        details = params.data.to_details(item_id=params.person_id)
         if details.birthday is not None:
-            details.birthday.validate(today=current_datetime.date())
+            details.birthday.validate(today=params.current_datetime.date())
         await self.people_storage.get_details(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
         )
         mutated_existing_relationships = await self.validate_relationship_changes(
-            person_id=person_id,
-            changes=params.relationship_changes,
-            author_username=author_username,
+            params=ValidatePersonRelationshipChangesParams(
+                person_id=params.person_id,
+                changes=params.data.relationship_changes,
+                author_username=params.author_username,
+            ),
         )
         await self.item_service.update_item(
             item=item,
             params=KnowledgeItemUpdateParams(
                 display_name=details.display_name,
-                description=params.description,
+                description=params.data.description,
             ),
-            tag_ids=params.tag_ids,
-            updated_at=current_datetime,
+            tag_ids=params.data.tag_ids,
+            updated_at=params.current_datetime,
         )
         await self.people_storage.update_details(
             details=details,
-            author_username=author_username,
+            author_username=params.author_username,
         )
         relationship_types = await self.people_storage.get_relationship_types_by_ids(
             relationship_type_ids=(
-                {value.relationship_type_id for value in params.relationship_changes.create}
-                | {value.relationship_type_id for value in params.relationship_changes.update}
+                {value.relationship_type_id for value in params.data.relationship_changes.create}
+                | {value.relationship_type_id for value in params.data.relationship_changes.update}
             ),
-            author_username=author_username,
+            author_username=params.author_username,
         )
         relationship_types_by_id = {value.id: value for value in relationship_types}
         await self.people_storage.create_relationships(
-            person_id=person_id,
-            author_username=author_username,
-            values=params.relationship_changes.create,
+            person_id=params.person_id,
+            author_username=params.author_username,
+            values=params.data.relationship_changes.create,
             relationship_types=relationship_types_by_id,
-            created_at=current_datetime,
+            created_at=params.current_datetime,
         )
         await self.people_storage.update_relationships(
-            person_id=person_id,
-            author_username=author_username,
-            values=params.relationship_changes.update,
+            person_id=params.person_id,
+            author_username=params.author_username,
+            values=params.data.relationship_changes.update,
             relationship_types=relationship_types_by_id,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         await self.people_storage.delete_relationships(
-            relationship_ids=set(params.relationship_changes.delete_ids),
-            author_username=author_username,
+            relationship_ids=set(params.data.relationship_changes.delete_ids),
+            author_username=params.author_username,
         )
-        touched_ids = {value.related_person_id for value in params.relationship_changes.create} | {
-            value.related_person_id for value in params.relationship_changes.update
-        }
+        touched_ids = {
+            value.related_person_id for value in params.data.relationship_changes.create
+        } | {value.related_person_id for value in params.data.relationship_changes.update}
         touched_ids.update(
-            relationship.related_person_id_for(person_id=person_id)
+            relationship.related_person_id_for(person_id=params.person_id)
             for relationship in mutated_existing_relationships
         )
         await self.item_storage.touch_items(
             item_ids=touched_ids,
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
-        return await self.get_person(person_id=person_id, author_username=author_username)
+        return await self.get_person(
+            params=PersonTargetParams(
+                person_id=params.person_id,
+                author_username=params.author_username,
+            ),
+        )
 
     async def validate_relationship_changes(
         self,
         *,
-        person_id: str,
-        changes: PersonRelationshipChanges,
-        author_username: str,
+        params: ValidatePersonRelationshipChangesParams,
     ) -> list[PersonRelationship]:
-        mutation_ids = {value.id for value in changes.update} | set(changes.delete_ids)
+        mutation_ids = {value.id for value in params.changes.update} | set(
+            params.changes.delete_ids,
+        )
         existing_relationships = await self.people_storage.get_relationships_by_ids(
             relationship_ids=mutation_ids,
-            author_username=author_username,
+            author_username=params.author_username,
         )
         if len(existing_relationships) != len(mutation_ids):
             raise PersonRelationshipNotFoundError
         if any(
-            person_id
+            params.person_id
             not in {
                 relationship.source_person_id,
                 relationship.target_person_id,
@@ -322,89 +326,83 @@ class PeopleUseCase:
             for relationship in existing_relationships
         ):
             raise PersonRelationshipNotFoundError
-        related_ids = {value.related_person_id for value in changes.create} | {
-            value.related_person_id for value in changes.update
+        related_ids = {value.related_person_id for value in params.changes.create} | {
+            value.related_person_id for value in params.changes.update
         }
-        if person_id in related_ids:
+        if params.person_id in related_ids:
             raise InvalidKnowledgeDataError
         related_items = await self.item_storage.get_items_by_ids(
             item_ids=related_ids,
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         if len(related_items) != len(related_ids):
             raise PersonRelationshipNotFoundError
-        relationship_type_ids = {value.relationship_type_id for value in changes.create} | {
-            value.relationship_type_id for value in changes.update
+        relationship_type_ids = {value.relationship_type_id for value in params.changes.create} | {
+            value.relationship_type_id for value in params.changes.update
         }
         relationship_types = await self.people_storage.get_relationship_types_by_ids(
             relationship_type_ids=relationship_type_ids,
-            author_username=author_username,
+            author_username=params.author_username,
         )
         if len(relationship_types) != len(relationship_type_ids):
             raise PersonRelationshipTypeNotFoundError
         create_pair_keys = [
             (
-                min(person_id, value.related_person_id),
-                max(person_id, value.related_person_id),
+                min(params.person_id, value.related_person_id),
+                max(params.person_id, value.related_person_id),
                 value.relationship_type_id,
             )
-            for value in changes.create
+            for value in params.changes.create
         ]
         update_pair_keys = [
             (
-                min(person_id, value.related_person_id),
-                max(person_id, value.related_person_id),
+                min(params.person_id, value.related_person_id),
+                max(params.person_id, value.related_person_id),
                 value.relationship_type_id,
             )
-            for value in changes.update
+            for value in params.changes.update
         ]
         pair_keys = [*create_pair_keys, *update_pair_keys]
         if len(pair_keys) != len(set(pair_keys)):
             raise KnowledgeConflictError
         return existing_relationships
 
-    async def delete_person(
-        self,
-        *,
-        person_id: str,
-        author_username: str,
-        current_datetime: datetime,
-    ) -> tuple[str, ...]:
+    async def delete_person(self, *, params: DeletePersonParams) -> tuple[str, ...]:
         await self.item_service.get_item(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         related_ids = await self.people_storage.list_related_person_ids(
-            person_id=person_id,
-            author_username=author_username,
+            person_id=params.person_id,
+            author_username=params.author_username,
         )
         related_date_ids = await self.dates_storage.list_date_ids_for_person(
-            person_id=person_id,
-            author_username=author_username,
+            person_id=params.person_id,
+            author_username=params.author_username,
         )
         files = await self.file_storage.list_item_files(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
         )
         object_names_to_delete = await self.file_service.delete_files(files=files)
         await self.item_service.delete_item(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         await self.item_storage.touch_items(
             item_ids=related_ids,
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         await self.item_storage.touch_items(
             item_ids=set(related_date_ids),
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return object_names_to_delete
 
@@ -423,76 +421,71 @@ class PersonRelationshipTypesUseCase:
     async def create_relationship_type(
         self,
         *,
-        params: PersonRelationshipTypeCreateParams,
-        current_datetime: datetime,
+        params: CreatePersonRelationshipTypeParams,
     ) -> PersonRelationshipType:
-        reverse_name = params.forward_name if params.is_symmetric else params.reverse_name
+        reverse_name = (
+            params.data.forward_name if params.data.is_symmetric else params.data.reverse_name
+        )
         normalized_params = PersonRelationshipTypeCreateParams(
-            author_username=params.author_username,
-            is_symmetric=params.is_symmetric,
-            forward_name=params.forward_name,
+            author_username=params.data.author_username,
+            is_symmetric=params.data.is_symmetric,
+            forward_name=params.data.forward_name,
             reverse_name=reverse_name,
         )
         PersonRelationshipType(
             id="validation",
-            author_username=params.author_username,
-            is_symmetric=params.is_symmetric,
-            forward_name=params.forward_name,
+            author_username=params.data.author_username,
+            is_symmetric=params.data.is_symmetric,
+            forward_name=params.data.forward_name,
             reverse_name=reverse_name,
-            created_at=current_datetime,
-            updated_at=current_datetime,
+            created_at=params.current_datetime,
+            updated_at=params.current_datetime,
         )
         return await self.storage.create_relationship_type(params=normalized_params)
 
     async def update_relationship_type(
         self,
         *,
-        relationship_type_id: str,
-        params: PersonRelationshipTypeUpdateParams,
-        author_username: str,
-        current_datetime: datetime,
+        params: UpdatePersonRelationshipTypeParams,
     ) -> PersonRelationshipType:
         relationship_type = await self.storage.get_relationship_type(
-            relationship_type_id=relationship_type_id,
-            author_username=author_username,
+            relationship_type_id=params.relationship_type_id,
+            author_username=params.author_username,
         )
-        reverse_name = params.forward_name if params.is_symmetric else params.reverse_name
+        reverse_name = (
+            params.data.forward_name if params.data.is_symmetric else params.data.reverse_name
+        )
         normalized_params = PersonRelationshipTypeUpdateParams(
-            is_symmetric=params.is_symmetric,
-            forward_name=params.forward_name,
+            is_symmetric=params.data.is_symmetric,
+            forward_name=params.data.forward_name,
             reverse_name=reverse_name,
         )
         PersonRelationshipType(
             id=relationship_type.id,
             author_username=relationship_type.author_username,
-            is_symmetric=params.is_symmetric,
-            forward_name=params.forward_name,
+            is_symmetric=params.data.is_symmetric,
+            forward_name=params.data.forward_name,
             reverse_name=reverse_name,
             created_at=relationship_type.created_at,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return await self.storage.update_relationship_type(
             relationship_type=relationship_type,
             params=normalized_params,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
 
-    async def delete_relationship_type(
-        self,
-        *,
-        relationship_type_id: str,
-        author_username: str,
-    ) -> None:
+    async def delete_relationship_type(self, *, params: PersonRelationshipTypeTargetParams) -> None:
         await self.storage.get_relationship_type(
-            relationship_type_id=relationship_type_id,
-            author_username=author_username,
+            relationship_type_id=params.relationship_type_id,
+            author_username=params.author_username,
         )
         if await self.storage.is_relationship_type_used(
-            relationship_type_id=relationship_type_id,
-            author_username=author_username,
+            relationship_type_id=params.relationship_type_id,
+            author_username=params.author_username,
         ):
             raise KnowledgeConflictError
         await self.storage.delete_relationship_type(
-            relationship_type_id=relationship_type_id,
-            author_username=author_username,
+            relationship_type_id=params.relationship_type_id,
+            author_username=params.author_username,
         )

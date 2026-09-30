@@ -135,3 +135,36 @@ class KnowledgeDateUpdateParams:
     def __post_init__(self) -> None:
         if not self.display_name.strip() or len(self.person_ids) != len(set(self.person_ids)):
             raise InvalidKnowledgeDataError
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class KnowledgeDateTargetParams:
+    date_id: str
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateKnowledgeDateParams:
+    data: KnowledgeDateCreateParams
+    today: date
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateKnowledgeDateParams:
+    date_id: str
+    data: KnowledgeDateUpdateParams
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteKnowledgeDateParams:
+    date_id: str
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListPersonDateReferencesParams:
+    person_id: str
+    author_username: str

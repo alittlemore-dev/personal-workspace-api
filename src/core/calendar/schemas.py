@@ -253,3 +253,17 @@ class Calendar:
             summary=CalendarSummary.from_entries(entries=entries),
             entries=entries,
         )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCalendarOccurrencesParams:
+    start_date: date
+    end_date: date
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCalendarParams:
+    reference_date: date
+    window: CalendarWindow
+    author_username: str

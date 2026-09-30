@@ -4,38 +4,13 @@ import pytest
 import pytest_asyncio
 from httpx import codes
 
-from core.calendar.enums import CalendarEntryKind, CalendarEntryPeriod, CalendarWindow
+from core.calendar.enums import CalendarWindow
 from core.calendar.schemas import (
-    Calendar,
-    CalendarAnnualDate,
-    CalendarEntry,
-    CalendarRelatedPerson,
-    CalendarSummary,
+    GetCalendarParams,
 )
 from entrypoints.litestar.api.calendar.endpoints import CalendarApiController
 from tests.test_cases import ApiTestCase
 from tests.unit.conftest import TEST_USERNAME
-
-
-def calendar_response() -> Calendar:
-    return Calendar(
-        reference_date=date(2026, 7, 31),
-        window=CalendarWindow.CURRENT_AND_NEXT_MONTHS,
-        summary=CalendarSummary(memorable_date_count=1, birthday_count=0),
-        entries=[
-            CalendarEntry(
-                id="1" * 32,
-                kind=CalendarEntryKind.MEMORABLE_DATE,
-                display_name="Годовщина",
-                annual_date=CalendarAnnualDate(day=2, month=8, year=2020),
-                period=CalendarEntryPeriod.NEXT_MONTH,
-                occurrence_year=2026,
-                related_people=[
-                    CalendarRelatedPerson(id="2" * 32, display_name="Анна"),
-                ],
-            ),
-        ],
-    )
 
 
 class TestCalendarApi(ApiTestCase):
@@ -47,7 +22,7 @@ class TestCalendarApi(ApiTestCase):
         missing = self.api.get_calendar(reference_date=None, window=None)
         self.asserts.status(response=missing, expected_status=codes.BAD_REQUEST)
         self.use_case.get_calendar.assert_not_called()
-        self.use_case.get_calendar.return_value = calendar_response()
+        self.use_case.get_calendar.return_value = self.factory.core.calendar()
 
         response = self.api.get_calendar(
             reference_date="2026-07-31",
@@ -73,9 +48,11 @@ class TestCalendarApi(ApiTestCase):
             ],
         }
         self.use_case.get_calendar.assert_awaited_once_with(
-            reference_date=date(2026, 7, 31),
-            window=CalendarWindow.CURRENT_AND_NEXT_MONTHS,
-            author_username=TEST_USERNAME,
+            params=GetCalendarParams(
+                reference_date=date(2026, 7, 31),
+                window=CalendarWindow.CURRENT_AND_NEXT_MONTHS,
+                author_username=TEST_USERNAME,
+            ),
         )
 
     @pytest.mark.parametrize(

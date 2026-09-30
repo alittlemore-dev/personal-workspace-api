@@ -279,3 +279,51 @@ class PersonRelationshipTypeUpdateParams:
 
 def birthday_max_day(*, month: int, year: int | None) -> int:
     return monthrange(year if year is not None else 2000, month)[1]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PersonTargetParams:
+    person_id: str
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdatePersonParams:
+    person_id: str
+    data: PersonUpdateParams
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ValidatePersonRelationshipChangesParams:
+    person_id: str
+    changes: PersonRelationshipChanges
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeletePersonParams:
+    person_id: str
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreatePersonRelationshipTypeParams:
+    data: PersonRelationshipTypeCreateParams
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdatePersonRelationshipTypeParams:
+    relationship_type_id: str
+    data: PersonRelationshipTypeUpdateParams
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PersonRelationshipTypeTargetParams:
+    relationship_type_id: str
+    author_username: str

@@ -51,6 +51,11 @@ event_dispatchers.py    # Domain event/reporting interfaces; concrete transports
   data is a valid collaborator; do not create a class whose only purpose is to provide the current
   time. Pass operation-specific concrete values, especially current timestamps and policy/config
   data, explicitly to public use-case methods, and never inject callable factories for them.
+  Keep reusable service collaborators on the use case and inject them through DI; recreate them
+  only when their lifetime is operation-specific.
+- Public use-case operations with more than one operation input must accept one typed
+  `<Operation>Params` domain dataclass. Do not suppress `PLR0913` to retain multi-argument
+  operation signatures.
 - Use cases contain orchestration, straightforward field checks, storage reads, and DB-derived
   decisions. Do not add private/static helpers or collection-transformation loops. Put entity
   checks on domain objects, construction/conversion in schema classmethods, and shared behavior
@@ -74,6 +79,9 @@ event_dispatchers.py    # Domain event/reporting interfaces; concrete transports
   dedicated subtype of that scalar with `__slots__ = ()`. Put the behavior on the value object and
   use the subtype in core signatures; convert raw transport values at the boundary. For example,
   an invitation token should know how to produce its own cryptographic hash.
+- Reuse canonical enums and validated value objects instead of defining equivalent domain-local
+  types. Use `ZoneInfo` for named IANA time zones in domain and persistence contracts; convert
+  identifiers at transport boundaries.
 - Core exceptions must express domain failures and inherit only from `Exception` or project domain
   exception bases that themselves inherit from `Exception`. Litestar/HTTP representation belongs in
   the Litestar entrypoint layer, where core exceptions should be mapped to

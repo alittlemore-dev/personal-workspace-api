@@ -6,7 +6,10 @@ from httpx import codes
 from core.knowledge.items.schemas import (
     KnowledgeTag,
     KnowledgeTagCreateParams,
+    KnowledgeTagTargetParams,
     KnowledgeTagUpdateParams,
+    ListKnowledgeTagsParams,
+    UpdateKnowledgeTagParams,
 )
 from tests.test_cases import ApiTestCase
 from tests.unit.conftest import TEST_USERNAME
@@ -38,8 +41,10 @@ class TestKnowledgeTagsApi(ApiTestCase):
         assert listed.json()["tags"][0]["id"] == self.tag.id
         assert created.json()["id"] == self.tag.id
         self.use_case.list_tags.assert_awaited_once_with(
-            author_username=TEST_USERNAME,
-            search_query="Work",
+            params=ListKnowledgeTagsParams(
+                author_username=TEST_USERNAME,
+                search_query="Work",
+            ),
         )
         self.use_case.create_tag.assert_awaited_once_with(
             params=KnowledgeTagCreateParams(name="Work", author_username=TEST_USERNAME),
@@ -57,12 +62,16 @@ class TestKnowledgeTagsApi(ApiTestCase):
         self.asserts.status(response=renamed, expected_status=codes.OK)
         self.asserts.status(response=deleted, expected_status=codes.NO_CONTENT)
         self.use_case.update_tag.assert_awaited_once_with(
-            tag_id=self.tag.id,
-            params=KnowledgeTagUpdateParams(name="Work"),
-            author_username=TEST_USERNAME,
-            current_datetime=NOW,
+            params=UpdateKnowledgeTagParams(
+                tag_id=self.tag.id,
+                data=KnowledgeTagUpdateParams(name="Work"),
+                author_username=TEST_USERNAME,
+                current_datetime=NOW,
+            ),
         )
         self.use_case.delete_tag.assert_awaited_once_with(
-            tag_id=self.tag.id,
-            author_username=TEST_USERNAME,
+            params=KnowledgeTagTargetParams(
+                tag_id=self.tag.id,
+                author_username=TEST_USERNAME,
+            ),
         )

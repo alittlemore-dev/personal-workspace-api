@@ -6,29 +6,12 @@ from httpx import codes
 from core.cache_tools.enums import CacheWarmOperationStatusEnum
 from core.cache_tools.exceptions import CacheWarmOperationNotFoundError
 from core.cache_tools.schemas import (
-    CacheToolsStatus,
     CacheWarmOperation,
-    CacheWarmSummary,
 )
 from entrypoints.litestar.api.tools.endpoints import ToolsApiController
 from tests.test_cases import ApiTestCase
 
 QUEUED_AT = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
-
-
-def cache_status() -> CacheToolsStatus:
-    return CacheToolsStatus(
-        enabled=True,
-        configured_ttl_seconds=86_400,
-        scheduled_warm_interval_seconds=3_600,
-        domains=(),
-        last_manual_warm_operation=CacheWarmOperation(
-            operation_id="previous-operation",
-            status=CacheWarmOperationStatusEnum.SUCCEEDED,
-            queued_at=QUEUED_AT,
-            summary=CacheWarmSummary(attempted=3, written=3, skipped=0),
-        ),
-    )
 
 
 class TestToolsCacheApi(ApiTestCase):
@@ -38,7 +21,9 @@ class TestToolsCacheApi(ApiTestCase):
         self.policy = await self.container.get_cache_tools_policy()
 
     def test_get_cache_status_has_no_product_domains(self) -> None:
-        self.use_case.get_status.return_value = cache_status()
+        self.use_case.get_status.return_value = self.factory.core.cache_tools_status(
+            queued_at=QUEUED_AT,
+        )
 
         response = self.api.get_tools_cache()
 
@@ -47,7 +32,9 @@ class TestToolsCacheApi(ApiTestCase):
         self.use_case.get_status.assert_awaited_once_with(policy=self.policy)
 
     def test_clear_returns_refreshed_status_without_warming(self) -> None:
-        self.use_case.clear.return_value = cache_status()
+        self.use_case.clear.return_value = self.factory.core.cache_tools_status(
+            queued_at=QUEUED_AT,
+        )
 
         response = self.api.post_tools_cache_clear()
 

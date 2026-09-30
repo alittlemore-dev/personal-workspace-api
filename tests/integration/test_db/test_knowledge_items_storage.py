@@ -14,7 +14,10 @@ from core.knowledge.items.schemas import (
     KnowledgeItemCreateParams,
     KnowledgeItemUpdateParams,
     KnowledgeTagCreateParams,
+    KnowledgeTagTargetParams,
     KnowledgeTagUpdateParams,
+    ListKnowledgeTagsParams,
+    UpdateKnowledgeTagParams,
 )
 from core.knowledge.items.use_cases import KnowledgeTagsUseCase
 from infra.postgresql.storages.knowledge.items import KnowledgeItemsDatabaseStorage
@@ -134,8 +137,10 @@ class TestKnowledgeItemsStorage(StorageTestCase):
         assert [
             value.id
             for value in await self.use_case.list_tags(
-                author_username="owner",
-                search_query="WORK",
+                params=ListKnowledgeTagsParams(
+                    author_username="owner",
+                    search_query="WORK",
+                ),
             )
         ] == [tag.id]
         with pytest.raises(KnowledgeConflictError):
@@ -144,10 +149,12 @@ class TestKnowledgeItemsStorage(StorageTestCase):
             )
         with pytest.raises(KnowledgeTagNotFoundError):
             await self.use_case.update_tag(
-                tag_id=tag.id,
-                params=KnowledgeTagUpdateParams(name="Changed"),
-                author_username="other-owner",
-                current_datetime=NOW,
+                params=UpdateKnowledgeTagParams(
+                    tag_id=tag.id,
+                    data=KnowledgeTagUpdateParams(name="Changed"),
+                    author_username="other-owner",
+                    current_datetime=NOW,
+                ),
             )
 
         await self.storage.replace_item_tags(
@@ -156,12 +163,22 @@ class TestKnowledgeItemsStorage(StorageTestCase):
             tag_ids=[tag.id],
         )
         with pytest.raises(KnowledgeConflictError):
-            await self.use_case.delete_tag(tag_id=tag.id, author_username="owner")
+            await self.use_case.delete_tag(
+                params=KnowledgeTagTargetParams(
+                    tag_id=tag.id,
+                    author_username="owner",
+                ),
+            )
         await self.storage.replace_item_tags(
             item_id=self.item.id,
             author_username="owner",
             tag_ids=[],
         )
-        await self.use_case.delete_tag(tag_id=tag.id, author_username="owner")
+        await self.use_case.delete_tag(
+            params=KnowledgeTagTargetParams(
+                tag_id=tag.id,
+                author_username="owner",
+            ),
+        )
         with pytest.raises(KnowledgeTagNotFoundError):
             await self.storage.get_tag(tag_id=tag.id, author_username="owner")

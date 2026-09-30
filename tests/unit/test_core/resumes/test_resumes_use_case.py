@@ -13,12 +13,17 @@ from core.resumes.enums import ResumeExportFormatEnum, ResumeThemeEnum
 from core.resumes.exceptions import ResumeNotFoundError
 from core.resumes.exporters import ResumeDocumentExporter
 from core.resumes.schemas import (
+    DeleteResumeParams,
+    ExportResumeParams,
     ResumeCreateParams,
     ResumeExport,
     ResumeExportParams,
     ResumeFilters,
     Resumes,
+    ResumeTargetParams,
     ResumeUpdateParams,
+    UpdateResumeParams,
+    UploadResumePhotoParams,
 )
 from core.resumes.services import ResumePhotoFileService
 from core.resumes.storages import ResumesStorage
@@ -93,8 +98,10 @@ class TestResumesUseCase(TestCase):
         self.storage.get_resume.return_value = expected
 
         result = await self.use_case.get_resume(
-            resume_id=self.factory.core.hex_id(1),
-            author_username="test",
+            params=ResumeTargetParams(
+                resume_id=self.factory.core.hex_id(1),
+                author_username="test",
+            ),
         )
 
         assert result == expected
@@ -108,8 +115,10 @@ class TestResumesUseCase(TestCase):
 
         with pytest.raises(ResumeNotFoundError):
             await self.use_case.get_resume(
-                resume_id=self.factory.core.hex_id(404),
-                author_username="test",
+                params=ResumeTargetParams(
+                    resume_id=self.factory.core.hex_id(404),
+                    author_username="test",
+                ),
             )
 
     async def test_create_resume_persists_explicit_content(self) -> None:
@@ -158,10 +167,12 @@ class TestResumesUseCase(TestCase):
         self.storage.update_resume.return_value = expected
 
         result = await self.use_case.update_resume(
-            resume_id=self.factory.core.hex_id(1),
-            params=params,
-            author_username="original-author",
-            current_datetime=CURRENT_DATETIME,
+            params=UpdateResumeParams(
+                resume_id=self.factory.core.hex_id(1),
+                data=params,
+                author_username="original-author",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert result == expected
@@ -185,9 +196,11 @@ class TestResumesUseCase(TestCase):
             content=self.factory.core.resume_empty_content(),
         )
         await self.use_case.delete_resume(
-            resume_id=self.factory.core.hex_id(1),
-            author_username="test",
-            current_datetime=CURRENT_DATETIME,
+            params=DeleteResumeParams(
+                resume_id=self.factory.core.hex_id(1),
+                author_username="test",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         self.storage.delete_resume.assert_called_once_with(
@@ -227,10 +240,12 @@ class TestResumesUseCase(TestCase):
         )
 
         result = await self.use_case.upload_photo(
-            resume_id=original.id,
-            author_username="test",
-            params=params,
-            current_datetime=CURRENT_DATETIME,
+            params=UploadResumePhotoParams(
+                resume_id=original.id,
+                author_username="test",
+                data=params,
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert result.content.profile.photo_file_id == new_id
@@ -258,14 +273,16 @@ class TestResumesUseCase(TestCase):
 
         with pytest.raises(FilePurposeNotAllowedError):
             await self.use_case.update_resume(
-                resume_id=original.id,
-                params=ResumeUpdateParams(
-                    title=original.title,
-                    language=original.language,
-                    content=content,
+                params=UpdateResumeParams(
+                    resume_id=original.id,
+                    data=ResumeUpdateParams(
+                        title=original.title,
+                        language=original.language,
+                        content=content,
+                    ),
+                    author_username="test",
+                    current_datetime=CURRENT_DATETIME,
                 ),
-                author_username="test",
-                current_datetime=CURRENT_DATETIME,
             )
 
         self.storage.update_resume.assert_not_awaited()
@@ -294,9 +311,11 @@ class TestResumesUseCase(TestCase):
         self.exporter.export_resume.return_value = expected
 
         result = await self.use_case.export_resume(
-            resume_id=self.factory.core.hex_id(1),
-            params=params,
-            author_username="test",
+            params=ExportResumeParams(
+                resume_id=self.factory.core.hex_id(1),
+                data=params,
+                author_username="test",
+            ),
         )
 
         assert result == expected
@@ -321,9 +340,11 @@ class TestResumesUseCase(TestCase):
 
         with pytest.raises(ResumeNotFoundError):
             await self.use_case.export_resume(
-                resume_id=self.factory.core.hex_id(404),
-                params=params,
-                author_username="test",
+                params=ExportResumeParams(
+                    resume_id=self.factory.core.hex_id(404),
+                    data=params,
+                    author_username="test",
+                ),
             )
 
         self.exporter.export_resume.assert_not_called()

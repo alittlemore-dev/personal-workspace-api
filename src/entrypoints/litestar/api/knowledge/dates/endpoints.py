@@ -1,26 +1,28 @@
-from datetime import datetime
-from typing import Annotated
-
 from dishka import FromDishka
-from litestar import Controller, Request, delete, get, post, put, status_codes
+from litestar import Controller, delete, get, post, put, status_codes
 from litestar.di import NamedDependency, Provide
 
-from core.knowledge.dates.schemas import KnowledgeDateFilters
+from core.knowledge.dates.schemas import (
+    CreateKnowledgeDateParams,
+    DeleteKnowledgeDateParams,
+    KnowledgeDateFilters,
+    KnowledgeDateTargetParams,
+    UpdateKnowledgeDateParams,
+)
 from core.knowledge.dates.use_cases import KnowledgeDatesUseCase
 from core.knowledge.files.clients import KnowledgeFileObjectCleaner
 from entrypoints.litestar.api.knowledge.dates.dependencies import (
+    provide_create_date_params,
+    provide_delete_date_params,
+    provide_get_date_params,
     provide_knowledge_date_filters,
+    provide_update_date_params,
 )
 from entrypoints.litestar.api.knowledge.dates.schemas import (
-    KnowledgeDateCreateRequestSchema,
     KnowledgeDateResponseSchema,
     KnowledgeDatesResponseSchema,
-    KnowledgeDateUpdateRequestSchema,
 )
-from entrypoints.litestar.api.knowledge.files.post_commit import (
-    register_knowledge_object_cleanup,
-)
-from entrypoints.litestar.api.parameters import KnowledgeDateIdPath, api_json_body
+from entrypoints.litestar.api.knowledge.files.post_commit import register_knowledge_object_cleanup
 from infra.config.constants import constants
 from infra.post_commit_actions import PostCommitActions
 
@@ -58,30 +60,16 @@ class KnowledgeDatesApiController(Controller):
         description="Quick-create a private memorable date.",
         name="knowledge-dates-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
+        dependencies={"params": Provide(provide_create_date_params)},
     )
     async def create_date(
         self,
-        data: Annotated[
-            KnowledgeDateCreateRequestSchema,
-            api_json_body(
-                title="Knowledge date create request",
-                description="Required title and annual date.",
-                examples=(
-                    {
-                        "displayName": "Годовщина",
-                        "date": {"day": 29, "month": 2, "year": None},
-                    },
-                ),
-            ),
-        ],
-        request: Request,
         use_case: FromDishka[KnowledgeDatesUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[CreateKnowledgeDateParams],
     ) -> KnowledgeDateResponseSchema:
         return KnowledgeDateResponseSchema.from_domain_schema(
             schema=await use_case.create_date(
-                params=data.to_domain_schema(author_username=request.user.username),
-                today=current_datetime.date(),
+                params=params,
             ),
         )
 
@@ -90,17 +78,16 @@ class KnowledgeDatesApiController(Controller):
         description="Get one private memorable date owned by the current author.",
         name="knowledge-dates-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_get_date_params, sync_to_thread=False)},
     )
     async def get_date(
         self,
-        date_id: KnowledgeDateIdPath,
-        request: Request,
         use_case: FromDishka[KnowledgeDatesUseCase],
+        params: NamedDependency[KnowledgeDateTargetParams],
     ) -> KnowledgeDateResponseSchema:
         return KnowledgeDateResponseSchema.from_domain_schema(
             schema=await use_case.get_date(
-                date_id=date_id,
-                author_username=request.user.username,
+                params=params,
             ),
         )
 
@@ -109,36 +96,16 @@ class KnowledgeDatesApiController(Controller):
         description="Replace editable private memorable date data.",
         name="knowledge-dates-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_update_date_params)},
     )
     async def update_date(
         self,
-        date_id: KnowledgeDateIdPath,
-        data: Annotated[
-            KnowledgeDateUpdateRequestSchema,
-            api_json_body(
-                title="Knowledge date update request",
-                description="Complete editable memorable date payload.",
-                examples=(
-                    {
-                        "displayName": "Годовщина",
-                        "date": {"day": 29, "month": 2, "year": None},
-                        "description": "",
-                        "tagIds": [],
-                        "personIds": [],
-                    },
-                ),
-            ),
-        ],
-        request: Request,
         use_case: FromDishka[KnowledgeDatesUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[UpdateKnowledgeDateParams],
     ) -> KnowledgeDateResponseSchema:
         return KnowledgeDateResponseSchema.from_domain_schema(
             schema=await use_case.update_date(
-                date_id=date_id,
-                params=data.to_domain_schema(),
-                author_username=request.user.username,
-                current_datetime=current_datetime,
+                params=params,
             ),
         )
 
@@ -147,20 +114,17 @@ class KnowledgeDatesApiController(Controller):
         description="Permanently delete a private memorable date.",
         name="knowledge-dates-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
+        dependencies={"params": Provide(provide_delete_date_params)},
     )
-    async def delete_date(  # noqa: PLR0913
+    async def delete_date(
         self,
-        date_id: KnowledgeDateIdPath,
-        request: Request,
         use_case: FromDishka[KnowledgeDatesUseCase],
-        current_datetime: FromDishka[datetime],
         object_cleaner: FromDishka[KnowledgeFileObjectCleaner],
         post_commit_actions: FromDishka[PostCommitActions],
+        params: NamedDependency[DeleteKnowledgeDateParams],
     ) -> None:
         object_names = await use_case.delete_date(
-            date_id=date_id,
-            author_username=request.user.username,
-            current_datetime=current_datetime,
+            params=params,
         )
         register_knowledge_object_cleanup(
             object_names=object_names,

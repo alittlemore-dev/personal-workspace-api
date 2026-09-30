@@ -18,6 +18,7 @@ from tests.helpers.identity import TestIdentityMiddleware
 from tests.unit.mocks.providers.cache_tools import MockCacheToolsProvider
 from tests.unit.mocks.providers.calendar import MockCalendarProvider
 from tests.unit.mocks.providers.files import MockFilesProvider
+from tests.unit.mocks.providers.finance import MockFinanceProvider
 from tests.unit.mocks.providers.general import MockGeneralProvider
 from tests.unit.mocks.providers.healthcheck import MockHealthcheckProvider
 from tests.unit.mocks.providers.knowledge import MockKnowledgeProvider
@@ -49,6 +50,7 @@ async def container(
             current_datetime=TEST_CURRENT_DATETIME,
         ),
         MockFilesProvider(random_suffix=random_suffix),
+        MockFinanceProvider(),
         MockCalendarProvider(),
         MockKnowledgeProvider(),
         MockResumesProvider(),

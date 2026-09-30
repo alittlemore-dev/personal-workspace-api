@@ -182,3 +182,22 @@ class Event:
         if self.recurrence.frequency == EventFrequency.YEARLY:
             return max(0, earliest.year - anchor.year - 1)
         return 0
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EventTargetParams:
+    event_id: str
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateEventParams:
+    draft: EventDraft
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateEventParams:
+    event_id: str
+    draft: EventDraft
+    author_username: str

@@ -7,9 +7,20 @@ from httpx import codes
 
 from core.account_time_zone.clients import AccountTimeZoneUnavailableError
 from core.calendar.occurrences import CalendarOccurrence, CalendarOccurrences
+from core.calendar.schemas import GetCalendarOccurrencesParams
 from core.events.enums import EventFrequency
-from core.events.schemas import Event, EventRecurrence
-from core.important_info.schemas import ImportantInfo
+from core.events.schemas import (
+    Event,
+    EventRecurrence,
+    EventTargetParams,
+)
+from core.important_info.schemas import (
+    CreateImportantInfoParams,
+    ImportantInfo,
+    ImportantInfoTargetParams,
+    SetImportantInfoOrderParams,
+    UpdateImportantInfoParams,
+)
 from tests.test_cases import ApiTestCase
 from tests.unit.conftest import TEST_USERNAME
 
@@ -37,29 +48,37 @@ class TestWorkspaceCalendarApi(ApiTestCase):
             self.api.post_important_info(data={"text": " Keep this "}).status_code == codes.CREATED
         )
         self.info_use_case.create_item.assert_awaited_once_with(
-            text="Keep this",
-            author_username=TEST_USERNAME,
+            params=CreateImportantInfoParams(
+                text="Keep this",
+                author_username=TEST_USERNAME,
+            ),
         )
         assert (
             self.api.put_important_info(item_id=item.id, data={"text": "Keep this"}).status_code
             == codes.OK
         )
         self.info_use_case.update_item.assert_awaited_once_with(
-            item_id=item.id,
-            text="Keep this",
-            author_username=TEST_USERNAME,
+            params=UpdateImportantInfoParams(
+                item_id=item.id,
+                text="Keep this",
+                author_username=TEST_USERNAME,
+            ),
         )
         assert self.api.put_important_info_order(data={"ids": [item.id]}).json() == {
             "items": [{"id": item.id, "text": item.text, "position": 0}],
         }
         self.info_use_case.set_order.assert_awaited_once_with(
-            ids=[item.id],
-            author_username=TEST_USERNAME,
+            params=SetImportantInfoOrderParams(
+                ids=[item.id],
+                author_username=TEST_USERNAME,
+            ),
         )
         assert self.api.delete_important_info(item_id=item.id).status_code == codes.NO_CONTENT
         self.info_use_case.delete_item.assert_awaited_once_with(
-            item_id=item.id,
-            author_username=TEST_USERNAME,
+            params=ImportantInfoTargetParams(
+                item_id=item.id,
+                author_username=TEST_USERNAME,
+            ),
         )
 
     def test_important_info_accepts_multiple_empty_items_and_empty_updates(self) -> None:
@@ -71,16 +90,19 @@ class TestWorkspaceCalendarApi(ApiTestCase):
             assert self.api.post_important_info(data={"text": ""}).status_code == codes.CREATED
         assert self.info_use_case.create_item.await_count == 2
         assert all(
-            call.kwargs["text"] == "" for call in self.info_use_case.create_item.await_args_list
+            call.kwargs["params"].text == ""
+            for call in self.info_use_case.create_item.await_args_list
         )
         assert (
             self.api.put_important_info(item_id=empty.id, data={"text": " "}).status_code
             == codes.OK
         )
         self.info_use_case.update_item.assert_awaited_once_with(
-            item_id=empty.id,
-            text="",
-            author_username=TEST_USERNAME,
+            params=UpdateImportantInfoParams(
+                item_id=empty.id,
+                text="",
+                author_username=TEST_USERNAME,
+            ),
         )
 
     @pytest.mark.parametrize("text", ["line one\nline two", "x" * 256])
@@ -121,19 +143,23 @@ class TestWorkspaceCalendarApi(ApiTestCase):
         assert self.api.post_event(data=payload).json() == expected
         self.events_use_case.create_event.assert_awaited_once()
         assert self.events_use_case.create_event.call_args.kwargs[
-            "draft"
-        ].anchor_time_zone == ZoneInfo("Europe/Berlin")
+            "params"
+        ].draft.anchor_time_zone == ZoneInfo("Europe/Berlin")
         assert self.api.get_event(event_id=event.id).json() == expected
         self.events_use_case.get_event.assert_awaited_once_with(
-            event_id=event.id,
-            author_username=TEST_USERNAME,
+            params=EventTargetParams(
+                event_id=event.id,
+                author_username=TEST_USERNAME,
+            ),
         )
         assert self.api.put_event(event_id=event.id, data=payload).json() == expected
         self.events_use_case.update_event.assert_awaited_once()
         assert self.api.delete_event(event_id=event.id).status_code == codes.NO_CONTENT
         self.events_use_case.delete_event.assert_awaited_once_with(
-            event_id=event.id,
-            author_username=TEST_USERNAME,
+            params=EventTargetParams(
+                event_id=event.id,
+                author_username=TEST_USERNAME,
+            ),
         )
 
     def test_event_create_and_update_accept_omitted_description_as_empty(self) -> None:
@@ -164,8 +190,8 @@ class TestWorkspaceCalendarApi(ApiTestCase):
         assert updated.status_code == codes.OK
         assert created.json()["description"] == ""
         assert updated.json()["description"] == ""
-        assert self.events_use_case.create_event.call_args.kwargs["draft"].description == ""
-        assert self.events_use_case.update_event.call_args.kwargs["draft"].description == ""
+        assert self.events_use_case.create_event.call_args.kwargs["params"].draft.description == ""
+        assert self.events_use_case.update_event.call_args.kwargs["params"].draft.description == ""
 
     def test_event_read_uses_current_account_zone_for_recurring_first_occurrence(self) -> None:
         recurring = Event(
@@ -255,9 +281,11 @@ class TestWorkspaceCalendarApi(ApiTestCase):
             "unplacedAnnualEntries": [],
         }
         self.occurrences_use_case.get_occurrences.assert_awaited_once_with(
-            start_date=date(2026, 5, 1),
-            end_date=date(2026, 5, 31),
-            author_username=TEST_USERNAME,
+            params=GetCalendarOccurrencesParams(
+                start_date=date(2026, 5, 1),
+                end_date=date(2026, 5, 31),
+                author_username=TEST_USERNAME,
+            ),
         )
         for start, end in [
             ("2026-05-01", "2026-05-01"),

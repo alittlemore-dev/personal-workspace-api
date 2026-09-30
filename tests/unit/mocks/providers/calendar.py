@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock, Mock
+from zoneinfo import ZoneInfo
 
 from dishka import Provider, Scope, provide
 
@@ -13,7 +14,7 @@ class MockCalendarProvider(Provider):
     @provide(scope=Scope.APP)
     async def provide_account_time_zone_reader(self) -> AccountTimeZoneReader:
         reader = AsyncMock(spec=AccountTimeZoneReader)
-        reader.get_time_zone.return_value = "UTC"
+        reader.get_time_zone.return_value = ZoneInfo("UTC")
         return reader
 
     @provide(scope=Scope.APP)

@@ -1,6 +1,16 @@
 from .base import BaseModel as BaseModel
 from .events import EventModel as EventModel
 from .files import FileModel as FileModel
+from .finance import FinanceCategoryModel as FinanceCategoryModel
+from .finance import FinanceMonthCategoryModel as FinanceMonthCategoryModel
+from .finance import FinanceMonthCurrencyChangeModel as FinanceMonthCurrencyChangeModel
+from .finance import FinanceMonthModel as FinanceMonthModel
+from .finance import FinanceRateModel as FinanceRateModel
+from .finance import FinanceRateSetModel as FinanceRateSetModel
+from .finance import FinanceTemplateCategoryModel as FinanceTemplateCategoryModel
+from .finance import FinanceTrackerModel as FinanceTrackerModel
+from .finance import FinanceTransactionModel as FinanceTransactionModel
+from .finance import FinanceTransactionRevisionModel as FinanceTransactionRevisionModel
 from .important_info import ImportantInfoModel as ImportantInfoModel
 from .knowledge import KnowledgeDateDetailsModel as KnowledgeDateDetailsModel
 from .knowledge import KnowledgeDatePersonModel as KnowledgeDatePersonModel

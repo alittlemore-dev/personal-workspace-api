@@ -3,6 +3,7 @@ from datetime import date, datetime
 from math import ceil
 from typing import Self
 
+from core.files.schemas import FileUploadParams
 from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
 from core.schemas import ValuedDataclass
@@ -195,3 +196,39 @@ class ResumeExportParams:
 class ResumeExport:
     format: ResumeExportFormatEnum
     content: bytes
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ResumeTargetParams:
+    resume_id: str
+    author_username: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateResumeParams:
+    resume_id: str
+    data: ResumeUpdateParams
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UploadResumePhotoParams:
+    resume_id: str
+    author_username: str
+    data: FileUploadParams
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteResumeParams:
+    resume_id: str
+    author_username: str
+    current_datetime: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ExportResumeParams:
+    resume_id: str
+    data: ResumeExportParams
+    author_username: str

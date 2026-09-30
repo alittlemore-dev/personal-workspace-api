@@ -11,13 +11,16 @@ from core.knowledge.items.enums import KnowledgeItemKind
 from core.knowledge.items.schemas import KnowledgeItemCreateParams
 from core.knowledge.people.enums import PersonListSort, PersonRelationshipDirection
 from core.knowledge.people.schemas import (
+    CreatePersonRelationshipTypeParams,
     PersonBirthday,
     PersonDetails,
     PersonFilters,
     PersonRelationshipCreateParams,
     PersonRelationshipTypeCreateParams,
+    PersonRelationshipTypeTargetParams,
     PersonRelationshipTypeUpdateParams,
     PersonRelationshipUpdateParams,
+    UpdatePersonRelationshipTypeParams,
 )
 from core.knowledge.people.use_cases import PersonRelationshipTypesUseCase
 from infra.postgresql.storages.knowledge.items import KnowledgeItemsDatabaseStorage
@@ -309,13 +312,15 @@ class TestKnowledgePeopleStorage(StorageTestCase):
         storage, first_id, second_id = relationship_context
         use_case = PersonRelationshipTypesUseCase(storage=storage)
         relationship_type = await use_case.create_relationship_type(
-            params=PersonRelationshipTypeCreateParams(
-                author_username="owner",
-                is_symmetric=True,
-                forward_name="friend",
-                reverse_name="",
+            params=CreatePersonRelationshipTypeParams(
+                data=PersonRelationshipTypeCreateParams(
+                    author_username="owner",
+                    is_symmetric=True,
+                    forward_name="friend",
+                    reverse_name="",
+                ),
+                current_datetime=CURRENT_DATETIME,
             ),
-            current_datetime=CURRENT_DATETIME,
         )
         assert relationship_type.reverse_name == "friend"
         assert [
@@ -327,14 +332,16 @@ class TestKnowledgePeopleStorage(StorageTestCase):
         assert await use_case.list_relationship_types(author_username="other-owner") == []
         with pytest.raises(PersonRelationshipTypeNotFoundError):
             await use_case.update_relationship_type(
-                relationship_type_id=relationship_type.id,
-                params=PersonRelationshipTypeUpdateParams(
-                    is_symmetric=False,
-                    forward_name="manager",
-                    reverse_name="report",
+                params=UpdatePersonRelationshipTypeParams(
+                    relationship_type_id=relationship_type.id,
+                    data=PersonRelationshipTypeUpdateParams(
+                        is_symmetric=False,
+                        forward_name="manager",
+                        reverse_name="report",
+                    ),
+                    author_username="other-owner",
+                    current_datetime=CURRENT_DATETIME,
                 ),
-                author_username="other-owner",
-                current_datetime=CURRENT_DATETIME,
             )
 
         await storage.create_relationships(
@@ -353,8 +360,10 @@ class TestKnowledgePeopleStorage(StorageTestCase):
         )
         with pytest.raises(KnowledgeConflictError):
             await use_case.delete_relationship_type(
-                relationship_type_id=relationship_type.id,
-                author_username="owner",
+                params=PersonRelationshipTypeTargetParams(
+                    relationship_type_id=relationship_type.id,
+                    author_username="owner",
+                ),
             )
         relationship = (
             await storage.list_relationships(
@@ -367,7 +376,9 @@ class TestKnowledgePeopleStorage(StorageTestCase):
             author_username="owner",
         )
         await use_case.delete_relationship_type(
-            relationship_type_id=relationship_type.id,
-            author_username="owner",
+            params=PersonRelationshipTypeTargetParams(
+                relationship_type_id=relationship_type.id,
+                author_username="owner",
+            ),
         )
         assert await storage.list_relationship_types(author_username="owner") == []

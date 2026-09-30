@@ -7,7 +7,10 @@ from core.i18n.enums import LanguageEnum
 from core.telegram.enums import TelegramConnectionState
 from core.telegram.exceptions import TelegramAccessError, TelegramInvitationError
 from core.telegram.schemas import (
+    CreateTelegramInvitationParams,
     InvitationToken,
+    RequestTelegramConnectionParams,
+    SetTelegramConnectionSettingsParams,
     TelegramConnectionSettings,
     TelegramParticipant,
     TelegramUseCaseConfig,
@@ -38,9 +41,11 @@ class TestTelegramStorage(StorageTestCase):
             limiter=None,
         )
         issued = await use_case.create_invitation(
-            owner_username="auth-user-without-local-row",
-            label="Family",
-            now=NOW,
+            params=CreateTelegramInvitationParams(
+                owner_username="auth-user-without-local-row",
+                label="Family",
+                now=NOW,
+            ),
         )
         participant = TelegramParticipant(
             user_id=42,
@@ -52,9 +57,11 @@ class TestTelegramStorage(StorageTestCase):
         assert issued.url == "https://t.me/alittlemore_workspace_bot?start=secret"
         assert (
             await use_case.request_connection(
-                token=issued.token,
-                participant=participant,
-                now=NOW,
+                params=RequestTelegramConnectionParams(
+                    token=issued.token,
+                    participant=participant,
+                    now=NOW,
+                ),
             )
             == "pending"
         )
@@ -63,9 +70,11 @@ class TestTelegramStorage(StorageTestCase):
         assert connections[0].private_chat_id == 42
         with pytest.raises(TelegramInvitationError):
             await use_case.request_connection(
-                token=issued.token,
-                participant=participant,
-                now=NOW,
+                params=RequestTelegramConnectionParams(
+                    token=issued.token,
+                    participant=participant,
+                    now=NOW,
+                ),
             )
 
     async def test_invitation_and_chat_connection_live_in_workspace_without_local_user(
@@ -156,14 +165,18 @@ class TestTelegramStorage(StorageTestCase):
         )
         with pytest.raises(TelegramAccessError):
             await use_case.set_connection_settings(
-                owner_username="owner-b",
-                connection_id=connection.id,
-                settings=changed,
+                params=SetTelegramConnectionSettingsParams(
+                    owner_username="owner-b",
+                    connection_id=connection.id,
+                    settings=changed,
+                ),
             )
         updated = await use_case.set_connection_settings(
-            owner_username="owner-a",
-            connection_id=connection.id,
-            settings=changed,
+            params=SetTelegramConnectionSettingsParams(
+                owner_username="owner-a",
+                connection_id=connection.id,
+                settings=changed,
+            ),
         )
         assert updated.notify_birthday
         assert updated.notify_memorable_date

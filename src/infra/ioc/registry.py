@@ -8,6 +8,7 @@ from infra.ioc.prodivers.calendar_provider import CalendarProvider
 from infra.ioc.prodivers.database_provider import DatabaseProvider
 from infra.ioc.prodivers.events_provider import EventsProvider
 from infra.ioc.prodivers.files_provider import FilesProvider
+from infra.ioc.prodivers.finance_provider import FinanceProvider
 from infra.ioc.prodivers.general_provider import GeneralProvider
 from infra.ioc.prodivers.healthcheck_provider import HealthcheckProvider
 from infra.ioc.prodivers.important_info_provider import ImportantInfoProvider
@@ -33,6 +34,7 @@ def get_providers() -> Iterable[Provider]:
         AccountTimeZoneProvider(),
         CalendarProvider(),
         EventsProvider(),
+        FinanceProvider(),
         ImportantInfoProvider(),
         ResumesProvider(),
         TelegramProvider(),

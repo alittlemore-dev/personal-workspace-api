@@ -6,45 +6,17 @@ from httpx import codes
 
 from core.knowledge.dates.enums import KnowledgeDateListSort
 from core.knowledge.dates.schemas import (
-    KnowledgeDate,
     KnowledgeDateCreateParams,
-    KnowledgeDateDetails,
     KnowledgeDateFilters,
     KnowledgeDatesPage,
     KnowledgeDateUpdateParams,
     KnowledgeDateValue,
 )
-from core.knowledge.items.enums import KnowledgeItemKind
-from core.knowledge.items.schemas import KnowledgeItem
-from entrypoints.litestar.api.knowledge.dates.endpoints import (
-    KnowledgeDatesApiController,
-)
+from entrypoints.litestar.api.knowledge.dates.endpoints import KnowledgeDatesApiController
 from tests.test_cases import ApiTestCase
 from tests.unit.conftest import TEST_USERNAME
 
 CURRENT_DATETIME = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
-
-
-def date_response(*, date_id: str = "1" * 32) -> KnowledgeDate:
-    return KnowledgeDate(
-        item=KnowledgeItem(
-            id=date_id,
-            kind=KnowledgeItemKind.DATE,
-            author_username="test",
-            display_name="Anniversary",
-            description="",
-            tags=[],
-            created_at=CURRENT_DATETIME,
-            updated_at=CURRENT_DATETIME,
-        ),
-        details=KnowledgeDateDetails(
-            item_id=date_id,
-            date=KnowledgeDateValue(day=29, month=2, year=None),
-            notifications_enabled=True,
-        ),
-        related_people=[],
-        attachments=[],
-    )
 
 
 class TestKnowledgeDatesApi(ApiTestCase):
@@ -93,7 +65,9 @@ class TestKnowledgeDatesApi(ApiTestCase):
         )
 
     def test_create_maps_required_fields_and_current_author(self) -> None:
-        self.use_case.create_date.return_value = date_response()
+        self.use_case.create_date.return_value = self.factory.core.knowledge_date(
+            now=CURRENT_DATETIME,
+        )
 
         response = self.api.post_knowledge_date(
             data={
@@ -103,13 +77,13 @@ class TestKnowledgeDatesApi(ApiTestCase):
         )
 
         self.asserts.status(response=response, expected_status=codes.CREATED)
-        call = self.use_case.create_date.await_args.kwargs
-        assert call["params"] == KnowledgeDateCreateParams(
+        call = self.use_case.create_date.await_args.kwargs["params"]
+        assert call.data == KnowledgeDateCreateParams(
             display_name="Anniversary",
             date=KnowledgeDateValue(day=29, month=2, year=None),
             author_username=TEST_USERNAME,
         )
-        assert call["today"] == datetime(2026, 7, 27, tzinfo=UTC).date()
+        assert call.today == datetime(2026, 7, 27, tzinfo=UTC).date()
 
     @pytest.mark.parametrize(
         ("date_value", "expected_status"),
@@ -126,7 +100,9 @@ class TestKnowledgeDatesApi(ApiTestCase):
         date_value: dict[str, int | None],
         expected_status: int,
     ) -> None:
-        self.use_case.create_date.return_value = date_response()
+        self.use_case.create_date.return_value = self.factory.core.knowledge_date(
+            now=CURRENT_DATETIME,
+        )
 
         response = self.api.post_knowledge_date(
             data={"displayName": "Anniversary", "date": date_value},
@@ -139,7 +115,9 @@ class TestKnowledgeDatesApi(ApiTestCase):
             self.use_case.create_date.assert_not_awaited()
 
     def test_update_maps_people_tags_and_rejects_duplicate_people(self) -> None:
-        self.use_case.update_date.return_value = date_response()
+        self.use_case.update_date.return_value = self.factory.core.knowledge_date(
+            now=CURRENT_DATETIME,
+        )
         payload = {
             "displayName": "Anniversary",
             "date": {"day": 29, "month": 2, "year": None},
@@ -152,9 +130,9 @@ class TestKnowledgeDatesApi(ApiTestCase):
         response = self.api.put_knowledge_date(date_id=1, data=payload)
 
         self.asserts.status(response=response, expected_status=codes.OK)
-        call = self.use_case.update_date.await_args.kwargs
-        assert call["date_id"] == "0" * 31 + "1"
-        assert call["params"] == KnowledgeDateUpdateParams(
+        call = self.use_case.update_date.await_args.kwargs["params"]
+        assert call.date_id == "0" * 31 + "1"
+        assert call.data == KnowledgeDateUpdateParams(
             display_name="Anniversary",
             date=KnowledgeDateValue(day=29, month=2, year=None),
             description="",
@@ -162,7 +140,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
             person_ids=["3" * 32],
             notifications_enabled=True,
         )
-        assert call["author_username"] == TEST_USERNAME
+        assert call.author_username == TEST_USERNAME
 
         payload["personIds"] = ["3" * 32, "3" * 32]
         duplicate = self.api.put_knowledge_date(date_id=1, data=payload)

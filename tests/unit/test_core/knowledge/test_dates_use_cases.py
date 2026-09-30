@@ -5,12 +5,15 @@ import pytest
 
 from core.knowledge.dates.enums import KnowledgeDateListSort
 from core.knowledge.dates.schemas import (
+    CreateKnowledgeDateParams,
+    DeleteKnowledgeDateParams,
     KnowledgeDateCreateParams,
     KnowledgeDateDetails,
     KnowledgeDateFilters,
     KnowledgeDatePersonLink,
     KnowledgeDateUpdateParams,
     KnowledgeDateValue,
+    UpdateKnowledgeDateParams,
 )
 from core.knowledge.dates.storages import KnowledgeDatesStorage
 from core.knowledge.dates.use_cases import KnowledgeDatesUseCase
@@ -20,30 +23,12 @@ from core.knowledge.files.schemas import KnowledgeFile
 from core.knowledge.files.services import KnowledgeFileCrudService
 from core.knowledge.files.storages import KnowledgeFilesStorage
 from core.knowledge.items.enums import KnowledgeItemKind
-from core.knowledge.items.schemas import KnowledgeItem, KnowledgeTag
+from core.knowledge.items.schemas import KnowledgeTag
 from core.knowledge.items.services import KnowledgeItemCrudService
 from core.knowledge.items.storages import KnowledgeItemsStorage
 from tests.test_cases import TestCase
 
 CURRENT_DATETIME = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
-
-
-def knowledge_item(
-    *,
-    item_id: str,
-    kind: KnowledgeItemKind,
-    display_name: str,
-) -> KnowledgeItem:
-    return KnowledgeItem(
-        id=item_id,
-        kind=kind,
-        author_username="owner",
-        display_name=display_name,
-        description="",
-        tags=[],
-        created_at=CURRENT_DATETIME,
-        updated_at=CURRENT_DATETIME,
-    )
 
 
 class TestKnowledgeDatesUseCase(TestCase):
@@ -67,12 +52,14 @@ class TestKnowledgeDatesUseCase(TestCase):
         date_id = self.factory.core.hex_id(1)
         person_id = self.factory.core.hex_id(2)
         tag_id = self.factory.core.hex_id(3)
-        date_item = knowledge_item(
+        date_item = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=date_id,
             kind=KnowledgeItemKind.DATE,
             display_name="Годовщина",
         )
-        person_item = knowledge_item(
+        person_item = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=person_id,
             kind=KnowledgeItemKind.PERSON,
             display_name="Иван Иванов",
@@ -130,7 +117,8 @@ class TestKnowledgeDatesUseCase(TestCase):
 
     async def test_create_uses_typed_item_and_blank_detail_state(self) -> None:
         date_id = self.factory.core.hex_id(1)
-        item = knowledge_item(
+        item = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=date_id,
             kind=KnowledgeItemKind.DATE,
             display_name="Годовщина",
@@ -146,12 +134,14 @@ class TestKnowledgeDatesUseCase(TestCase):
         self.item_storage.get_items_by_ids.return_value = []
 
         created = await self.use_case.create_date(
-            params=KnowledgeDateCreateParams(
-                display_name="  Годовщина  ",
-                date=KnowledgeDateValue(day=1, month=5, year=2020),
-                author_username="owner",
+            params=CreateKnowledgeDateParams(
+                data=KnowledgeDateCreateParams(
+                    display_name="  Годовщина  ",
+                    date=KnowledgeDateValue(day=1, month=5, year=2020),
+                    author_username="owner",
+                ),
+                today=CURRENT_DATETIME.date(),
             ),
-            today=CURRENT_DATETIME.date(),
         )
 
         assert created.item.id == date_id
@@ -163,7 +153,8 @@ class TestKnowledgeDatesUseCase(TestCase):
     async def test_update_rejects_foreign_or_wrong_kind_person_before_mutation(self) -> None:
         date_id = self.factory.core.hex_id(1)
         person_id = self.factory.core.hex_id(2)
-        self.item_service.get_item.return_value = knowledge_item(
+        self.item_service.get_item.return_value = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=date_id,
             kind=KnowledgeItemKind.DATE,
             display_name="Дата",
@@ -178,17 +169,19 @@ class TestKnowledgeDatesUseCase(TestCase):
 
         with pytest.raises(PersonNotFoundError):
             await self.use_case.update_date(
-                date_id=date_id,
-                params=KnowledgeDateUpdateParams(
-                    display_name="Дата",
-                    date=KnowledgeDateValue(day=2, month=1, year=None),
-                    description="",
-                    tag_ids=[],
-                    person_ids=[person_id],
-                    notifications_enabled=True,
+                params=UpdateKnowledgeDateParams(
+                    date_id=date_id,
+                    data=KnowledgeDateUpdateParams(
+                        display_name="Дата",
+                        date=KnowledgeDateValue(day=2, month=1, year=None),
+                        description="",
+                        tag_ids=[],
+                        person_ids=[person_id],
+                        notifications_enabled=True,
+                    ),
+                    author_username="owner",
+                    current_datetime=CURRENT_DATETIME,
                 ),
-                author_username="owner",
-                current_datetime=CURRENT_DATETIME,
             )
 
         self.item_service.update_item.assert_not_called()
@@ -198,12 +191,14 @@ class TestKnowledgeDatesUseCase(TestCase):
         date_id = self.factory.core.hex_id(1)
         old_person_id = self.factory.core.hex_id(2)
         new_person_id = self.factory.core.hex_id(3)
-        item = knowledge_item(
+        item = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=date_id,
             kind=KnowledgeItemKind.DATE,
             display_name="Дата",
         )
-        new_person = knowledge_item(
+        new_person = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=new_person_id,
             kind=KnowledgeItemKind.PERSON,
             display_name="Новый человек",
@@ -221,17 +216,19 @@ class TestKnowledgeDatesUseCase(TestCase):
         self.item_storage.get_items_by_ids.side_effect = [[new_person], [new_person]]
 
         await self.use_case.update_date(
-            date_id=date_id,
-            params=KnowledgeDateUpdateParams(
-                display_name="Дата",
-                date=KnowledgeDateValue(day=2, month=1, year=None),
-                description="Описание",
-                tag_ids=[],
-                person_ids=[new_person_id],
-                notifications_enabled=True,
+            params=UpdateKnowledgeDateParams(
+                date_id=date_id,
+                data=KnowledgeDateUpdateParams(
+                    display_name="Дата",
+                    date=KnowledgeDateValue(day=2, month=1, year=None),
+                    description="Описание",
+                    tag_ids=[],
+                    person_ids=[new_person_id],
+                    notifications_enabled=True,
+                ),
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
             ),
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
         )
 
         self.dates_storage.replace_person_links.assert_awaited_once_with(
@@ -248,7 +245,8 @@ class TestKnowledgeDatesUseCase(TestCase):
     async def test_delete_returns_private_objects_and_touches_people(self) -> None:
         date_id = self.factory.core.hex_id(1)
         person_id = self.factory.core.hex_id(2)
-        self.item_service.get_item.return_value = knowledge_item(
+        self.item_service.get_item.return_value = self.factory.core.knowledge_item(
+            now=CURRENT_DATETIME,
             item_id=date_id,
             kind=KnowledgeItemKind.DATE,
             display_name="Дата",
@@ -278,9 +276,11 @@ class TestKnowledgeDatesUseCase(TestCase):
         mutations.attach_mock(self.item_service.delete_item, "delete_item")
 
         object_names = await self.use_case.delete_date(
-            date_id=date_id,
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
+            params=DeleteKnowledgeDateParams(
+                date_id=date_id,
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert object_names == ("attachments/file.txt",)

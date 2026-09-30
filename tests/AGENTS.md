@@ -83,12 +83,12 @@ the shared base schema.
   `ContainerTestCase` for Dishka, `ApiTestCase` for HTTP helpers, and `StorageTestCase` for database
   assertions and automatic rollback. Follow adjacent tests for their public helper APIs.
 - Reuse `tests/unit/mocks/providers/` and the plain-Python factories under
-  `tests/helpers/factories/` (`CoreFactoryHelper` and `ApiFactoryHelper`; no Mimesis).
-  Create domain objects through `self.factory.core.*` when covered; defaults are allowed in tests.
+  `tests/helpers/factories/` (no Mimesis). Build core, API, and ORM entity fixtures through their
+  layer-specific factory helpers. Add builders there for uncovered entity setups rather than
+  module-level setup functions; defaults are allowed in test factories.
 - Put reusable endpoint helpers in `tests/helpers/api.py`, HTTP assertions in
   `helpers/assertions.py`, and useful repeated collection projections in `helpers/collections.py`.
-  Keep scenario-specific payload assertions and setup visible in the test. Add factory builders
-  only for setups reused across tests.
+  Keep scenario-specific payload assertions and setup visible in the test.
 - Test generated schema, migration/data results, security boundaries, query behavior, and observable
   API/core contracts. Do not duplicate ORM declarations, trivial converters, source text, package
   versions, lockfiles, or exact command strings as tests.

@@ -21,6 +21,12 @@ from core.account_time_zone.clients import AccountTimeZoneUnavailableError
 from core.events.exceptions import InvalidEventDataError
 from core.exceptions import DomainError, EntryNotFoundError
 from core.files.exceptions import FileClientInternalError, FileInUseError, InvalidFileDataError
+from core.finance.exceptions import (
+    FinanceConflictError,
+    FinanceNotFoundError,
+    FinanceRateUnavailableError,
+    InvalidFinanceDataError,
+)
 from core.important_info.exceptions import InvalidImportantInfoOrderError
 from core.knowledge.exceptions import InvalidKnowledgeDataError, KnowledgeConflictError
 from core.telegram.exceptions import (
@@ -38,6 +44,10 @@ DOMAIN_ERROR_MAPPING: dict[type[DomainError], type[BaseVerboseHTTPException]] = 
     FileClientInternalError: InternalServerErrorHTTPException,
     InvalidKnowledgeDataError: BadRequestHTTPException,
     InvalidEventDataError: BadRequestHTTPException,
+    FinanceNotFoundError: NotFoundHTTPException,
+    InvalidFinanceDataError: BadRequestHTTPException,
+    FinanceConflictError: ConflictHTTPException,
+    FinanceRateUnavailableError: ServiceUnavailableHTTPException,
     InvalidImportantInfoOrderError: BadRequestHTTPException,
     KnowledgeConflictError: ConflictHTTPException,
     TelegramAccessError: ForbiddenHTTPException,

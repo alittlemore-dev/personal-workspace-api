@@ -1,34 +1,44 @@
-from datetime import datetime
 from typing import Annotated
 
+from backend_sdk import Principal
+from backend_sdk.integrations.litestar import AuthContext
 from dishka import FromDishka
 from litestar import Controller, Request, delete, get, post, put, status_codes
+from litestar.datastructures import State
 from litestar.di import NamedDependency, Provide
 
 from core.knowledge.files.clients import KnowledgeFileObjectCleaner
-from core.knowledge.people.schemas import PersonFilters
+from core.knowledge.people.schemas import (
+    CreatePersonRelationshipTypeParams,
+    DeletePersonParams,
+    PersonFilters,
+    PersonRelationshipTypeTargetParams,
+    PersonTargetParams,
+    UpdatePersonParams,
+    UpdatePersonRelationshipTypeParams,
+)
 from core.knowledge.people.use_cases import (
     PeopleUseCase,
     PersonRelationshipTypesUseCase,
 )
-from entrypoints.litestar.api.knowledge.files.post_commit import (
-    register_knowledge_object_cleanup,
+from entrypoints.litestar.api.knowledge.files.post_commit import register_knowledge_object_cleanup
+from entrypoints.litestar.api.knowledge.people.dependencies import (
+    provide_create_relationship_type_params,
+    provide_delete_person_params,
+    provide_delete_relationship_type_params,
+    provide_get_person_params,
+    provide_person_filters,
+    provide_update_person_params,
+    provide_update_relationship_type_params,
 )
-from entrypoints.litestar.api.knowledge.people.dependencies import provide_person_filters
 from entrypoints.litestar.api.knowledge.people.schemas import (
     PeopleResponseSchema,
     PersonQuickCreateRequestSchema,
-    PersonRelationshipTypeRequestSchema,
     PersonRelationshipTypeResponseSchema,
     PersonRelationshipTypesResponseSchema,
     PersonResponseSchema,
-    PersonUpdateRequestSchema,
 )
-from entrypoints.litestar.api.parameters import (
-    PersonIdPath,
-    PersonRelationshipTypeIdPath,
-    api_json_body,
-)
+from entrypoints.litestar.api.parameters import api_json_body
 from infra.config.constants import constants
 from infra.post_commit_actions import PostCommitActions
 
@@ -75,7 +85,7 @@ class PeopleApiController(Controller):
                 examples=({"firstName": "Иван", "lastName": "Иванов"},),
             ),
         ],
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[PeopleUseCase],
     ) -> PersonResponseSchema:
         return PersonResponseSchema.from_domain_schema(
@@ -89,17 +99,16 @@ class PeopleApiController(Controller):
         description="Get one private person owned by the current author.",
         name="knowledge-people-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_get_person_params, sync_to_thread=False)},
     )
     async def get_person(
         self,
-        person_id: PersonIdPath,
-        request: Request,
         use_case: FromDishka[PeopleUseCase],
+        params: NamedDependency[PersonTargetParams],
     ) -> PersonResponseSchema:
         return PersonResponseSchema.from_domain_schema(
             schema=await use_case.get_person(
-                person_id=person_id,
-                author_username=request.user.username,
+                params=params,
             ),
         )
 
@@ -108,45 +117,16 @@ class PeopleApiController(Controller):
         description="Replace editable private person data and apply relationship commands.",
         name="knowledge-people-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={"params": Provide(provide_update_person_params)},
     )
     async def update_person(
         self,
-        person_id: PersonIdPath,
-        data: Annotated[
-            PersonUpdateRequestSchema,
-            api_json_body(
-                title="Person update request",
-                description="Complete editable person payload.",
-                examples=(
-                    {
-                        "lastName": "Иванов",
-                        "firstName": "Иван",
-                        "middleName": "",
-                        "email": "",
-                        "phone": "",
-                        "telegram": "",
-                        "birthday": None,
-                        "description": "",
-                        "tagIds": [],
-                        "relationshipChanges": {
-                            "create": [],
-                            "update": [],
-                            "deleteIds": [],
-                        },
-                    },
-                ),
-            ),
-        ],
-        request: Request,
         use_case: FromDishka[PeopleUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[UpdatePersonParams],
     ) -> PersonResponseSchema:
         return PersonResponseSchema.from_domain_schema(
             schema=await use_case.update_person(
-                person_id=person_id,
-                params=data.to_domain_schema(),
-                author_username=request.user.username,
-                current_datetime=current_datetime,
+                params=params,
             ),
         )
 
@@ -155,20 +135,17 @@ class PeopleApiController(Controller):
         description="Permanently delete a private person.",
         name="knowledge-people-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
+        dependencies={"params": Provide(provide_delete_person_params)},
     )
-    async def delete_person(  # noqa: PLR0913
+    async def delete_person(
         self,
-        person_id: PersonIdPath,
-        request: Request,
         use_case: FromDishka[PeopleUseCase],
         object_cleaner: FromDishka[KnowledgeFileObjectCleaner],
         post_commit_actions: FromDishka[PostCommitActions],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[DeletePersonParams],
     ) -> None:
         object_names = await use_case.delete_person(
-            person_id=person_id,
-            author_username=request.user.username,
-            current_datetime=current_datetime,
+            params=params,
         )
         register_knowledge_object_cleanup(
             object_names=object_names,
@@ -184,7 +161,7 @@ class PeopleApiController(Controller):
     )
     async def list_relationship_types(
         self,
-        request: Request,
+        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[PersonRelationshipTypesUseCase],
     ) -> PersonRelationshipTypesResponseSchema:
         return PersonRelationshipTypesResponseSchema.from_domain_schema(
@@ -198,31 +175,18 @@ class PeopleApiController(Controller):
         description="Create an author-scoped person relationship type.",
         name="knowledge-relationship-types-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
+        dependencies={
+            "params": Provide(provide_create_relationship_type_params),
+        },
     )
     async def create_relationship_type(
         self,
-        data: Annotated[
-            PersonRelationshipTypeRequestSchema,
-            api_json_body(
-                title="Relationship type request",
-                description="Symmetric or directional labels.",
-                examples=(
-                    {
-                        "isSymmetric": False,
-                        "forwardName": "руководитель",
-                        "reverseName": "подчинённый",
-                    },
-                ),
-            ),
-        ],
-        request: Request,
         use_case: FromDishka[PersonRelationshipTypesUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[CreatePersonRelationshipTypeParams],
     ) -> PersonRelationshipTypeResponseSchema:
         return PersonRelationshipTypeResponseSchema.from_domain_schema(
             schema=await use_case.create_relationship_type(
-                params=data.to_create_schema(author_username=request.user.username),
-                current_datetime=current_datetime,
+                params=params,
             ),
         )
 
@@ -231,34 +195,18 @@ class PeopleApiController(Controller):
         description="Update an author-scoped person relationship type.",
         name="knowledge-relationship-types-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
+        dependencies={
+            "params": Provide(provide_update_relationship_type_params),
+        },
     )
     async def update_relationship_type(
         self,
-        relationship_type_id: PersonRelationshipTypeIdPath,
-        data: Annotated[
-            PersonRelationshipTypeRequestSchema,
-            api_json_body(
-                title="Relationship type request",
-                description="Complete relationship type payload.",
-                examples=(
-                    {
-                        "isSymmetric": True,
-                        "forwardName": "друг",
-                        "reverseName": "",
-                    },
-                ),
-            ),
-        ],
-        request: Request,
         use_case: FromDishka[PersonRelationshipTypesUseCase],
-        current_datetime: FromDishka[datetime],
+        params: NamedDependency[UpdatePersonRelationshipTypeParams],
     ) -> PersonRelationshipTypeResponseSchema:
         return PersonRelationshipTypeResponseSchema.from_domain_schema(
             schema=await use_case.update_relationship_type(
-                relationship_type_id=relationship_type_id,
-                params=data.to_update_schema(),
-                author_username=request.user.username,
-                current_datetime=current_datetime,
+                params=params,
             ),
         )
 
@@ -267,14 +215,15 @@ class PeopleApiController(Controller):
         description="Delete an unused author-scoped relationship type.",
         name="knowledge-relationship-types-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
+        dependencies={
+            "params": Provide(provide_delete_relationship_type_params, sync_to_thread=False),
+        },
     )
     async def delete_relationship_type(
         self,
-        relationship_type_id: PersonRelationshipTypeIdPath,
-        request: Request,
         use_case: FromDishka[PersonRelationshipTypesUseCase],
+        params: NamedDependency[PersonRelationshipTypeTargetParams],
     ) -> None:
         await use_case.delete_relationship_type(
-            relationship_type_id=relationship_type_id,
-            author_username=request.user.username,
+            params=params,
         )

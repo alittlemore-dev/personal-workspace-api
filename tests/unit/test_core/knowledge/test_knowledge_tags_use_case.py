@@ -1,7 +1,11 @@
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
-from core.knowledge.items.schemas import KnowledgeTag, KnowledgeTagUpdateParams
+from core.knowledge.items.schemas import (
+    KnowledgeTag,
+    KnowledgeTagUpdateParams,
+    UpdateKnowledgeTagParams,
+)
 from core.knowledge.items.storages import KnowledgeItemsStorage
 from core.knowledge.items.use_cases import KnowledgeTagsUseCase
 from tests.test_cases import TestCase
@@ -25,10 +29,12 @@ class TestKnowledgeTagsUseCase(TestCase):
         storage.update_tag.return_value = tag
 
         await use_case.update_tag(
-            tag_id=tag.id,
-            params=KnowledgeTagUpdateParams(name="Career"),
-            author_username="owner",
-            current_datetime=CURRENT_DATETIME,
+            params=UpdateKnowledgeTagParams(
+                tag_id=tag.id,
+                data=KnowledgeTagUpdateParams(name="Career"),
+                author_username="owner",
+                current_datetime=CURRENT_DATETIME,
+            ),
         )
 
         assert storage.update_tag.await_args.kwargs["updated_at"] == CURRENT_DATETIME

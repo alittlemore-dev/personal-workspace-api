@@ -1,16 +1,18 @@
 from dataclasses import dataclass, replace
-from datetime import date, datetime
 
 from core.knowledge.dates.schemas import (
+    CreateKnowledgeDateParams,
+    DeleteKnowledgeDateParams,
     KnowledgeDate,
-    KnowledgeDateCreateParams,
     KnowledgeDateDetails,
     KnowledgeDateFilters,
     KnowledgeDateReference,
     KnowledgeDatesPage,
     KnowledgeDateSummary,
-    KnowledgeDateUpdateParams,
+    KnowledgeDateTargetParams,
+    ListPersonDateReferencesParams,
     RelatedPerson,
+    UpdateKnowledgeDateParams,
 )
 from core.knowledge.dates.storages import KnowledgeDatesStorage
 from core.knowledge.exceptions import KnowledgeTagNotFoundError, PersonNotFoundError
@@ -103,28 +105,28 @@ class KnowledgeDatesUseCase:
             page_size=effective_filters.page_size,
         )
 
-    async def get_date(self, *, date_id: str, author_username: str) -> KnowledgeDate:
+    async def get_date(self, *, params: KnowledgeDateTargetParams) -> KnowledgeDate:
         item = await self.item_service.get_item(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
         )
         details = await self.dates_storage.get_details(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
         )
         links = await self.dates_storage.list_person_links(
-            date_ids={date_id},
-            author_username=author_username,
+            date_ids={params.date_id},
+            author_username=params.author_username,
         )
         people = await self.item_storage.get_items_by_ids(
             item_ids={link.person_id for link in links},
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         files = await self.file_storage.list_item_files(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
         )
         return KnowledgeDate(
             item=item,
@@ -139,145 +141,141 @@ class KnowledgeDatesUseCase:
             attachments=[file for file in files if file.kind == KnowledgeFileKind.ATTACHMENT],
         )
 
-    async def create_date(self, *, params: KnowledgeDateCreateParams, today: date) -> KnowledgeDate:
-        params.date.validate(today=today)
+    async def create_date(self, *, params: CreateKnowledgeDateParams) -> KnowledgeDate:
+        params.data.date.validate(today=params.today)
         item = await self.item_service.create_item(
             params=KnowledgeItemCreateParams(
                 kind=KnowledgeItemKind.DATE,
-                author_username=params.author_username,
-                display_name=params.display_name.strip(),
+                author_username=params.data.author_username,
+                display_name=params.data.display_name.strip(),
                 description="",
             ),
         )
         await self.dates_storage.create_details(
             details=KnowledgeDateDetails(
                 item_id=item.id,
-                date=params.date,
+                date=params.data.date,
                 notifications_enabled=True,
             ),
-            author_username=params.author_username,
+            author_username=params.data.author_username,
         )
-        return await self.get_date(date_id=item.id, author_username=params.author_username)
+        return await self.get_date(
+            params=KnowledgeDateTargetParams(
+                date_id=item.id,
+                author_username=params.data.author_username,
+            ),
+        )
 
-    async def update_date(
-        self,
-        *,
-        date_id: str,
-        params: KnowledgeDateUpdateParams,
-        author_username: str,
-        current_datetime: datetime,
-    ) -> KnowledgeDate:
-        params.date.validate(today=current_datetime.date())
+    async def update_date(self, *, params: UpdateKnowledgeDateParams) -> KnowledgeDate:
+        params.data.date.validate(today=params.current_datetime.date())
         item = await self.item_service.get_item(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
         )
         await self.dates_storage.get_details(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
         )
         existing_links = await self.dates_storage.list_person_links(
-            date_ids={date_id},
-            author_username=author_username,
+            date_ids={params.date_id},
+            author_username=params.author_username,
         )
         people = await self.item_storage.get_items_by_ids(
-            item_ids=set(params.person_ids),
-            author_username=author_username,
+            item_ids=set(params.data.person_ids),
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
-        if len(people) != len(set(params.person_ids)):
+        if len(people) != len(set(params.data.person_ids)):
             raise PersonNotFoundError
         await self.item_service.update_item(
             item=item,
             params=KnowledgeItemUpdateParams(
-                display_name=params.display_name.strip(),
-                description=params.description,
+                display_name=params.data.display_name.strip(),
+                description=params.data.description,
             ),
-            tag_ids=params.tag_ids,
-            updated_at=current_datetime,
+            tag_ids=params.data.tag_ids,
+            updated_at=params.current_datetime,
         )
         await self.dates_storage.update_details(
             details=KnowledgeDateDetails(
-                item_id=date_id,
-                date=params.date,
-                notifications_enabled=params.notifications_enabled,
+                item_id=params.date_id,
+                date=params.data.date,
+                notifications_enabled=params.data.notifications_enabled,
             ),
-            author_username=author_username,
+            author_username=params.author_username,
         )
         await self.dates_storage.replace_person_links(
-            date_id=date_id,
-            person_ids=params.person_ids,
-            author_username=author_username,
+            date_id=params.date_id,
+            person_ids=params.data.person_ids,
+            author_username=params.author_username,
         )
         await self.item_storage.touch_items(
-            item_ids={link.person_id for link in existing_links} | set(params.person_ids),
-            author_username=author_username,
+            item_ids={link.person_id for link in existing_links} | set(params.data.person_ids),
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
-        return await self.get_date(date_id=date_id, author_username=author_username)
+        return await self.get_date(
+            params=KnowledgeDateTargetParams(
+                date_id=params.date_id,
+                author_username=params.author_username,
+            ),
+        )
 
-    async def delete_date(
-        self,
-        *,
-        date_id: str,
-        author_username: str,
-        current_datetime: datetime,
-    ) -> tuple[str, ...]:
+    async def delete_date(self, *, params: DeleteKnowledgeDateParams) -> tuple[str, ...]:
         await self.item_service.get_item(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
         )
         links = await self.dates_storage.list_person_links(
-            date_ids={date_id},
-            author_username=author_username,
+            date_ids={params.date_id},
+            author_username=params.author_username,
         )
         files = await self.file_storage.list_item_files(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
         )
         object_names_to_delete = await self.file_service.delete_files(files=files)
         await self.item_service.delete_item(
-            item_id=date_id,
-            author_username=author_username,
+            item_id=params.date_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
         )
         await self.item_storage.touch_items(
             item_ids={link.person_id for link in links},
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return object_names_to_delete
 
     async def list_date_references_for_person(
         self,
         *,
-        person_id: str,
-        author_username: str,
+        params: ListPersonDateReferencesParams,
     ) -> list[KnowledgeDateReference]:
         people = await self.item_storage.get_items_by_ids(
-            item_ids={person_id},
-            author_username=author_username,
+            item_ids={params.person_id},
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         if len(people) != 1:
             raise PersonNotFoundError
         date_ids = await self.dates_storage.list_date_ids_for_person(
-            person_id=person_id,
-            author_username=author_username,
+            person_id=params.person_id,
+            author_username=params.author_username,
         )
         items = await self.item_storage.get_items_by_ids(
             item_ids=set(date_ids),
-            author_username=author_username,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.DATE,
         )
         items_by_id = {item.id: item for item in items}
         details = await self.dates_storage.list_details(
             item_ids=date_ids,
-            author_username=author_username,
+            author_username=params.author_username,
         )
         details_by_id = {value.item_id: value for value in details}
         return sorted(

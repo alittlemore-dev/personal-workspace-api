@@ -20,6 +20,8 @@ from core.knowledge.files.clients import (
 )
 from core.knowledge.files.enums import KnowledgeFileKind, KnowledgeFileProcessing
 from core.knowledge.files.schemas import (
+    DeleteKnowledgeAttachmentParams,
+    DeletePersonPhotoParams,
     KnowledgeFile,
     KnowledgeFileMutationResult,
     KnowledgeFileRule,
@@ -28,6 +30,9 @@ from core.knowledge.files.schemas import (
     KnowledgeFileUpdateParams,
     KnowledgeFileUploadParams,
     ProcessedKnowledgePhoto,
+    RenameKnowledgeAttachmentParams,
+    ReplacePersonPhotoParams,
+    UploadKnowledgeAttachmentParams,
 )
 from core.knowledge.files.services import KnowledgeFileCrudService
 from core.knowledge.files.storages import KnowledgeFilesStorage
@@ -449,10 +454,12 @@ class TestKnowledgeFilesUseCase(TestCase):
         self.item_storage = Mock(spec=KnowledgeItemsStorage)
         self.file_storage = Mock(spec=KnowledgeFilesStorage)
         self.file_service = Mock(spec=KnowledgeFileCrudService)
+        self.rollback_registrar = Mock(spec=KnowledgeFileRollbackRegistrar)
         self.use_case = KnowledgeFilesUseCase(
             item_storage=self.item_storage,
             file_storage=self.file_storage,
             file_service=self.file_service,
+            rollback_registrar=self.rollback_registrar,
         )
         self.item = KnowledgeItem(
             id="1" * 32,
@@ -485,7 +492,6 @@ class TestKnowledgeFilesUseCase(TestCase):
             processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
             relative_path="person-photos/photo.webp",
         )
-        self.rollback_registrar = Mock(spec=KnowledgeFileRollbackRegistrar)
 
     async def test_replace_person_photo_returns_old_object_for_post_commit_cleanup(self) -> None:
         new_photo = replace(self.photo, id="3" * 32, relative_path="person-photos/new.webp")
@@ -505,9 +511,10 @@ class TestKnowledgeFilesUseCase(TestCase):
         self.file_service.create_file.return_value = new_photo
 
         result = await self.use_case.replace_person_photo(
-            params=params,
-            rollback_registrar=self.rollback_registrar,
-            current_datetime=NOW,
+            params=ReplacePersonPhotoParams(
+                data=params,
+                current_datetime=NOW,
+            ),
         )
 
         assert result == KnowledgeFileMutationResult(
@@ -529,9 +536,11 @@ class TestKnowledgeFilesUseCase(TestCase):
         self.file_service.delete_file.return_value = self.photo
 
         result = await self.use_case.delete_person_photo(
-            person_id=self.item.id,
-            author_username="owner",
-            current_datetime=NOW,
+            params=DeletePersonPhotoParams(
+                person_id=self.item.id,
+                author_username="owner",
+                current_datetime=NOW,
+            ),
         )
 
         assert result == KnowledgeFileMutationResult(
@@ -546,9 +555,11 @@ class TestKnowledgeFilesUseCase(TestCase):
         self.file_service.delete_file.return_value = None
 
         result = await self.use_case.delete_person_photo(
-            person_id=self.item.id,
-            author_username="owner",
-            current_datetime=NOW,
+            params=DeletePersonPhotoParams(
+                person_id=self.item.id,
+                author_username="owner",
+                current_datetime=NOW,
+            ),
         )
 
         assert result.object_names_to_delete == ()
@@ -560,9 +571,11 @@ class TestKnowledgeFilesUseCase(TestCase):
 
         with pytest.raises(KnowledgeFileNotFoundError):
             await self.use_case.delete_person_photo(
-                person_id=self.item.id,
-                author_username="owner",
-                current_datetime=NOW,
+                params=DeletePersonPhotoParams(
+                    person_id=self.item.id,
+                    author_username="owner",
+                    current_datetime=NOW,
+                ),
             )
 
         self.file_service.delete_file.assert_not_awaited()
@@ -574,11 +587,13 @@ class TestKnowledgeFilesUseCase(TestCase):
 
         with pytest.raises(KnowledgeFileNotFoundError):
             await self.use_case.rename_attachment(
-                item_id=self.item.id,
-                file_id=self.file.id,
-                author_username="owner",
-                params=KnowledgeFileUpdateParams(name="Renamed"),
-                current_datetime=NOW,
+                params=RenameKnowledgeAttachmentParams(
+                    item_id=self.item.id,
+                    file_id=self.file.id,
+                    author_username="owner",
+                    data=KnowledgeFileUpdateParams(name="Renamed"),
+                    current_datetime=NOW,
+                ),
             )
 
     async def test_delete_attachment_returns_post_commit_cleanup_path(self) -> None:
@@ -587,10 +602,12 @@ class TestKnowledgeFilesUseCase(TestCase):
         self.file_service.delete_file.return_value = self.file
 
         result = await self.use_case.delete_attachment(
-            item_id=self.item.id,
-            file_id=self.file.id,
-            author_username="owner",
-            current_datetime=NOW,
+            params=DeleteKnowledgeAttachmentParams(
+                item_id=self.item.id,
+                file_id=self.file.id,
+                author_username="owner",
+                current_datetime=NOW,
+            ),
         )
 
         assert result == KnowledgeFileMutationResult(
@@ -606,10 +623,12 @@ class TestKnowledgeFilesUseCase(TestCase):
         self.file_service.delete_file.return_value = None
 
         result = await self.use_case.delete_attachment(
-            item_id=self.item.id,
-            file_id=self.file.id,
-            author_username="owner",
-            current_datetime=NOW,
+            params=DeleteKnowledgeAttachmentParams(
+                item_id=self.item.id,
+                file_id=self.file.id,
+                author_username="owner",
+                current_datetime=NOW,
+            ),
         )
 
         assert result == KnowledgeFileMutationResult(
@@ -630,13 +649,13 @@ class TestKnowledgeFilesUseCase(TestCase):
             content=b"private",
         )
         self.file_service.create_file.return_value = self.file
-        rollback_registrar = Mock(spec=KnowledgeFileRollbackRegistrar)
 
         result = await self.use_case.upload_attachment(
-            params=params,
-            processing=KnowledgeFileProcessing.RAW,
-            rollback_registrar=rollback_registrar,
-            current_datetime=NOW,
+            params=UploadKnowledgeAttachmentParams(
+                data=params,
+                processing=KnowledgeFileProcessing.RAW,
+                current_datetime=NOW,
+            ),
         )
 
         assert result == self.file
@@ -668,13 +687,13 @@ class TestKnowledgeFilesUseCase(TestCase):
             original_name="diagram.png",
         )
         self.file_service.create_file.return_value = normalized_file
-        rollback_registrar = Mock(spec=KnowledgeFileRollbackRegistrar)
 
         result = await self.use_case.upload_attachment(
-            params=params,
-            processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
-            rollback_registrar=rollback_registrar,
-            current_datetime=NOW,
+            params=UploadKnowledgeAttachmentParams(
+                data=params,
+                processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
+                current_datetime=NOW,
+            ),
         )
 
         assert result.kind == KnowledgeFileKind.ATTACHMENT
@@ -683,6 +702,6 @@ class TestKnowledgeFilesUseCase(TestCase):
             params=params,
             processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
             now=NOW,
-            rollback_registrar=rollback_registrar,
+            rollback_registrar=self.rollback_registrar,
         )
         self.file_storage.list_item_files.assert_not_awaited()

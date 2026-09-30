@@ -63,6 +63,13 @@ class TaskiqConstants:
     plan_reminders_task_name: Literal["plan_reminders"] = "plan_reminders"
     send_reminders_task_name: Literal["send_reminders"] = "send_reminders"
     prune_reminders_task_name: Literal["prune_reminders"] = "prune_reminders"
+    sync_finance_rates_task_name: Literal["sync_finance_rates"] = "sync_finance_rates"
+
+
+class FinanceConstants:
+    bank_of_russia_url: str = "https://www.cbr.ru/scripts/XML_daily.asp"
+    http_timeout_seconds: int = 10
+    sync_interval_seconds: int = 14_400
 
 
 class TelegramConstants:
@@ -168,6 +175,7 @@ class Constants:
     valkey: ValkeyConstants = ValkeyConstants()
     response_cache: ResponseCacheConstants = ResponseCacheConstants()
     taskiq: TaskiqConstants = TaskiqConstants()
+    finance: FinanceConstants = FinanceConstants()
     telegram: TelegramConstants = TelegramConstants()
     files: FilesConstants = FilesConstants()
     knowledge_files: KnowledgeFilesConstants = KnowledgeFilesConstants()

@@ -5,7 +5,12 @@ from zoneinfo import ZoneInfo
 
 from core.account_time_zone.clients import AccountTimeZoneReader
 from core.calendar.enums import CalendarEntryKind
-from core.calendar.schemas import CalendarAnnualDate, CalendarRelatedPerson, CalendarSources
+from core.calendar.schemas import (
+    CalendarAnnualDate,
+    CalendarRelatedPerson,
+    CalendarSources,
+    GetCalendarOccurrencesParams,
+)
 from core.events.schemas import Event
 from core.events.storages import EventsStorage
 from core.knowledge.dates.storages import KnowledgeDatesStorage
@@ -161,24 +166,18 @@ class CalendarOccurrencesUseCase:
     events_storage: EventsStorage
     account_time_zone_reader: AccountTimeZoneReader
 
-    async def get_occurrences(
-        self,
-        *,
-        start_date: date,
-        end_date: date,
-        author_username: str,
-    ) -> CalendarOccurrences:
+    async def get_occurrences(self, *, params: GetCalendarOccurrencesParams) -> CalendarOccurrences:
         account_zone = await self.account_time_zone_reader.get_time_zone(
-            owner_username=author_username,
+            owner_username=params.author_username,
         )
-        start_boundary = datetime.combine(start_date, time.min, account_zone).astimezone(UTC)
-        end_boundary = datetime.combine(end_date, time.min, account_zone).astimezone(UTC)
+        start_boundary = datetime.combine(params.start_date, time.min, account_zone).astimezone(UTC)
+        end_boundary = datetime.combine(params.end_date, time.min, account_zone).astimezone(UTC)
         occurrences = CalendarOccurrences(entries=[], unplaced_annual_entries=[])
-        for event in await self.events_storage.list_events(author_username=author_username):
+        for event in await self.events_storage.list_events(author_username=params.author_username):
             occurrences.add_event(
                 event=event,
-                start_date=start_date,
-                end_date=end_date,
+                start_date=params.start_date,
+                end_date=params.end_date,
                 start_boundary=start_boundary,
                 end_boundary=end_boundary,
                 account_zone=account_zone,
@@ -187,26 +186,26 @@ class CalendarOccurrencesUseCase:
         sources = CalendarSources.from_details(
             date_details=await self.dates_storage.list_details_for_months(
                 months=months,
-                author_username=author_username,
+                author_username=params.author_username,
             ),
             birthday_details=await self.people_storage.list_birthday_details_for_months(
                 months=months,
-                author_username=author_username,
+                author_username=params.author_username,
             ),
         )
         if not sources.is_empty:
             links = await self.dates_storage.list_person_links(
                 date_ids=sources.date_ids,
-                author_username=author_username,
+                author_username=params.author_username,
             )
             date_items = await self.item_storage.get_items_by_ids(
                 item_ids=sources.date_ids,
-                author_username=author_username,
+                author_username=params.author_username,
                 kind=KnowledgeItemKind.DATE,
             )
             people = await self.item_storage.get_items_by_ids(
                 item_ids=sources.person_ids(links=links),
-                author_username=author_username,
+                author_username=params.author_username,
                 kind=KnowledgeItemKind.PERSON,
             )
             names = {item.id: item.display_name for item in [*date_items, *people]}
@@ -230,8 +229,8 @@ class CalendarOccurrencesUseCase:
                         year=details.date.year,
                     ),
                     related_people=related[details.item_id],
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=params.start_date,
+                    end_date=params.end_date,
                 )
             for source in sources.birthdays:
                 occurrences.add_annual(
@@ -240,8 +239,8 @@ class CalendarOccurrencesUseCase:
                     display_name=names[source.item_id],
                     annual_date=source.annual_date,
                     related_people=[],
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=params.start_date,
+                    end_date=params.end_date,
                 )
         occurrences.entries.sort(key=lambda entry: entry.sort_key(zone=account_zone))
         occurrences.unplaced_annual_entries.sort(

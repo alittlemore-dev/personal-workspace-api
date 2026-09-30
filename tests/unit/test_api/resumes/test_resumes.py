@@ -11,12 +11,15 @@ from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
 from core.resumes.exceptions import ResumeNotFoundError
 from core.resumes.schemas import (
+    DeleteResumeParams,
+    ExportResumeParams,
     ResumeCreateParams,
     ResumeExperienceItem,
     ResumeExport,
     ResumeExportParams,
     ResumeFilters,
     ResumeProjectItem,
+    ResumeTargetParams,
     ResumeUpdateParams,
 )
 from tests.test_cases import ApiTestCase
@@ -272,15 +275,15 @@ class TestResumesApi(ApiTestCase):
         )
 
         self.asserts.status(response=response, expected_status=codes.OK)
-        call = self.use_case.update_resume.await_args.kwargs
-        assert call["resume_id"] == self.factory.core.hex_id(3)
-        assert call["params"] == ResumeUpdateParams(
+        call = self.use_case.update_resume.await_args.kwargs["params"]
+        assert call.resume_id == self.factory.core.hex_id(3)
+        assert call.data == ResumeUpdateParams(
             title="Updated resume",
             language=LanguageEnum.EN,
             content=content,
         )
-        assert call["author_username"] == TEST_USERNAME
-        assert isinstance(call["current_datetime"], datetime)
+        assert call.author_username == TEST_USERNAME
+        assert isinstance(call.current_datetime, datetime)
 
     def test_update_accepts_highlights_at_new_limit(self) -> None:
         self.use_case.update_resume.return_value = self.factory.core.resume(resume_id=3)
@@ -294,7 +297,7 @@ class TestResumesApi(ApiTestCase):
         )
 
         self.asserts.status(response=response, expected_status=codes.OK)
-        params = self.use_case.update_resume.await_args.kwargs["params"]
+        params = self.use_case.update_resume.await_args.kwargs["params"].data
         assert params.content.experience[0].highlights == ["x" * 512]
         assert params.content.experience[0].projects[0].highlights == ["y" * 512]
 
@@ -309,8 +312,10 @@ class TestResumesApi(ApiTestCase):
             expected_message=ResumeNotFoundError.message,
         )
         self.use_case.get_resume.assert_awaited_once_with(
-            resume_id=self.factory.core.hex_id(404),
-            author_username=TEST_USERNAME,
+            params=ResumeTargetParams(
+                resume_id=self.factory.core.hex_id(404),
+                author_username=TEST_USERNAME,
+            ),
         )
 
     def test_export_uses_unsaved_current_payload(self) -> None:
@@ -339,15 +344,17 @@ class TestResumesApi(ApiTestCase):
         assert response.content == b"%PDF-1.4"
         assert response.headers["content-type"] == "application/pdf"
         self.use_case.export_resume.assert_awaited_once_with(
-            resume_id=self.factory.core.hex_id(3),
-            params=ResumeExportParams(
-                format=ResumeExportFormatEnum.PDF,
-                theme=ResumeThemeEnum.ACCENT,
-                title="Target resume",
-                language=LanguageEnum.EN,
-                content=content,
+            params=ExportResumeParams(
+                resume_id=self.factory.core.hex_id(3),
+                data=ResumeExportParams(
+                    format=ResumeExportFormatEnum.PDF,
+                    theme=ResumeThemeEnum.ACCENT,
+                    title="Target resume",
+                    language=LanguageEnum.EN,
+                    content=content,
+                ),
+                author_username=TEST_USERNAME,
             ),
-            author_username=TEST_USERNAME,
         )
 
     def test_export_supports_docx_and_rejects_unknown_format(self) -> None:
@@ -409,9 +416,11 @@ class TestResumesApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
         self.use_case.delete_resume.assert_awaited_once_with(
-            resume_id=self.factory.core.hex_id(3),
-            author_username=TEST_USERNAME,
-            current_datetime=ANY,
+            params=DeleteResumeParams(
+                resume_id=self.factory.core.hex_id(3),
+                author_username=TEST_USERNAME,
+                current_datetime=ANY,
+            ),
         )
 
     def test_photo_upload_and_read_are_scoped_to_current_author(self) -> None:
@@ -432,7 +441,9 @@ class TestResumesApi(ApiTestCase):
         )
         assert upload.status_code == codes.OK
         assert upload.json()["content"]["profile"]["photoFileId"] == file_id
-        assert self.use_case.upload_photo.await_args.kwargs["author_username"] == TEST_USERNAME
+        assert (
+            self.use_case.upload_photo.await_args.kwargs["params"].author_username == TEST_USERNAME
+        )
 
         photo = self.api.client.get(f"/api/resumes/{original.id}/photo")
         assert photo.status_code == codes.OK
@@ -440,6 +451,8 @@ class TestResumesApi(ApiTestCase):
         assert photo.headers["content-type"].startswith("image/jpeg")
         assert photo.headers["cache-control"] == "private, no-store"
         self.use_case.read_photo.assert_awaited_once_with(
-            resume_id=original.id,
-            author_username=TEST_USERNAME,
+            params=ResumeTargetParams(
+                resume_id=original.id,
+                author_username=TEST_USERNAME,
+            ),
         )

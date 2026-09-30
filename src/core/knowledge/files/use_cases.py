@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
 
 from core.knowledge.exceptions import (
     InvalidKnowledgeDataError,
@@ -8,11 +7,15 @@ from core.knowledge.exceptions import (
 from core.knowledge.files.clients import KnowledgeFileRollbackRegistrar
 from core.knowledge.files.enums import KnowledgeFileKind, KnowledgeFileProcessing
 from core.knowledge.files.schemas import (
+    DeleteKnowledgeAttachmentParams,
+    DeletePersonPhotoParams,
     KnowledgeFile,
     KnowledgeFileContent,
     KnowledgeFileMutationResult,
-    KnowledgeFileUpdateParams,
-    KnowledgeFileUploadParams,
+    KnowledgeFileTargetParams,
+    RenameKnowledgeAttachmentParams,
+    ReplacePersonPhotoParams,
+    UploadKnowledgeAttachmentParams,
 )
 from core.knowledge.files.services import KnowledgeFileCrudService
 from core.knowledge.files.storages import KnowledgeFilesStorage
@@ -25,48 +28,40 @@ class KnowledgeFilesUseCase:
     item_storage: KnowledgeItemsStorage
     file_storage: KnowledgeFilesStorage
     file_service: KnowledgeFileCrudService
+    rollback_registrar: KnowledgeFileRollbackRegistrar
 
-    async def upload_attachment(
-        self,
-        *,
-        params: KnowledgeFileUploadParams,
-        processing: KnowledgeFileProcessing,
-        rollback_registrar: KnowledgeFileRollbackRegistrar,
-        current_datetime: datetime,
-    ) -> KnowledgeFile:
+    async def upload_attachment(self, *, params: UploadKnowledgeAttachmentParams) -> KnowledgeFile:
         item = await self.item_storage.get_item_for_author(
-            item_id=params.item_id,
-            author_username=params.author_username,
+            item_id=params.data.item_id,
+            author_username=params.data.author_username,
         )
-        if params.kind != KnowledgeFileKind.ATTACHMENT:
+        if params.data.kind != KnowledgeFileKind.ATTACHMENT:
             raise InvalidKnowledgeDataError
         file = await self.file_service.create_file(
-            params=params,
-            processing=processing,
-            now=current_datetime,
-            rollback_registrar=rollback_registrar,
+            params=params.data,
+            processing=params.processing,
+            now=params.current_datetime,
+            rollback_registrar=self.rollback_registrar,
         )
         await self.item_storage.touch_items(
             item_ids={item.id},
             author_username=item.author_username,
             kind=item.kind,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return file
 
     async def replace_person_photo(
         self,
         *,
-        params: KnowledgeFileUploadParams,
-        rollback_registrar: KnowledgeFileRollbackRegistrar,
-        current_datetime: datetime,
+        params: ReplacePersonPhotoParams,
     ) -> KnowledgeFileMutationResult:
         item = await self.item_storage.get_item(
-            item_id=params.item_id,
-            author_username=params.author_username,
+            item_id=params.data.item_id,
+            author_username=params.data.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
-        if params.kind != KnowledgeFileKind.PERSON_PHOTO:
+        if params.data.kind != KnowledgeFileKind.PERSON_PHOTO:
             raise InvalidKnowledgeDataError
         existing_files = await self.file_storage.list_item_files(
             item_id=item.id,
@@ -82,69 +77,58 @@ class KnowledgeFilesUseCase:
             if deleted is not None:
                 object_names_to_delete = (deleted.relative_path,)
         file = await self.file_service.create_file(
-            params=params,
+            params=params.data,
             processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
-            now=current_datetime,
-            rollback_registrar=rollback_registrar,
+            now=params.current_datetime,
+            rollback_registrar=self.rollback_registrar,
         )
         await self.item_storage.touch_items(
             item_ids={item.id},
             author_username=item.author_username,
             kind=item.kind,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return KnowledgeFileMutationResult(
             file=file,
             object_names_to_delete=object_names_to_delete,
         )
 
-    async def rename_attachment(
-        self,
-        *,
-        item_id: str,
-        file_id: str,
-        author_username: str,
-        params: KnowledgeFileUpdateParams,
-        current_datetime: datetime,
-    ) -> KnowledgeFile:
+    async def rename_attachment(self, *, params: RenameKnowledgeAttachmentParams) -> KnowledgeFile:
         item = await self.item_storage.get_item_for_author(
-            item_id=item_id,
-            author_username=author_username,
+            item_id=params.item_id,
+            author_username=params.author_username,
         )
         file = await self.file_storage.get_file(
-            file_id=file_id,
-            author_username=author_username,
+            file_id=params.file_id,
+            author_username=params.author_username,
         )
         if file.item_id != item.id or file.kind != KnowledgeFileKind.ATTACHMENT:
             raise KnowledgeFileNotFoundError
         file = await self.file_service.rename_file(
             file=file,
-            params=params,
-            updated_at=current_datetime,
+            params=params.data,
+            updated_at=params.current_datetime,
         )
         await self.item_storage.touch_items(
             item_ids={item.id},
             author_username=item.author_username,
             kind=item.kind,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return file
 
     async def delete_attachment(
         self,
         *,
-        item_id: str,
-        file_id: str,
-        author_username: str,
-        current_datetime: datetime,
+        params: DeleteKnowledgeAttachmentParams,
     ) -> KnowledgeFileMutationResult:
         item = await self.item_storage.get_item_for_author(
-            item_id=item_id,
-            author_username=author_username,
+            item_id=params.item_id,
+            author_username=params.author_username,
         )
         file = await self.file_storage.get_file(
-            file_id=file_id,
-            author_username=author_username,
+            file_id=params.file_id,
+            author_username=params.author_username,
         )
         if file.item_id != item.id or file.kind != KnowledgeFileKind.ATTACHMENT:
             raise KnowledgeFileNotFoundError
@@ -153,7 +137,7 @@ class KnowledgeFilesUseCase:
             item_ids={item.id},
             author_username=item.author_username,
             kind=item.kind,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return KnowledgeFileMutationResult(
             file=None,
@@ -163,18 +147,16 @@ class KnowledgeFilesUseCase:
     async def delete_person_photo(
         self,
         *,
-        person_id: str,
-        author_username: str,
-        current_datetime: datetime,
+        params: DeletePersonPhotoParams,
     ) -> KnowledgeFileMutationResult:
         item = await self.item_storage.get_item(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
             kind=KnowledgeItemKind.PERSON,
         )
         files = await self.file_storage.list_item_files(
-            item_id=person_id,
-            author_username=author_username,
+            item_id=params.person_id,
+            author_username=params.author_username,
         )
         photo = next(
             (file for file in files if file.kind == KnowledgeFileKind.PERSON_PHOTO),
@@ -187,20 +169,15 @@ class KnowledgeFilesUseCase:
             item_ids={item.id},
             author_username=item.author_username,
             kind=item.kind,
-            updated_at=current_datetime,
+            updated_at=params.current_datetime,
         )
         return KnowledgeFileMutationResult(
             file=None,
             object_names_to_delete=((deleted.relative_path,) if deleted is not None else ()),
         )
 
-    async def get_file_content(
-        self,
-        *,
-        file_id: str,
-        author_username: str,
-    ) -> KnowledgeFileContent:
+    async def get_file_content(self, *, params: KnowledgeFileTargetParams) -> KnowledgeFileContent:
         return await self.file_service.read_file(
-            file_id=file_id,
-            author_username=author_username,
+            file_id=params.file_id,
+            author_username=params.author_username,
         )

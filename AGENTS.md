@@ -206,6 +206,8 @@ files at the project root. Shared runtime and deployment infrastructure belongs 
   method when GET is unsuitable.
 - Controllers must receive dependencies through `FromDishka[...]`, typed as the concrete use case
   class registered in Dishka.
+- Fully parameterize Litestar `Request` with the project's principal, auth context, and state
+  types so request identity fields retain their concrete types.
 - Endpoint/controller modules must not define `@staticmethod`, `@classmethod`, or private helper
   methods for request-derived values or parameter assembly when a Litestar `Provide` dependency can
   own that logic. Put those dependencies in a neighboring `dependencies.py` module.
@@ -216,6 +218,8 @@ files at the project root. Shared runtime and deployment infrastructure belongs 
   `from_domain_schema` for conversion from it when the method signature identifies the exact
   source/target type. Use a specific semantic conversion name only when the conversion changes the
   concept.
+- Keep reusable transport/Pydantic validators in `validators.py` at their owning outer layer and
+  reference them from schemas. Domain invariants remain on their owning domain objects.
 - Do not use `cast("Self", ...)` to suppress classmethod return-type errors. Use an accurately typed
   constructor or an explicit concrete return type.
 - Do not pass Pydantic API schemas, SQLAlchemy models, or Litestar types into the core layer.

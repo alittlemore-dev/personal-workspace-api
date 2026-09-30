@@ -1,22 +1,22 @@
-from backend_sdk import Principal
-from backend_sdk.integrations.litestar import AuthContext
 from dishka import FromDishka
 from dishka.integrations.litestar import DishkaRouter
-from litestar import Controller, Request, get, status_codes
-from litestar.datastructures import State
+from litestar import Controller, get, status_codes
 from litestar.di import NamedDependency, Provide
 
 from core.calendar.occurrences import CalendarOccurrencesUseCase
+from core.calendar.schemas import (
+    GetCalendarOccurrencesParams,
+    GetCalendarParams,
+)
 from core.calendar.use_cases import CalendarUseCase
 from entrypoints.litestar.api.calendar.dependencies import (
-    CalendarOccurrenceWindow,
-    provide_calendar_occurrence_window,
+    provide_get_calendar_params,
+    provide_get_occurrences_params,
 )
 from entrypoints.litestar.api.calendar.schemas import (
     CalendarOccurrencesResponseSchema,
     CalendarResponseSchema,
 )
-from entrypoints.litestar.api.parameters import CalendarReferenceDateQuery, CalendarWindowQuery
 from infra.config.constants import constants
 
 
@@ -39,19 +39,16 @@ class CalendarApiController(Controller):
         name="calendar-api-handler",
         status_code=status_codes.HTTP_200_OK,
         cache=False,
+        dependencies={"params": Provide(provide_get_calendar_params, sync_to_thread=False)},
     )
     async def get_calendar(
         self,
-        reference_date: CalendarReferenceDateQuery,
-        window: CalendarWindowQuery,
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[CalendarUseCase],
+        params: NamedDependency[GetCalendarParams],
     ) -> CalendarResponseSchema:
         return CalendarResponseSchema.from_domain_schema(
             schema=await use_case.get_calendar(
-                reference_date=reference_date,
-                window=window,
-                author_username=request.user.username,
+                params=params,
             ),
         )
 
@@ -60,20 +57,17 @@ class CalendarApiController(Controller):
         status_code=status_codes.HTTP_200_OK,
         cache=False,
         dependencies={
-            "window": Provide(provide_calendar_occurrence_window, sync_to_thread=False),
+            "params": Provide(provide_get_occurrences_params, sync_to_thread=False),
         },
     )
     async def get_occurrences(
         self,
-        window: NamedDependency[CalendarOccurrenceWindow],
-        request: Request[Principal, AuthContext, State],
         use_case: FromDishka[CalendarOccurrencesUseCase],
+        params: NamedDependency[GetCalendarOccurrencesParams],
     ) -> CalendarOccurrencesResponseSchema:
         return CalendarOccurrencesResponseSchema.from_domain_schema(
             schema=await use_case.get_occurrences(
-                start_date=window.start_date,
-                end_date=window.end_date,
-                author_username=request.user.username,
+                params=params,
             ),
         )
 

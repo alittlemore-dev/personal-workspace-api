@@ -6,7 +6,11 @@ import pytest
 import pytest_asyncio
 from httpx import codes
 
-from core.telegram.schemas import InvitationToken, IssuedTelegramInvitation
+from core.telegram.schemas import (
+    CreateTelegramInvitationParams,
+    InvitationToken,
+    IssuedTelegramInvitation,
+)
 from core.telegram.use_cases import TelegramUseCase
 from infra.config.settings import settings
 from tests.test_cases import ApiTestCase
@@ -45,9 +49,11 @@ class TestTelegramManagementApi(ApiTestCase):
         assert response.json()["url"] == "https://t.me/alittlemore_workspace_bot?start=secret"
         assert response.headers["cache-control"] == "no-store"
         self.use_case.create_invitation.assert_awaited_once_with(
-            owner_username="test-owner",
-            label="Family",
-            now=NOW,
+            params=CreateTelegramInvitationParams(
+                owner_username="test-owner",
+                label="Family",
+                now=NOW,
+            ),
         )
 
     def test_blank_invitation_label_is_rejected_before_use_case(self) -> None:

@@ -33,34 +33,9 @@ from core.notifications.use_cases import (
     SendRemindersUseCase,
 )
 from core.telegram.storages import TelegramAccountSettingsReader, TelegramTransaction
+from tests.helpers.factories.core import CoreFactoryHelper
 
 NOW = datetime(2026, 12, 25, 9, tzinfo=UTC)
-
-
-def recipient(*, notify_birthday: bool = True) -> ReminderRecipient:
-    return ReminderRecipient(
-        connection_id="c" * 32,
-        owner_username="owner",
-        private_chat_id=42,
-        notify_birthday=notify_birthday,
-        notify_memorable_date=False,
-        language=LanguageEnum.RU,
-    )
-
-
-def source() -> ReminderSource:
-    return ReminderSource(
-        owner_username="owner",
-        item_id="i" * 32,
-        kind=ReminderKind.BIRTHDAY,
-        title="Анна",
-        day=1,
-        month=1,
-        year=2000,
-        description="",
-        related_people=(),
-        notifications_enabled=True,
-    )
 
 
 SCHEDULE = ReminderSchedule(
@@ -77,8 +52,8 @@ def setup_planner(
     target: ReminderSource | None = None,
     target_recipient: ReminderRecipient | None = None,
 ) -> tuple[PlanRemindersUseCase, AsyncMock, AsyncMock]:
-    item = target or source()
-    connection = target_recipient or recipient()
+    item = target or CoreFactoryHelper.reminder_source()
+    connection = target_recipient or CoreFactoryHelper.reminder_recipient()
     storage = AsyncMock(spec=ReminderStorage)
     storage.list_recipients.return_value = [connection]
     storage.list_sources.side_effect = lambda **kwargs: (
@@ -120,8 +95,11 @@ def setup_sender(
         ),
         None,
     ]
-    storage.get_current.return_value = (recipient(), source())
-    storage.get_recipient.return_value = recipient()
+    storage.get_current.return_value = (
+        CoreFactoryHelper.reminder_recipient(),
+        CoreFactoryHelper.reminder_source(),
+    )
+    storage.get_recipient.return_value = CoreFactoryHelper.reminder_recipient()
     reader = AsyncMock(spec=TelegramAccountSettingsReader)
     reader.can_notify.return_value = True
     account_time_zone_reader = AsyncMock(spec=AccountTimeZoneReader)
@@ -174,8 +152,8 @@ async def test_before_nine_plans_delivery_for_nine() -> None:
 async def test_one_account_zone_plans_all_recipients_at_same_local_nine() -> None:
     use_case, storage, _ = setup_planner()
     storage.list_recipients.return_value = [
-        recipient(),
-        replace(recipient(), connection_id="d" * 32),
+        CoreFactoryHelper.reminder_recipient(),
+        replace(CoreFactoryHelper.reminder_recipient(), connection_id="d" * 32),
     ]
     reader = cast("AsyncMock", use_case.account_time_zone_reader)
     reader.get_time_zone.return_value = ZoneInfo("America/New_York")
@@ -216,12 +194,14 @@ async def test_missed_local_day_is_not_caught_up() -> None:
 
 @pytest.mark.asyncio
 async def test_disabled_card_or_type_does_not_plan_delivery() -> None:
-    disabled = replace(source(), notifications_enabled=False)
+    disabled = replace(CoreFactoryHelper.reminder_source(), notifications_enabled=False)
     use_case, storage, _ = setup_planner(target=disabled)
     assert await use_case.run(now=NOW) == 0
     storage.plan.assert_not_awaited()
 
-    use_case, storage, _ = setup_planner(target_recipient=recipient(notify_birthday=False))
+    use_case, storage, _ = setup_planner(
+        target_recipient=CoreFactoryHelper.reminder_recipient(notify_birthday=False),
+    )
     assert await use_case.run(now=NOW) == 0
     storage.plan.assert_not_awaited()
 
@@ -334,7 +314,7 @@ async def test_pruner_expires_old_deliveries_and_removes_90_day_history() -> Non
 def test_message_includes_people_and_plain_text_excerpt_in_each_language() -> None:
     formatter = ReminderTextFormatter(description_limit=300)
     item = replace(
-        source(),
+        CoreFactoryHelper.reminder_source(),
         kind=ReminderKind.MEMORABLE_DATE,
         title="Свадьба",
         description="**Собраться** [в кафе](https://example.com) <b>вместе</b>",
@@ -367,7 +347,7 @@ def test_description_excerpt_is_limited_to_300_plain_characters() -> None:
 
 
 def test_leap_day_is_not_an_occurrence_on_february_28() -> None:
-    item = replace(source(), day=29, month=2, year=None)
+    item = replace(CoreFactoryHelper.reminder_source(), day=29, month=2, year=None)
     assert not item.occurs_on(day=date(2027, 2, 28))
     assert item.occurs_on(day=date(2028, 2, 29))
 

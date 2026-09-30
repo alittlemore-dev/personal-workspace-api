@@ -8,7 +8,11 @@ from aiogram.methods import SendMessage
 from dishka import Provider, Scope, make_async_container, provide
 
 from core.telegram.exceptions import TelegramLimitError
-from core.telegram.schemas import TelegramParticipant
+from core.telegram.schemas import (
+    InvitationToken,
+    RequestTelegramConnectionParams,
+    TelegramParticipant,
+)
 from core.telegram.storages import TelegramTransaction
 from core.telegram.use_cases import TelegramUseCase
 from entrypoints.telegram.dispatcher import TelegramBotDispatcher
@@ -50,14 +54,16 @@ async def test_private_start_requests_pending_connection_and_replies() -> None:
                 update(chat_type="private", text=f"/start {INVITE_PAYLOAD}"),
             )
         cast("AsyncMock", use_case.request_connection).assert_awaited_once_with(
-            token=INVITE_PAYLOAD,
-            participant=TelegramParticipant(
-                user_id=42,
-                private_chat_id=42,
-                first_name="Boris",
-                username="boris",
+            params=RequestTelegramConnectionParams(
+                token=InvitationToken(INVITE_PAYLOAD),
+                participant=TelegramParticipant(
+                    user_id=42,
+                    private_chat_id=42,
+                    first_name="Boris",
+                    username="boris",
+                ),
+                now=NOW,
             ),
-            now=NOW,
         )
         cast("AsyncMock", transaction.commit).assert_awaited_once_with()
         assert isinstance(send.call_args.args[0], SendMessage)

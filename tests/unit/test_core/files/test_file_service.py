@@ -1,4 +1,3 @@
-import hashlib
 from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import Mock
@@ -28,34 +27,13 @@ from core.files.schemas import (
 from core.files.services import FileService
 from core.files.storages import FileStorage
 from core.files.types import Namespace
+from tests.test_cases import TestCase
 
 NOW = datetime(2026, 7, 3, 10, 0, tzinfo=UTC)
 NAMESPACE: Namespace = "media"
 
 
-def stored_file(
-    *,
-    file_id: str = "file-id",
-    purpose: FilePurpose = FilePurpose.ATTACHMENT,
-    orphaned_at: datetime | None = NOW,
-) -> StoredFile:
-    return StoredFile(
-        id=file_id,
-        purpose=purpose,
-        namespace=NAMESPACE,
-        relative_path=f"attachments/{file_id}.pdf",
-        mime_type="application/pdf",
-        size_bytes=4,
-        name="Attachment",
-        original_name="original.pdf",
-        original_sha256=hashlib.sha256(b"data").hexdigest(),
-        orphaned_at=orphaned_at,
-        created_at=NOW,
-        updated_at=NOW,
-    )
-
-
-class TestFileService:
+class TestFileService(TestCase):
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
         self.file_client = Mock(spec=FileClient)
@@ -86,10 +64,10 @@ class TestFileService:
                 ),
             ),
         )
-        self.file = stored_file()
+        self.file = self.factory.core.stored_pdf()
 
     async def test_upload_validates_processes_and_persists_namespaced_metadata(self) -> None:
-        persisted = stored_file()
+        persisted = self.factory.core.stored_pdf()
         self.file_storage.create_file.return_value = persisted
 
         result = await self.service.upload_file(
@@ -149,8 +127,8 @@ class TestFileService:
         self.file_client.upload_file.assert_not_awaited()
 
     async def test_duplicate_upload_refreshes_orphan_marker_without_object_write(self) -> None:
-        duplicate = stored_file(file_id="existing-id")
-        refreshed = stored_file(file_id="existing-id", orphaned_at=NOW)
+        duplicate = self.factory.core.stored_pdf(file_id="existing-id")
+        refreshed = self.factory.core.stored_pdf(file_id="existing-id", orphaned_at=NOW)
         self.file_storage.find_file_by_original_sha256.return_value = duplicate
         self.file_storage.refresh_file_orphaned_at.return_value = refreshed
 
@@ -239,7 +217,7 @@ class TestFileService:
         )
 
     async def test_update_and_list_preserve_namespace_boundary(self) -> None:
-        file = stored_file()
+        file = self.factory.core.stored_pdf()
         self.file_storage.update_file_name.return_value = file
         self.file_storage.list_files.return_value = [file]
 

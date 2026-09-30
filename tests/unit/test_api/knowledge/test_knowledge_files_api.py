@@ -11,9 +11,11 @@ from httpx import codes
 from core.knowledge.exceptions import KnowledgeFileNotFoundError, KnowledgeItemNotFoundError
 from core.knowledge.files.enums import KnowledgeFileKind, KnowledgeFileProcessing
 from core.knowledge.files.schemas import (
+    DeletePersonPhotoParams,
     KnowledgeFile,
     KnowledgeFileContent,
     KnowledgeFileMutationResult,
+    KnowledgeFileTargetParams,
 )
 from infra.post_commit_actions import PostCommitActions
 from tests.test_cases import ApiTestCase
@@ -32,7 +34,6 @@ class TestKnowledgeFilesApi(ApiTestCase):
     async def setup(self) -> None:
         self.use_case = await self.container.get_knowledge_files_use_case()
         self.cleaner = await self.container.get_knowledge_file_object_cleaner()
-        self.rollback_registrar = await self.container.get_knowledge_file_rollback_registrar()
         self.photo = self.file(
             kind=KnowledgeFileKind.PERSON_PHOTO,
             processing=KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE,
@@ -83,8 +84,10 @@ class TestKnowledgeFilesApi(ApiTestCase):
         assert response.headers["x-content-type-options"] == "nosniff"
         assert response.headers["cache-control"] == "no-store"
         self.use_case.get_file_content.assert_awaited_once_with(
-            file_id="1" * 32,
-            author_username=TEST_USERNAME,
+            params=KnowledgeFileTargetParams(
+                file_id="1" * 32,
+                author_username=TEST_USERNAME,
+            ),
         )
 
     def test_photo_content_is_inline_normalized_webp(self) -> None:
@@ -210,14 +213,10 @@ class TestKnowledgeFilesApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.OK)
         assert response.json()["contentPath"] == f"/api/knowledge/files/{file.id}/content"
-        params = self.use_case.replace_person_photo.await_args.kwargs["params"]
+        params = self.use_case.replace_person_photo.await_args.kwargs["params"].data
         assert params.item_id == file.item_id
         assert params.author_username == TEST_USERNAME
         assert params.kind == KnowledgeFileKind.PERSON_PHOTO
-        assert (
-            self.use_case.replace_person_photo.await_args.kwargs["rollback_registrar"]
-            is self.rollback_registrar
-        )
         assert add_action.call_args.kwargs["action"].keywords == {
             "object_names": ("person-photos/old.webp",),
         }
@@ -236,9 +235,11 @@ class TestKnowledgeFilesApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
         self.use_case.delete_person_photo.assert_awaited_once_with(
-            person_id=file.item_id,
-            author_username=TEST_USERNAME,
-            current_datetime=NOW,
+            params=DeletePersonPhotoParams(
+                person_id=file.item_id,
+                author_username=TEST_USERNAME,
+                current_datetime=NOW,
+            ),
         )
         assert add_action.call_args.kwargs["action"].keywords == {
             "object_names": (file.relative_path,),
@@ -267,7 +268,7 @@ class TestKnowledgeFilesApi(ApiTestCase):
         assert body["processing"] == KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE
         assert body["mimeType"] == "image/webp"
         assert body["contentPath"] == f"/api/knowledge/files/{file.id}/content"
-        params = self.use_case.upload_attachment.await_args.kwargs["params"]
+        params = self.use_case.upload_attachment.await_args.kwargs["params"].data
         assert params.item_id == file.item_id
         assert params.author_username == TEST_USERNAME
         assert params.kind == KnowledgeFileKind.ATTACHMENT
@@ -275,14 +276,10 @@ class TestKnowledgeFilesApi(ApiTestCase):
         assert params.mime_type == "image/png"
         assert params.content == b"png-bytes"
         assert (
-            self.use_case.upload_attachment.await_args.kwargs["processing"]
+            self.use_case.upload_attachment.await_args.kwargs["params"].processing
             == KnowledgeFileProcessing.NORMALIZED_RASTER_IMAGE
         )
-        assert (
-            self.use_case.upload_attachment.await_args.kwargs["rollback_registrar"]
-            is self.rollback_registrar
-        )
-        assert self.use_case.upload_attachment.await_args.kwargs["current_datetime"] == NOW
+        assert self.use_case.upload_attachment.await_args.kwargs["params"].current_datetime == NOW
 
     def test_editor_image_upload_rejects_disallowed_declared_mime(self) -> None:
         response = self.api.client.post(
@@ -307,7 +304,7 @@ class TestKnowledgeFilesApi(ApiTestCase):
             expected_message=KnowledgeItemNotFoundError.message,
         )
         assert (
-            self.use_case.upload_attachment.await_args.kwargs["params"].author_username
+            self.use_case.upload_attachment.await_args.kwargs["params"].data.author_username
             == TEST_USERNAME
         )
 
@@ -350,7 +347,7 @@ class TestKnowledgeFilesApi(ApiTestCase):
         self.asserts.status(response=response, expected_status=codes.BAD_REQUEST)
         self.use_case.upload_attachment.assert_not_awaited()
 
-    def test_attachment_upload_passes_request_rollback_registrar(self) -> None:
+    def test_attachment_upload_passes_request_timestamp(self) -> None:
         file = self.file(kind=KnowledgeFileKind.ATTACHMENT)
         self.use_case.upload_attachment.return_value = file
 
@@ -361,11 +358,9 @@ class TestKnowledgeFilesApi(ApiTestCase):
         )
 
         self.asserts.status(response=response, expected_status=codes.CREATED)
-        assert (
-            self.use_case.upload_attachment.await_args.kwargs["rollback_registrar"]
-            is self.rollback_registrar
-        )
-        current_datetime = self.use_case.upload_attachment.await_args.kwargs["current_datetime"]
+        current_datetime = self.use_case.upload_attachment.await_args.kwargs[
+            "params"
+        ].current_datetime
         assert current_datetime == NOW
 
     def test_attachment_delete_schedules_cleanup_after_commit(self) -> None:
@@ -381,7 +376,9 @@ class TestKnowledgeFilesApi(ApiTestCase):
             )
 
         self.asserts.status(response=response, expected_status=codes.NO_CONTENT)
-        current_datetime = self.use_case.delete_attachment.await_args.kwargs["current_datetime"]
+        current_datetime = self.use_case.delete_attachment.await_args.kwargs[
+            "params"
+        ].current_datetime
         assert current_datetime == NOW
         action = add_action.call_args.kwargs["action"]
         assert isinstance(action, partial)

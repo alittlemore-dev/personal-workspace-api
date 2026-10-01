@@ -30,6 +30,7 @@ load_runtime_secrets() {
         "TELEGRAM_BOT_TOKEN"
         "TELEGRAM_WEBHOOK_SECRET"
         "TELEGRAM_SERVICE_SECRET"
+        "TELEGRAM_PROXY_URLS"
     )
     local variable_name
 

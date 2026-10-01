@@ -82,6 +82,7 @@ class TelegramConstants:
     connection_timeout_seconds: int = 10
     connection_retry_seconds: int = 30
     connection_check_seconds: int = 30
+    proxy_cooldown_seconds: int = 30
     runtime_store_timeout_seconds: int = 3
     redemption_attempt_limit: int = 10
     redemption_attempt_window_seconds: int = 900

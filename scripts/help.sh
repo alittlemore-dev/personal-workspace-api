@@ -3,6 +3,7 @@ set -euo pipefail
 
 printf '%-28s %s\n' \
     'install' 'Install Python dependencies.' \
+    'lock' 'Resolve intentionally changed Python dependencies.' \
     'tests / tests-fast' 'Run all tests / unit tests.' \
     'test-integration' 'Run PostgreSQL and migration tests.' \
     'tests-coverage' 'Run tests with coverage.' \

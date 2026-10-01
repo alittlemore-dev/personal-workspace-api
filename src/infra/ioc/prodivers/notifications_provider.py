@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterator
 from datetime import time, timedelta
 
-from aiogram import Bot
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +22,9 @@ from core.telegram.storages import TelegramAccountSettingsReader, TelegramTransa
 from infra.config.constants import constants
 from infra.config.settings import settings
 from infra.postgresql.storages.notifications import ReminderDatabaseStorage
+from infra.telegram.bot import create_telegram_bot
 from infra.telegram.reminder_sender import AiogramReminderSender, UnavailableReminderSender
+from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
 class NotificationsProvider(Provider):
@@ -55,11 +56,17 @@ class NotificationsProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    async def provide_sender(self) -> AsyncIterator[ReminderSender]:
+    async def provide_sender(
+        self,
+        runtime_status: TelegramRuntimeStatusStore,
+    ) -> AsyncIterator[ReminderSender]:
         if not settings.telegram.available:
             yield UnavailableReminderSender()
             return
-        bot = Bot(settings.telegram.bot_token.get_secret_value())
+        bot = create_telegram_bot(
+            telegram_settings=settings.telegram,
+            runtime_status=runtime_status,
+        )
         try:
             yield AiogramReminderSender(bot=bot)
         finally:

@@ -313,6 +313,34 @@ feedback, preserves saved preferences and drafts, and disables Telegram edits un
 Auth API checks the protected internal status endpoint only when Telegram preferences change,
 so unrelated account preferences remain editable during an outage.
 
+The API dispatcher and notification workers create their Bot API clients through the same
+factory. `TELEGRAM_PROXY_URLS` contains a JSON array of SOCKS5 / HTTP CONNECT URLs; an empty
+array (or an empty legacy secret file) explicitly selects direct access. Deployment loads it
+through `TELEGRAM_PROXY_URLS_FILE`. Supported proxy URLs require a host and port,
+percent-encoded credentials, and no query, fragment, or non-root path. The clients retain the
+bounded request timeout and never fall back to a direct connection when the proxy fails.
+Settings parse the JSON once into `list[SecretStrExtended]`; each route remains masked until
+the transport creates its client or computes the pool fingerprint.
+Each route has its own client session. A background monitor probes the current route with
+`getMe`, selects another route after transport failures, and periodically checks failed
+backups after a cooldown. A working route stays selected when a former primary recovers.
+The expiring Valkey lease carries the selected index and a fingerprint of the configured
+pool and bot token, never URLs or credentials. API and TaskIQ clients validate that lease before ordinary
+requests. Missing, expired, mismatched, or malformed leases block delivery. A delayed failure
+from an old route must not invalidate a newer selection.
+Management writes, webhook delivery, settings status, and the internal status endpoint also
+check the fresh shared lease when the local monitor reports ready. Worker-detected failures
+therefore block Telegram edits before the next monitor cycle.
+
+Only network errors, timeouts, and server failures trigger failover; invalid tokens,
+authorization errors, ordinary Bot API errors, and rate limits do not cycle proxies.
+The transport sends an ordinary request once. A timeout may mean Telegram accepted a message,
+so switching routes never immediately replays it; notification retries remain controlled by
+the existing queue and may still duplicate a message whose outcome was unknown.
+
+Proxy requests use the remote resolver. This controls outgoing Bot API calls only; incoming
+Telegram webhooks still require a reachable public HTTPS endpoint. [aiogram proxy support](https://docs.aiogram.dev/en/latest/api/session/aiohttp.html#proxy-requests-in-aiohttpsession).
+
 Notification workers require a fresh, expiring readiness lease in Valkey before claiming work.
 Leases are isolated by the deployment slot's auth origin and expire if the backend stops renewing
 them. Missing leases and Valkey failures fail closed; skipped runs do not consume delivery

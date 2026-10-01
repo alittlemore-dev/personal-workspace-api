@@ -1,8 +1,6 @@
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 
-from aiogram import Bot
-from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.base import DefaultKeyBuilder
 from aiogram.fsm.storage.redis import RedisStorage
 from dishka import AsyncContainer
@@ -35,7 +33,9 @@ from entrypoints.telegram.dispatcher import TelegramBotDispatcher
 from infra.config import loggers
 from infra.config.constants import constants
 from infra.config.settings import settings
+from infra.telegram.bot import create_telegram_bot
 from infra.telegram.runtime import TelegramRuntimeState
+from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 Lifespan = Sequence[Callable[[Litestar], AbstractAsyncContextManager] | AbstractAsyncContextManager]
 
@@ -171,6 +171,7 @@ def create_litestar_app(
         ),
     )
     if settings.telegram.available:
+        app.state.telegram_runtime_status = TelegramRuntimeStatusStore.create()
         storage = RedisStorage.from_url(
             settings.valkey.get_url(constants.valkey.databases.response_cache)
             .get_secret_value()
@@ -185,9 +186,9 @@ def create_litestar_app(
         )
         app.state.telegram_dispatcher = TelegramBotDispatcher.create(
             container=container,
-            bot=Bot(
-                settings.telegram.bot_token.get_secret_value(),
-                session=AiohttpSession(timeout=constants.telegram.connection_timeout_seconds),
+            bot=create_telegram_bot(
+                telegram_settings=settings.telegram,
+                runtime_status=app.state.telegram_runtime_status,
             ),
             storage=storage,
             isolation=storage.create_isolation(lock_kwargs={"timeout": 120}),

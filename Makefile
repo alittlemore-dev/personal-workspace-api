@@ -9,6 +9,10 @@ QUERY_PLAN_BASELINE_PATH ?= performance/query_plans/realistic-baseline.json
 install:
 	bash scripts/install.sh install
 
+.PHONY: lock
+lock:
+	bash scripts/install.sh lock
+
 .PHONY: run
 run:
 	bash scripts/app.sh run

@@ -1,9 +1,20 @@
+import hashlib
+import json
 from ipaddress import IPv4Address
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from litestar.config.response_cache import CACHE_FOREVER
-from pydantic import Field, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import (
+    Field,
+    NonNegativeFloat,
+    PositiveFloat,
+    PositiveInt,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from core.files.types import Namespace
 from core.schemas import Secret
@@ -11,6 +22,12 @@ from infra.config.constants import constants
 
 _LOCAL_ALL_INTERFACES_HOST = IPv4Address(0).compressed
 _MISSING_TELEGRAM_CREDENTIALS = "Telegram credentials and bot username are required when available"
+_INVALID_TELEGRAM_PROXY_URLS = (
+    "Telegram proxies must be an empty value or a JSON array of distinct socks5/http URLs "
+    "with hosts and explicit ports; "
+    "encode credentials and omit path, query, and fragment"
+)
+_ASCII_SPACE = 32
 
 
 class ProjectBaseSettings(BaseSettings):
@@ -155,13 +172,70 @@ class TaskiqSettings(ProjectBaseSettings):
 
 
 class TelegramSettings(ProjectBaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TELEGRAM_")
+    model_config = SettingsConfigDict(env_prefix="TELEGRAM_", hide_input_in_errors=True)
 
     available: bool = False
     bot_username: str = ""
     bot_token: SecretStrExtended = SecretStrExtended("")
     webhook_secret: SecretStrExtended = SecretStrExtended("")
     service_secret: SecretStrExtended = SecretStrExtended("")
+    proxy_urls: Annotated[list[SecretStrExtended], NoDecode] = Field(repr=False)
+
+    @property
+    def proxy_pool_id(self) -> str:
+        normalized = json.dumps(
+            {
+                "routes": [proxy.get_secret_value() for proxy in self.proxy_urls],
+                "bot_token": self.bot_token.get_secret_value(),
+            },
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(normalized.encode()).hexdigest()
+
+    @field_validator("proxy_urls", mode="before")
+    @classmethod
+    def validate_proxy_urls(cls, value: object) -> list[SecretStrExtended]:
+        try:
+            urls = value
+            if isinstance(value, str):
+                urls = json.loads(value) if value else []
+            if not isinstance(urls, list) or any(
+                not isinstance(url, str | SecretStrExtended) for url in urls
+            ):
+                raise ValueError(_INVALID_TELEGRAM_PROXY_URLS)  # noqa: TRY301
+            secrets = [
+                url if isinstance(url, SecretStrExtended) else SecretStrExtended(url)
+                for url in urls
+            ]
+            raw_urls = [secret.get_secret_value() for secret in secrets]
+            if len(set(raw_urls)) != len(raw_urls):
+                raise ValueError(_INVALID_TELEGRAM_PROXY_URLS)  # noqa: TRY301
+            for raw_url in raw_urls:
+                parsed = urlsplit(raw_url)
+                valid = (
+                    parsed.scheme in {"socks5", "http"}
+                    and bool(parsed.hostname)
+                    and parsed.port is not None
+                    and parsed.port > 0
+                    and parsed.path in {"", "/"}
+                    and not parsed.query
+                    and not parsed.fragment
+                    and not any(
+                        character.isspace() or ord(character) < _ASCII_SPACE
+                        for character in raw_url
+                    )
+                    and "\\" not in raw_url
+                    and (
+                        (parsed.username is None and parsed.password is None)
+                        or bool(parsed.username)
+                    )
+                    and (parsed.username is None or parsed.password is not None)
+                )
+                if not valid:
+                    raise ValueError(_INVALID_TELEGRAM_PROXY_URLS)  # noqa: TRY301
+        except ValueError:
+            raise ValueError(_INVALID_TELEGRAM_PROXY_URLS) from None
+        return secrets
 
     @model_validator(mode="after")
     def validate_available_configuration(self) -> TelegramSettings:  # noqa: N804

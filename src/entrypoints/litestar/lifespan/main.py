@@ -19,7 +19,7 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None]:
     status_store: TelegramRuntimeStatusStore | None = None
     try:
         if telegram_dispatcher is not None:
-            status_store = TelegramRuntimeStatusStore.create()
+            status_store = app.state.telegram_runtime_status
             runtime = TelegramBotRuntime(
                 bot=telegram_dispatcher.bot,
                 state=app.state.telegram_runtime_state,

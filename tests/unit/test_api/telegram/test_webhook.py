@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from backend_sdk.auth.testing import FakeAuthenticationClient
@@ -9,6 +9,7 @@ from litestar.testing import TestClient
 from core.telegram.enums import TelegramRuntimeStatus
 from entrypoints.litestar.initializers.main import create_litestar_app
 from infra.config.settings import settings
+from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
 def test_wrong_webhook_secret_is_rejected_before_json_parse(client: TestClient) -> None:
@@ -27,6 +28,9 @@ def test_valid_webhook_forwards_update_to_dispatcher(
     dispatcher = AsyncMock()
     client.app.state.telegram_dispatcher = dispatcher
     client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus.READY
+    store = Mock(spec=TelegramRuntimeStatusStore)
+    store.is_ready = AsyncMock(return_value=True)
+    client.app.state.telegram_runtime_status = store
     monkeypatch.setattr(settings.telegram, "available", True)
     response = client.post(
         "/api/telegram/webhook",
@@ -39,7 +43,7 @@ def test_valid_webhook_forwards_update_to_dispatcher(
     )
 
 
-@pytest.mark.parametrize("runtime_status", ["connecting", "failed", "disabled"])
+@pytest.mark.parametrize("runtime_status", ["connecting", "failed", "disabled", "ready"])
 def test_unready_webhook_rejects_updates_without_dispatching(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -48,6 +52,9 @@ def test_unready_webhook_rejects_updates_without_dispatching(
     dispatcher = AsyncMock()
     client.app.state.telegram_dispatcher = dispatcher
     client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus(runtime_status)
+    store = Mock(spec=TelegramRuntimeStatusStore)
+    store.is_ready = AsyncMock(return_value=False)
+    client.app.state.telegram_runtime_status = store
     monkeypatch.setattr(settings.telegram, "available", True)
     response = client.post(
         "/api/telegram/webhook",
@@ -58,7 +65,11 @@ def test_unready_webhook_rejects_updates_without_dispatching(
     dispatcher.feed_raw_update.assert_not_awaited()
 
 
-def test_runtime_status_requires_service_secret_and_is_minimal(client: TestClient) -> None:
+def test_runtime_status_requires_service_secret_and_is_minimal(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings.telegram, "available", True)
     client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus.CONNECTING
     for supplied in ("", "wrong"):
         response = client.get(
@@ -73,6 +84,23 @@ def test_runtime_status_requires_service_secret_and_is_minimal(client: TestClien
     assert response.status_code == 200
     assert response.json() == {"status": "connecting"}
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_internal_status_does_not_report_ready_after_worker_invalidates_lease(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings.telegram, "available", True)
+    client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus.READY
+    store = Mock(spec=TelegramRuntimeStatusStore)
+    store.is_ready = AsyncMock(return_value=False)
+    client.app.state.telegram_runtime_status = store
+    response = client.get(
+        "/api/internal/telegram/status",
+        headers={"X-Telegram-Service-Secret": settings.telegram.service_secret.get_secret_value()},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"status": "failed"}
 
 
 def test_webhook_allows_anonymous_telegram_but_management_requires_account(

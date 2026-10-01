@@ -6,16 +6,17 @@ from litestar.exceptions import HTTPException
 from litestar.handlers.base import BaseRouteHandler
 
 from core.telegram.enums import TelegramRuntimeStatus
+from entrypoints.litestar.api.telegram.runtime import get_runtime_status
 from infra.config.settings import settings
 
 
-def require_ready_bot(connection: ASGIConnection[Any, Any, Any, Any], _: BaseRouteHandler) -> None:
+async def require_ready_bot(
+    connection: ASGIConnection[Any, Any, Any, Any],
+    _: BaseRouteHandler,
+) -> None:
     if connection.scope.get("method") == "GET":
         return
-    if (
-        not settings.telegram.available
-        or connection.app.state.telegram_runtime_state.status != TelegramRuntimeStatus.READY
-    ):
+    if await get_runtime_status(connection) != TelegramRuntimeStatus.READY:
         raise HTTPException(status_code=503, detail="Telegram bot is not ready")
 
 

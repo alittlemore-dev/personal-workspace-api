@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import pytest_asyncio
@@ -17,6 +17,7 @@ from core.telegram.schemas import (
 )
 from core.telegram.use_cases import TelegramUseCase
 from infra.config.settings import settings
+from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 from tests.test_cases import ApiTestCase
 
 NOW = datetime(2026, 7, 27, 12, tzinfo=UTC)
@@ -28,6 +29,9 @@ class TestTelegramManagementApi(ApiTestCase):
         self.use_case = cast("Mock", await self.container.container.get(TelegramUseCase))
         monkeypatch.setattr(settings.telegram, "available", True)
         self.api.client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus.READY
+        self.runtime_status = Mock(spec=TelegramRuntimeStatusStore)
+        self.runtime_status.is_ready = AsyncMock(return_value=True)
+        self.api.client.app.state.telegram_runtime_status = self.runtime_status
 
     def test_lists_connections_and_bot_availability(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(settings.telegram, "available", True)
@@ -44,19 +48,29 @@ class TestTelegramManagementApi(ApiTestCase):
             "connections": [],
         }
 
-    @pytest.mark.parametrize("runtime_status", ["connecting", "failed", "disabled"])
+    @pytest.mark.parametrize(
+        ("runtime_status", "expected_status"),
+        [
+            ("connecting", "connecting"),
+            ("failed", "failed"),
+            ("disabled", "disabled"),
+            ("ready", "failed"),
+        ],
+    )
     def test_unready_bot_blocks_all_mutations_and_keeps_settings_readable(
         self,
         runtime_status: str,
+        expected_status: str,
     ) -> None:
         self.api.client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus(
             runtime_status,
         )
+        self.runtime_status.is_ready.return_value = False
         self.use_case.list_invitations.return_value = []
         self.use_case.list_connections.return_value = []
         response = self.api.client.get("/api/telegram")
         assert response.status_code == 200
-        assert response.json()["status"] == runtime_status
+        assert response.json()["status"] == expected_status
         for method, path, payload in (
             ("POST", "/invitations", {"label": "Family"}),
             ("DELETE", "/invitations/example", None),

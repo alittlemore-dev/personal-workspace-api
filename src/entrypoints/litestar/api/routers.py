@@ -29,7 +29,7 @@ protected_api_router = Router(
     ],
     tags=["protected api"],
     include_in_schema=False,
-    guards=[RequireRole(RoleEnum.USER)],
+    guards=[RequireRole(RoleEnum.MODERATOR)],
 )
 
 api_router = Router(

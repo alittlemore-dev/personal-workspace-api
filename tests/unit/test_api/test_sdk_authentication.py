@@ -1,5 +1,6 @@
 from datetime import date
 
+import pytest
 from backend_sdk import RoleEnum
 from backend_sdk.auth.testing import FakeAuthenticationClient, bearer_headers
 from backend_sdk.integrations.litestar import AuthPlugin
@@ -51,12 +52,14 @@ class TestSdkAuthentication:
 
         assert response.status_code == codes.UNAUTHORIZED
 
+    @pytest.mark.parametrize("role", [RoleEnum.OWNER, RoleEnum.ADMIN, RoleEnum.MODERATOR])
     async def test_authenticated_principal_reaches_author_scoped_endpoint(
         self,
         container: AsyncContainer,
+        role: RoleEnum,
     ) -> None:
-        username = "sdk-authenticated-owner"
-        auth_client = FakeAuthenticationClient(username=username, role=RoleEnum.OWNER)
+        username = f"sdk-authenticated-{role.value}"
+        auth_client = FakeAuthenticationClient(username=username, role=role)
         use_case = await IocContainerHelper(container=container).get_calendar_use_case()
         use_case.get_calendar.return_value = Calendar(
             reference_date=date(2026, 7, 31),
@@ -76,12 +79,23 @@ class TestSdkAuthentication:
             )
 
         assert response.status_code == codes.OK
+        assert use_case.get_calendar.call_args.kwargs["params"].author_username == username
         assert response.json() == {
             "referenceDate": "2026-07-31",
             "window": "currentAndNextMonths",
             "summary": {"memorableDateCount": 0, "birthdayCount": 0},
             "entries": [],
         }
+
+    def test_rejects_regular_user_from_workspace(self, container: AsyncContainer) -> None:
+        auth_client = FakeAuthenticationClient(username="regular-user", role=RoleEnum.USER)
+        with build_sdk_auth_app(container=container, auth_client=auth_client) as client:
+            response = client.get(
+                "/api/calendar",
+                params={"referenceDate": "2026-07-31", "window": "currentAndNextMonths"},
+                headers=bearer_headers(token="user-token"),  # noqa: S106
+            )
+        assert response.status_code == codes.FORBIDDEN
 
     async def test_authenticated_response_disables_shared_caching(
         self,

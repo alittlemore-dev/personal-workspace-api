@@ -310,7 +310,8 @@ Webhook registration or polling startup runs in a cancellable background task ra
 The runtime reports `disabled`, `connecting`, `ready`, or `failed`; connection attempts have a
 ten-second timeout and retry every thirty seconds. Webhook mode uses periodic Bot API checks;
 polling holds each update request for up to twenty seconds, with ten additional seconds for
-transport. Logs record exception types without tokens or external exception messages.
+transport. Logs record the Bot API method, route index, timeout, exception type, and cause type
+without tokens, proxy URLs, message content, or external exception messages.
 Telegram management mutations and incoming updates return 503 until the local bot runtime is
 ready; the settings read remains available. The web settings page shows connection/failure
 feedback, preserves saved preferences and drafts, and disables Telegram edits until recovery.
@@ -328,6 +329,10 @@ the transport creates its client or computes the pool fingerprint.
 Each route has its own client session. A background monitor probes the current route with
 `getMe`, selects another route after transport failures, and periodically checks failed
 backups after a cooldown. A working route stays selected when a former primary recovers.
+Proxy sessions open a new tunnel for each request. A proxy can leave a keep-alive socket open
+while no longer forwarding subsequent requests; reusing that socket causes polling and replies
+to time out. Closing each request's connection avoids this failure without closing concurrent
+requests or replaying uncertain sends. Direct connections retain normal connection pooling.
 The expiring Valkey lease carries the selected index and a fingerprint of the configured
 pool and bot token, never URLs or credentials. API and TaskIQ clients validate that lease before ordinary
 requests. The fingerprint also includes the delivery mode. Missing, expired, mismatched,

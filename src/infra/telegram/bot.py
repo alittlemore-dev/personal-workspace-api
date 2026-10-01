@@ -6,7 +6,7 @@ from typing import Any
 from aiogram import Bot
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.session.base import BaseSession
-from aiogram.exceptions import TelegramNetworkError, TelegramServerError
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError, TelegramServerError
 from aiogram.methods import GetMe, SetWebhook, TelegramMethod
 from aiogram.methods.base import TelegramType
 from aiogram.types import User
@@ -22,6 +22,13 @@ TRANSPORT_ERRORS = (TelegramNetworkError, TelegramServerError, TimeoutError)
 PROXY_ERRORS = (ProxyConnectionError, ProxyTimeoutError, ProxyError)
 
 
+class TelegramProxySession(AiohttpSession):
+    def __init__(self, *, proxy: str, timeout: float) -> None:
+        super().__init__(proxy=proxy, timeout=timeout)
+        # Some proxies stop forwarding reused tunnels without closing the socket.
+        self._connector_init["force_close"] = True
+
+
 class TelegramFailoverSession(BaseSession):
     def __init__(
         self,
@@ -31,8 +38,8 @@ class TelegramFailoverSession(BaseSession):
     ) -> None:
         super().__init__(timeout=constants.telegram.connection_timeout_seconds)
         self.pool_id = telegram_settings.proxy_pool_id
-        self.routes = tuple(
-            AiohttpSession(proxy=proxy.get_secret_value(), timeout=self.timeout)
+        self.routes: tuple[AiohttpSession, ...] = tuple(
+            TelegramProxySession(proxy=proxy.get_secret_value(), timeout=self.timeout)
             for proxy in telegram_settings.proxy_urls
         ) or (AiohttpSession(timeout=self.timeout),)
         self.runtime_status = runtime_status
@@ -60,11 +67,21 @@ class TelegramFailoverSession(BaseSession):
         route.api = self.api
         try:
             return await route.make_request(bot, method, timeout=request_timeout)
-        except PROXY_ERRORS:
-            raise TelegramNetworkError(
-                method=method,
-                message="Telegram proxy transport failed",
-            ) from None
+        except (*PROXY_ERRORS, TelegramAPIError, TimeoutError) as exc:
+            log_sanitized_exception(
+                event="Telegram transport request failed",
+                error=exc,
+                request_method=method.__api_method__,
+                route_index=index,
+                request_timeout=self.timeout if request_timeout is None else request_timeout,
+                cause_type=type(exc.__cause__).__name__,
+            )
+            if isinstance(exc, PROXY_ERRORS):
+                raise TelegramNetworkError(
+                    method=method,
+                    message="Telegram proxy transport failed",
+                ) from None
+            raise
 
     async def request_candidate(
         self,

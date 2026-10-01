@@ -52,16 +52,18 @@ async def test_failed_send_has_one_attempt_invalidates_route_and_wakes_monitor(
     transport: TelegramFailoverSession,
     monkeypatch: pytest.MonkeyPatch,
     error: str,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     method = SendMessage(chat_id=123, text="One attempt")
     failures = {
-        "network": TelegramNetworkError(method=method, message="network"),
+        "network": TelegramNetworkError(method=method, message="PRIVATE_TOKEN"),
         "timeout": TimeoutError(),
         "server": TelegramServerError(method=method, message="server"),
         "proxy-connection": ProxyConnectionError("PRIVATE_PROXY_PASSWORD"),
         "proxy-timeout": ProxyTimeoutError("PRIVATE_PROXY_PASSWORD"),
         "proxy-protocol": ProxyError("PRIVATE_PROXY_PASSWORD"),
     }
+    failures["network"].__cause__ = TimeoutError("PRIVATE_PROXY_PASSWORD")
     primary = AsyncMock(side_effect=failures[error])
     backup = AsyncMock()
     monkeypatch.setattr(transport.routes[0], "make_request", primary)
@@ -80,6 +82,13 @@ async def test_failed_send_has_one_attempt_invalidates_route_and_wakes_monitor(
     with pytest.raises(TelegramNetworkError):
         await bot(method)
     assert primary.await_count == 1
+    log = capsys.readouterr().out
+    assert "Telegram transport request failed" in log
+    assert "sendMessage" in log
+    assert "PRIVATE_PROXY_PASSWORD" not in log
+    assert "PRIVATE_TOKEN" not in log
+    if error == "network":
+        assert "TimeoutError" in log
 
 
 @pytest.mark.asyncio

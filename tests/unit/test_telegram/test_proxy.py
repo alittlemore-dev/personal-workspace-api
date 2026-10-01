@@ -22,7 +22,7 @@ from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 @pytest.mark.parametrize("protocol", ["socks5", "http", "direct"])
 @pytest.mark.asyncio
-async def test_bot_routes_api_calls_and_decodes_proxy_credentials(protocol: str) -> None:  # noqa: PLR0915
+async def test_bot_uses_fresh_proxy_tunnels_and_decodes_credentials(protocol: str) -> None:  # noqa: PLR0915
     destinations: list[str] = []
     authorizations: list[tuple[str, str]] = []
     methods: list[str] = []
@@ -86,12 +86,17 @@ async def test_bot_routes_api_calls_and_decodes_proxy_credentials(protocol: str)
                 },
             }
             body = json.dumps({"ok": True, "result": results[method]}).encode()
+            connection = "close" if protocol == "direct" else "keep-alive"
             writer.write(
-                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n"
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                + f"Connection: {connection}\r\n".encode()
                 + f"Content-Length: {len(body)}\r\n\r\n".encode()
                 + body,
             )
             await writer.drain()
+            if protocol != "direct":
+                # A proxy can advertise keep-alive while its reused tunnel stops forwarding.
+                assert await reader.read(1) == b""
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
         finally:

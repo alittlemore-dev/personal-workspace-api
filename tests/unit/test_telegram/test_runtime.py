@@ -20,6 +20,7 @@ from infra.config.constants import constants
 from infra.config.settings import SecretStrExtended, settings
 from infra.telegram.bot import create_telegram_bot
 from infra.telegram.runtime import TelegramBotRuntime, TelegramRuntimeState
+from infra.valkey.telegram_delivery import TelegramDeliveryLease
 from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
@@ -39,10 +40,14 @@ def runtime() -> TelegramBotRuntime:
     store.publish = AsyncMock()
     store.publish_ready = AsyncMock()
     bot = create_telegram_bot(telegram_settings=config, runtime_status=store)
+    lease = Mock(spec=TelegramDeliveryLease)
+    lease.ensure_owned = AsyncMock()
     return TelegramBotRuntime(
         bot=bot,
         state=TelegramRuntimeState(status=TelegramRuntimeStatus.CONNECTING),
         status_store=store,
+        delivery_lease=lease,
+        handle_update=AsyncMock(),
     )
 
 
@@ -121,7 +126,7 @@ async def test_total_outage_recovers_and_publishes_ready_only_after_webhook(
         patch.object(TelegramBotRuntime, "wait", next_attempt),
         pytest.raises(asyncio.CancelledError),
     ):
-        await runtime.run()
+        await runtime.monitor()
     assert observed == [
         TelegramRuntimeStatus.READY,
         TelegramRuntimeStatus.FAILED,
@@ -197,7 +202,7 @@ async def test_registration_timeout_is_bounded(
         patch.object(TelegramBotRuntime, "wait", side_effect=asyncio.CancelledError),
         pytest.raises(asyncio.CancelledError),
     ):
-        await asyncio.wait_for(runtime.run(), timeout=1)
+        await asyncio.wait_for(runtime.monitor(), timeout=1)
     assert runtime.state.status == TelegramRuntimeStatus.FAILED
 
 
@@ -260,9 +265,19 @@ async def test_status_lease_is_atomic_expires_and_deployment_slots_are_isolated(
     with patch("infra.valkey.telegram_runtime.Valkey.from_url", return_value=valkey):
         monkeypatch.setattr(settings.auth, "verify_url", "http://auth-blue/api/auth/verify")
         blue = TelegramRuntimeStatusStore.create()
+        blue_delivery = TelegramDeliveryLease.create(blue)
         monkeypatch.setattr(settings.auth, "verify_url", "http://auth-green/api/auth/verify")
+        monkeypatch.setattr(settings.telegram, "delivery_mode", "polling")
+        monkeypatch.setattr(
+            settings.telegram,
+            "proxy_urls",
+            [SecretStrExtended("http://new.test:8080")],
+        )
         green = TelegramRuntimeStatusStore.create()
+        green_delivery = TelegramDeliveryLease.create(green)
     assert blue.key != green.key
+    assert blue.pool_id != green.pool_id
+    assert blue_delivery.key == green_delivery.key
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,7 @@ from infra.ioc.prodivers.notifications_provider import NotificationsProvider
 from infra.telegram.bot import create_telegram_bot
 from infra.telegram.reminder_sender import AiogramReminderSender
 from infra.telegram.runtime import TelegramBotRuntime, TelegramRuntimeState
+from infra.valkey.telegram_delivery import TelegramDeliveryLease
 from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
@@ -75,6 +76,8 @@ async def test_bot_routes_api_calls_and_decodes_proxy_credentials(protocol: str)
             results: dict[str, object] = {
                 "getMe": {"id": 123456, "is_bot": True, "first_name": "Test"},
                 "setWebhook": True,
+                "deleteWebhook": True,
+                "getUpdates": [{"update_id": 42}],
                 "sendMessage": {
                     "message_id": 1,
                     "date": 1,
@@ -113,6 +116,8 @@ async def test_bot_routes_api_calls_and_decodes_proxy_credentials(protocol: str)
     try:
         assert (await asyncio.wait_for(bot.get_me(), timeout=2)).id == 123456
         assert await asyncio.wait_for(bot.set_webhook(url="https://app.test/webhook"), timeout=2)
+        assert await asyncio.wait_for(bot.delete_webhook(drop_pending_updates=False), timeout=2)
+        assert (await asyncio.wait_for(bot.get_updates(timeout=0), timeout=2))[0].update_id == 42
         await asyncio.wait_for(
             AiogramReminderSender(bot=bot).send(private_chat_id=123, text="Test"),
             timeout=2,
@@ -122,12 +127,12 @@ async def test_bot_routes_api_calls_and_decodes_proxy_credentials(protocol: str)
         server.close()
         await server.wait_closed()
     assert errors == []
-    assert methods == ["getMe", "setWebhook", "sendMessage"]
+    assert methods == ["getMe", "setWebhook", "deleteWebhook", "getUpdates", "sendMessage"]
     if protocol == "direct":
         assert destinations == []
     else:
-        assert destinations == ["telegram.test:8080"] * 3
-        assert authorizations == [("test@user", "pass:word")] * 3
+        assert destinations == ["telegram.test:8080"] * 5
+        assert authorizations == [("test@user", "pass:word")] * 5
 
 
 @pytest.mark.asyncio
@@ -276,6 +281,8 @@ async def test_real_proxy_pool_fails_over_stays_sticky_and_never_replays_send(  
         bot=bot,
         state=TelegramRuntimeState(status=TelegramRuntimeStatus.CONNECTING),
         status_store=store,
+        delivery_lease=Mock(spec=TelegramDeliveryLease),
+        handle_update=AsyncMock(),
     )
     try:
         assert await asyncio.wait_for(runtime.connect(None, None), timeout=2) == 1

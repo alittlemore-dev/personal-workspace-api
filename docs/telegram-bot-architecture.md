@@ -18,7 +18,7 @@ scenarios attached to the same integration. In the first version, all active con
 Workspace have the same available actions. Roles and permissions for individual features are
 deferred. **Notification settings are individual to each connection.**
 
-"Shared bot" means one technical Telegram bot identity and one webhook. Each person talks to it
+"Shared bot" means one technical Telegram bot identity and one active update receiver. Each person talks to it
 in a separate **private chat**. Messages from different Workspaces or for different people are
 never posted to a common chat. The server selects recipient chats from connections and
 subscriptions; the bot does not broadcast every event to everyone who has opened it.
@@ -49,7 +49,7 @@ outside the first version.
 
 | Option | Benefit | Cost | Decision |
 | --- | --- | --- | --- |
-| One shared bot with Workspace-level connections | One entry point, consistent settings across domains, one webhook | Every operation must enforce owner isolation | Selected |
+| One shared bot with Workspace-level connections | One entry point, consistent settings across domains, one update receiver | Every operation must enforce owner isolation | Selected |
 | One bot per finance tracker | Separate bot identity per tracker | Every owner must supply a token and webhook; poor fit for calendar and tasks | Rejected |
 | Permanent link containing the owner's identifier | Easy to reuse | Anyone holding it can repeatedly request access; individual invitations cannot be revoked safely | Rejected |
 
@@ -92,8 +92,9 @@ user.
    can cancel an unused invitation. Sharing the link grants the ability to **request** a
    connection, not immediate access. Invitation creation and redemption attempts are
    rate-limited.
-3. A person opens the link in a private chat and sends `/start <token>`. The webhook validates
-   its secret header, the chat type, token, expiry, integration state, block state, and any
+3. A person opens the link in a private chat and sends `/start <token>`. The selected update
+   receiver dispatches it to the same command handler. Webhooks validate their secret header;
+   the handler validates the chat type, token, expiry, integration state, block state, and any
    conflicting active connection. Token consumption and creation of a `pending` request are
    atomic. Redelivery of the Telegram update does not create another request.
 4. Web settings show the Telegram ID and the name/username observed at request time. The owner
@@ -185,7 +186,7 @@ files, and the entire knowledge database are not notification sources in this de
 
 ## 8. Processing and reliability
 
-The shared bot sends webhooks to a separately classified integration HTTP endpoint in
+In webhook mode, the shared bot sends updates to a separately classified integration HTTP endpoint in
 `personal-workspace`. The endpoint validates `X-Telegram-Bot-Api-Secret-Token` **before**
 processing payload data and does not rely on a web cookie. The bot sends a private `/start`
 settings request to `auth-api` with a separate service credential. `personal-workspace` resolves
@@ -303,10 +304,13 @@ worker and scheduler boundary for outgoing notifications. Its delivery code can 
 Bot API client without routing an artificial incoming update through the dispatcher. [aiogram
 webhook integration](https://docs.aiogram.dev/en/latest/dispatcher/webhook.html).
 
-Webhook registration runs in a cancellable background task rather than blocking API startup.
-The runtime reports `disabled`, `connecting`, `ready`, or `failed`; attempts have a ten-second
-timeout and retry every thirty seconds. After registration, periodic Bot API checks detect later
-connectivity failures. Logs record exception types without tokens or external exception messages.
+`TELEGRAM_DELIVERY_MODE` explicitly selects `polling` or `webhook`. Production currently uses
+polling through the configured proxy pool; the webhook endpoint and secret are retained.
+Webhook registration or polling startup runs in a cancellable background task rather than blocking API startup.
+The runtime reports `disabled`, `connecting`, `ready`, or `failed`; connection attempts have a
+ten-second timeout and retry every thirty seconds. Webhook mode uses periodic Bot API checks;
+polling holds each update request for up to twenty seconds, with ten additional seconds for
+transport. Logs record exception types without tokens or external exception messages.
 Telegram management mutations and incoming updates return 503 until the local bot runtime is
 ready; the settings read remains available. The web settings page shows connection/failure
 feedback, preserves saved preferences and drafts, and disables Telegram edits until recovery.
@@ -326,7 +330,8 @@ Each route has its own client session. A background monitor probes the current r
 backups after a cooldown. A working route stays selected when a former primary recovers.
 The expiring Valkey lease carries the selected index and a fingerprint of the configured
 pool and bot token, never URLs or credentials. API and TaskIQ clients validate that lease before ordinary
-requests. Missing, expired, mismatched, or malformed leases block delivery. A delayed failure
+requests. The fingerprint also includes the delivery mode. Missing, expired, mismatched,
+or malformed leases block delivery. A delayed failure
 from an old route must not invalidate a newer selection.
 Management writes, webhook delivery, settings status, and the internal status endpoint also
 check the fresh shared lease when the local monitor reports ready. Worker-detected failures
@@ -340,6 +345,24 @@ the existing queue and may still duplicate a message whose outcome was unknown.
 
 Proxy requests use the remote resolver. This controls outgoing Bot API calls only; incoming
 Telegram webhooks still require a reachable public HTTPS endpoint. [aiogram proxy support](https://docs.aiogram.dev/en/latest/api/session/aiohttp.html#proxy-requests-in-aiohttpsession).
+
+Polling removes the registered webhook with `drop_pending_updates=false`, obtains `getUpdates`
+through the same route sessions, and passes each update to the existing dispatcher sequentially.
+It publishes readiness only after a successful update request. `offset` advances after each
+handler attempt settles and survives proxy failover within the receiver. Handler errors are
+logged and acknowledged, so committed work and uncertain outbound replies are not retried by
+replaying the command; a failed action requires an explicit user retry. Outbound transport
+errors pause the unhandled remainder of the batch until recovery. Unconfirmed updates may be
+redelivered after a process restart. Rate limits respect `retry_after`. In polling mode the
+retained webhook endpoint rejects updates with 503 after authenticating the secret.
+
+A bot-wide Valkey ownership lease spans deployment slots, transport modes, and proxy pools.
+Only its owner polls or registers/removes a webhook. A separate task renews ownership; losing
+it cancels connection/receive work. Standbys reflect their slot's readiness but cannot withdraw
+the owner's lease on shutdown. Owner release atomically invalidates slot readiness and releases
+delivery ownership, and an expired owner cannot clear its successor's lease. During deployment
+the previous slot retains delivery until it stops or its ownership expires. [Telegram polling
+contract](https://core.telegram.org/bots/api#getupdates).
 
 Notification workers require a fresh, expiring readiness lease in Valkey before claiming work.
 Leases are isolated by the deployment slot's auth origin and expire if the backend stops renewing

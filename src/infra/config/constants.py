@@ -77,6 +77,12 @@ class FinanceConstants:
 
 
 class TelegramConstants:
+    delivery_lease_key_prefix: str = "telegram:delivery:"
+    delivery_lease_ttl_seconds: int = 90
+    delivery_lease_refresh_seconds: int = 15
+    delivery_lease_retry_seconds: int = 5
+    polling_timeout_seconds: int = 20
+    allowed_updates: tuple[str, ...] = ("message", "callback_query")
     runtime_status_key_prefix: str = "telegram:runtime:"
     runtime_status_ttl_seconds: int = 90
     connection_timeout_seconds: int = 10

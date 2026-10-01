@@ -101,6 +101,46 @@ class TestSettings:
 
 
 class TestTelegramSettings:
+    @pytest.mark.parametrize("mode", ["polling", "webhook"])
+    def test_delivery_mode_accepts_supported_modes(
+        self,
+        mode: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("TELEGRAM_DELIVERY_MODE", mode)
+        assert TelegramSettings(_env_file=None).delivery_mode == mode
+
+    def test_delivery_mode_is_explicit_and_rejects_unknown_values(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("TELEGRAM_DELIVERY_MODE")
+        with pytest.raises(ValidationError):
+            TelegramSettings(_env_file=None)
+        monkeypatch.setenv("TELEGRAM_DELIVERY_MODE", "automatic")
+        with pytest.raises(ValidationError):
+            TelegramSettings(_env_file=None)
+
+    def test_polling_does_not_require_webhook_secret_but_webhook_does(self) -> None:
+        polling = TelegramSettings(
+            _env_file=None,
+            available=True,
+            delivery_mode="polling",
+            webhook_secret=SecretStrExtended(""),
+        )
+        assert polling.available
+        with pytest.raises(ValidationError):
+            TelegramSettings(
+                _env_file=None,
+                available=True,
+                delivery_mode="webhook",
+                webhook_secret=SecretStrExtended(""),
+            )
+        assert (
+            polling.proxy_pool_id
+            != polling.model_copy(update={"delivery_mode": "webhook"}).proxy_pool_id
+        )
+
     @pytest.mark.parametrize(
         "proxy_urls",
         [

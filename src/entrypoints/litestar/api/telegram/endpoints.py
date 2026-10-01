@@ -231,6 +231,8 @@ class TelegramWebhookController(Controller):
         supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
         if not expected or not hmac.compare_digest(supplied, expected):
             raise HTTPException(status_code=403)
+        if settings.telegram.delivery_mode != "webhook":
+            raise HTTPException(status_code=503)
         if await get_runtime_status(request) != TelegramRuntimeStatus.READY:
             raise HTTPException(status_code=503)
         update: Any = await request.json()

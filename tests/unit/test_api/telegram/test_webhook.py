@@ -43,6 +43,22 @@ def test_valid_webhook_forwards_update_to_dispatcher(
     )
 
 
+def test_polling_mode_rejects_webhook_without_dispatching(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings.telegram, "delivery_mode", "polling")
+    dispatcher = AsyncMock()
+    client.app.state.telegram_dispatcher = dispatcher
+    response = client.post(
+        "/api/telegram/webhook",
+        json={"update_id": 42},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "TEST_WEBHOOK_SECRET"},
+    )
+    assert response.status_code == 503
+    dispatcher.feed_raw_update.assert_not_awaited()
+
+
 @pytest.mark.parametrize("runtime_status", ["connecting", "failed", "disabled", "ready"])
 def test_unready_webhook_rejects_updates_without_dispatching(
     client: TestClient,

@@ -9,6 +9,7 @@ from entrypoints.litestar.lifespan.main import app_lifespan
 from infra.config.settings import settings
 from infra.telegram.bot import TelegramFailoverSession
 from infra.telegram.runtime import TelegramRuntimeState
+from infra.valkey.telegram_delivery import TelegramDeliveryLease
 from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
@@ -43,9 +44,15 @@ async def test_lifespan_does_not_wait_for_webhook_and_cancels_connection_on_shut
     store.get_ready_route = AsyncMock(return_value=None)
     app.state.telegram_runtime_status = store
     store.close = AsyncMock()
+    lease = Mock(spec=TelegramDeliveryLease)
+    lease.acquire = AsyncMock(return_value=True)
+    lease.ensure_owned = AsyncMock()
+    lease.release = AsyncMock()
+    lease.keep_alive = AsyncMock(side_effect=asyncio.Event().wait)
 
     with (
         patch("entrypoints.litestar.lifespan.main.before_app_create"),
+        patch.object(TelegramDeliveryLease, "create", return_value=lease),
     ):
         async with app_lifespan(app):
             await asyncio.wait_for(entered.wait(), timeout=1)
@@ -60,6 +67,7 @@ async def test_lifespan_does_not_wait_for_webhook_and_cancels_connection_on_shut
     assert method.allowed_updates == ["message", "callback_query"]
     store.close.assert_awaited_once()
     dispatcher.close.assert_awaited_once()
+    lease.release.assert_awaited_once()
     app.state.dishka_container.close.assert_awaited_once()
     assert app.state.telegram_runtime_state.status == TelegramRuntimeStatus.FAILED
 

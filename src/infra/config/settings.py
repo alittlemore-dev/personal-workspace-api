@@ -179,6 +179,7 @@ class TelegramSettings(ProjectBaseSettings):
     bot_token: SecretStrExtended = SecretStrExtended("")
     webhook_secret: SecretStrExtended = SecretStrExtended("")
     service_secret: SecretStrExtended = SecretStrExtended("")
+    delivery_mode: Literal["polling", "webhook"]
     proxy_urls: Annotated[list[SecretStrExtended], NoDecode] = Field(repr=False)
 
     @property
@@ -187,6 +188,7 @@ class TelegramSettings(ProjectBaseSettings):
             {
                 "routes": [proxy.get_secret_value() for proxy in self.proxy_urls],
                 "bot_token": self.bot_token.get_secret_value(),
+                "delivery_mode": self.delivery_mode,
             },
             separators=(",", ":"),
         )
@@ -245,7 +247,9 @@ class TelegramSettings(ProjectBaseSettings):
                 (
                     self.bot_username,
                     self.bot_token.get_secret_value(),
-                    self.webhook_secret.get_secret_value(),
+                    self.webhook_secret.get_secret_value()
+                    if self.delivery_mode == "webhook"
+                    else True,
                     self.service_secret.get_secret_value(),
                 ),
             )

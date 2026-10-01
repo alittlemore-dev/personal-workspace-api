@@ -49,6 +49,8 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
     last_contact_at: Mapped[datetime] = mapped_column(UTCDateTime)
     notify_birthday: Mapped[bool] = mapped_column(Boolean, server_default="false")
     notify_memorable_date: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    notify_finance_transaction: Mapped[bool] = mapped_column(Boolean)
+    notify_finance_limit: Mapped[bool] = mapped_column(Boolean)
     language: Mapped[LanguageEnum] = mapped_column(
         Enum(LanguageEnum, name="telegram_notification_language_enum", native_enum=True),
         server_default=LanguageEnum.EN.name,
@@ -92,6 +94,8 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
             notify_birthday=self.notify_birthday,
             notify_memorable_date=self.notify_memorable_date,
             language=self.language,
+            notify_finance_transaction=self.notify_finance_transaction,
+            notify_finance_limit=self.notify_finance_limit,
         )
 
     def to_reminder_recipient(self) -> ReminderRecipient:

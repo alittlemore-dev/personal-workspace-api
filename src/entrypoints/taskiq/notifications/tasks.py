@@ -10,6 +10,7 @@ from core.notifications.use_cases import (
 from entrypoints.taskiq.broker import broker
 from infra.config.constants import constants
 from infra.config.settings import settings
+from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
 @broker.task(
@@ -44,8 +45,9 @@ async def plan_reminders(
 async def send_reminders(
     use_case: FromDishka[SendRemindersUseCase],
     current_datetime: FromDishka[datetime],
+    runtime_status: FromDishka[TelegramRuntimeStatusStore],
 ) -> int:
-    if not settings.telegram.available:
+    if not settings.telegram.available or not await runtime_status.is_ready():
         return 0
     return await use_case.run(now=current_datetime)
 

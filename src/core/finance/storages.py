@@ -116,6 +116,15 @@ class FinanceStorage(ABC):
     ) -> FinanceTransaction: ...
 
     @abstractmethod
+    async def confirmed_operation(
+        self,
+        *,
+        owner_username: str,
+        author_id: str,
+        operation_id: str,
+    ) -> FinanceTransaction | None: ...
+
+    @abstractmethod
     async def create_transaction(
         self,
         *,

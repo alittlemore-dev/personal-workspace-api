@@ -1,11 +1,16 @@
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, replace
+from datetime import date, timedelta
+from time import monotonic
 
 from core.finance.clients import FinanceRateClient
-from core.finance.enums import FinanceCurrency
-from core.finance.exceptions import FinanceConflictError, FinanceRateUnavailableError
+from core.finance.enums import FinanceCurrency, FinanceSource
+from core.finance.exceptions import (
+    FinanceConflictError,
+    FinanceRateUnavailableError,
+)
 from core.finance.schemas import (
     ChangeFinanceCurrencyParams,
+    ConfirmedFinanceOperationParams,
     CreateFinanceCategoryParams,
     CreateFinanceTransactionParams,
     DeleteFinanceCategoryParams,
@@ -29,17 +34,27 @@ from core.finance.schemas import (
     ListFinanceTransactionsParams,
     SetFinanceCategoryArchivedParams,
     SetFinanceTransactionDeletedParams,
+    TelegramFinanceContextParams,
     UpdateFinanceCategoryParams,
     UpdateFinanceTransactionParams,
     UpdateOpeningBalanceParams,
 )
+from core.finance.services import (
+    FinanceEventService,
+    FinanceMonthService,
+    FinanceTelegramAccessService,
+)
 from core.finance.storages import FinanceStorage
+from core.telegram.schemas import TelegramConnection
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceUseCase:
     storage: FinanceStorage
     rate_client: FinanceRateClient
+    telegram_access: FinanceTelegramAccessService
+    events: FinanceEventService
+    months: FinanceMonthService
 
     async def ensure_month(self, params: EnsureFinanceMonthParams) -> FinanceMonth:
         tracker = await self.storage.lock_tracker(owner_username=params.owner_username)
@@ -60,16 +75,40 @@ class FinanceUseCase:
                 templates=templates,
                 now=params.now,
             )
-        archived_category_ids = await self.storage.archived_category_ids(tracker=tracker)
-        while month.period_start < current_period:
-            month = await self.storage.create_rollover_month(
-                tracker=tracker,
-                rollover=month.rollover(archived_category_ids),
-                now=params.now,
-            )
-        if month.period_start != current_period:
-            raise FinanceConflictError
-        return month
+        return await self.months.advance(
+            tracker=tracker,
+            now=params.now,
+        )
+
+    async def telegram_context(
+        self,
+        params: TelegramFinanceContextParams,
+    ) -> tuple[TelegramConnection, FinanceMonth | None]:
+        connection = await self.telegram_access.resolve(params, lock=False)
+        tracker = await self.storage.lock_tracker(owner_username=connection.owner_username)
+        if tracker is None:
+            return connection, None
+        month = await self.months.advance(
+            tracker=tracker,
+            now=params.now,
+        )
+        return connection, month
+
+    async def confirmed_telegram_operation(
+        self,
+        params: ConfirmedFinanceOperationParams,
+    ) -> FinanceTransaction | None:
+        await self.telegram_access.validate(
+            actor=params.actor,
+            owner_username=params.owner_username,
+            now=params.now,
+            lock=False,
+        )
+        return await self.storage.confirmed_operation(
+            owner_username=params.owner_username,
+            author_id=params.actor.identifier,
+            operation_id=params.actor.operation_id,
+        )
 
     async def get_month(self, params: FinanceMonthParams) -> FinanceMonth:
         return await self.storage.get_month(owner_username=params.owner_username, now=params.now)
@@ -162,17 +201,58 @@ class FinanceUseCase:
         self,
         params: CreateFinanceTransactionParams,
     ) -> FinanceTransaction:
+        started = monotonic()
+        started_at = params.now
+        if params.actor.source == FinanceSource.TELEGRAM:
+            existing = await self.confirmed_telegram_operation(
+                ConfirmedFinanceOperationParams(
+                    actor=params.actor,
+                    owner_username=params.owner_username,
+                    now=params.now,
+                ),
+            )
+            if existing is not None:
+                return existing
         month = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
         zone = month.time_zone
         params.draft.validate(period_start=month.period_start, time_zone=zone)
+        if params.actor.source == FinanceSource.TELEGRAM and month.id != params.actor.month_id:
+            raise FinanceConflictError
+        month.get_category(params.draft.category_id).check_accepting_transaction(None)
         rate_set_id = await self.resolve_rate_set_id(
             on_date=params.draft.occurred_at.astimezone(zone).date(),
         )
         rate_set = await self.storage.get_rate_set(rate_set_id=rate_set_id)
+        if params.actor.source == FinanceSource.TELEGRAM:
+            params = replace(params, now=started_at + timedelta(seconds=monotonic() - started))
         month = await self.storage.lock_month(owner_username=params.owner_username, now=params.now)
+        if params.actor.source == FinanceSource.TELEGRAM:
+            connection = await self.telegram_access.validate(
+                actor=params.actor,
+                owner_username=params.owner_username,
+                now=params.now,
+                lock=True,
+            )
+            existing = await self.storage.confirmed_operation(
+                owner_username=params.owner_username,
+                author_id=params.actor.identifier,
+                operation_id=params.actor.operation_id,
+            )
+            if existing is not None:
+                return existing
+            params = replace(
+                params,
+                now=started_at + timedelta(seconds=monotonic() - started),
+                actor=replace(params.actor, label=connection.label),
+            )
+            if month.id != params.actor.month_id or month.period_start != params.now.astimezone(
+                month.time_zone,
+            ).date().replace(day=1):
+                raise FinanceConflictError
+        params.draft.validate(period_start=month.period_start, time_zone=month.time_zone)
         category = month.get_category(params.draft.category_id)
         category.check_accepting_transaction(None)
-        return await self.storage.create_transaction(
+        result = await self.storage.create_transaction(
             write=FinanceTransactionCreation(
                 month=month,
                 category=category,
@@ -180,6 +260,15 @@ class FinanceUseCase:
                 pricing=FinanceTransactionPricing.from_draft(params.draft, rate_set_id, rate_set),
             ),
         )
+        after = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        await self.events.created(
+            owner_username=params.owner_username,
+            before=month,
+            after=after,
+            transaction=result,
+            now=params.now,
+        )
+        return result
 
     async def update_transaction(
         self,
@@ -217,7 +306,7 @@ class FinanceUseCase:
         existing.check_updatable(params.version)
         category = month.get_category(params.draft.category_id)
         category.check_accepting_transaction(existing.category_id)
-        return await self.storage.update_transaction(
+        result = await self.storage.update_transaction(
             write=FinanceTransactionUpdate(
                 month=month,
                 category=category,
@@ -226,6 +315,15 @@ class FinanceUseCase:
                 pricing=pricing,
             ),
         )
+        after = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        await self.events.changed(
+            owner_username=params.owner_username,
+            before=month,
+            after=after,
+            transaction=result,
+            now=params.now,
+        )
+        return result
 
     async def set_transaction_deleted(
         self,
@@ -238,13 +336,22 @@ class FinanceUseCase:
             now=params.now,
         )
         existing.check_deletion_change(params.version, deleted=params.deleted)
-        return await self.storage.set_transaction_deleted(
+        result = await self.storage.set_transaction_deleted(
             write=FinanceTransactionDeletionChange(
                 month=month,
                 transaction=existing,
                 params=params,
             ),
         )
+        after = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        await self.events.changed(
+            owner_username=params.owner_username,
+            before=month,
+            after=after,
+            transaction=result,
+            now=params.now,
+        )
+        return result
 
     async def revisions(self, params: FinanceTransactionRevisionsParams) -> FinanceRevisions:
         return FinanceRevisions(

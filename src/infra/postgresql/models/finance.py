@@ -17,7 +17,7 @@ from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 from sqlalchemy_dev_utils.types.datetime import UTCDateTime
 from sqlalchemy_dev_utils.types.pydantic import PydanticType
 
-from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
+from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction, FinanceSource
 from infra.postgresql.models.base import BaseModel, TableArgs
 from infra.postgresql.models.mixins.ids import HexUuidIDMixin
 from infra.postgresql.schemas.finance import (
@@ -132,6 +132,12 @@ class FinanceTransactionModel(HexUuidIDMixin, BaseModel):
     occurred_at: Mapped[datetime] = mapped_column(UTCDateTime)
     description: Mapped[str] = mapped_column(String(2000))
     author_username: Mapped[str] = mapped_column(String(255))
+    source: Mapped[FinanceSource] = mapped_column(
+        Enum(FinanceSource, name="finance_source_enum", native_enum=True),
+    )
+    author_id: Mapped[str] = mapped_column(String(255))
+    author_label: Mapped[str] = mapped_column(String(255))
+    operation_id: Mapped[str] = mapped_column(String(32))
     version: Mapped[int] = mapped_column(Integer)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
@@ -140,7 +146,15 @@ class FinanceTransactionModel(HexUuidIDMixin, BaseModel):
     @declared_attr.directive
     @classmethod
     def __table_args__(cls) -> TableArgs:
-        return (Index("finance_transaction_month_date_idx", cls.month_id, cls.occurred_at),)
+        return (
+            Index("finance_transaction_month_date_idx", cls.month_id, cls.occurred_at),
+            Index(
+                "finance_telegram_operation_once",
+                cls.operation_id,
+                unique=True,
+                postgresql_where=cls.source == FinanceSource.TELEGRAM,
+            ),
+        )
 
 
 class FinanceTransactionRevisionModel(HexUuidIDMixin, BaseModel):

@@ -5,6 +5,7 @@ from litestar.params import PathParameter
 from pydantic import Field, field_validator
 
 from core.i18n.enums import LanguageEnum
+from core.telegram.enums import TelegramRuntimeStatus
 from core.telegram.schemas import (
     TelegramConnection,
     TelegramConnectionSettings,
@@ -50,6 +51,8 @@ class TelegramConnectionResponse(CamelCaseSchema):
     last_contact_at: datetime
     notify_birthday: bool
     notify_memorable_date: bool
+    notify_finance_transaction: bool
+    notify_finance_limit: bool
     language: LanguageEnum
 
     @classmethod
@@ -66,6 +69,8 @@ class TelegramConnectionResponse(CamelCaseSchema):
             last_contact_at=schema.last_contact_at,
             notify_birthday=schema.notify_birthday,
             notify_memorable_date=schema.notify_memorable_date,
+            notify_finance_transaction=schema.notify_finance_transaction,
+            notify_finance_limit=schema.notify_finance_limit,
             language=schema.language,
         )
 
@@ -73,20 +78,29 @@ class TelegramConnectionResponse(CamelCaseSchema):
 class TelegramConnectionSettingsRequest(CamelCaseSchema):
     notify_birthday: bool
     notify_memorable_date: bool
+    notify_finance_transaction: bool
+    notify_finance_limit: bool
     language: LanguageEnum
 
     def to_domain_schema(self) -> TelegramConnectionSettings:
         return TelegramConnectionSettings(
             notify_birthday=self.notify_birthday,
             notify_memorable_date=self.notify_memorable_date,
+            notify_finance_transaction=self.notify_finance_transaction,
+            notify_finance_limit=self.notify_finance_limit,
             language=self.language,
         )
 
 
 class TelegramSettingsResponse(CamelCaseSchema):
     available: bool
+    status: TelegramRuntimeStatus
     invitations: list[TelegramInvitationResponse]
     connections: list[TelegramConnectionResponse]
+
+
+class TelegramRuntimeStatusResponse(CamelCaseSchema):
+    status: TelegramRuntimeStatus
 
 
 class TelegramIssuedInvitationResponse(CamelCaseSchema):

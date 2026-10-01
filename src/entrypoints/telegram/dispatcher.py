@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
+from aiogram.fsm.storage.base import BaseEventIsolation, BaseStorage
 from aiogram.types import Message
 from dishka import AsyncContainer
 from dishka.integrations.aiogram import FromDishka, inject, setup_dishka
@@ -24,6 +25,7 @@ from core.telegram.schemas import (
 )
 from core.telegram.storages import TelegramTransaction
 from core.telegram.use_cases import TelegramUseCase
+from entrypoints.telegram.finance import FinanceConversation, create_finance_router
 
 
 @inject
@@ -70,11 +72,29 @@ class TelegramBotDispatcher:
     dispatcher: Dispatcher
 
     @classmethod
-    def create(cls, *, container: AsyncContainer, bot: Bot) -> Self:
+    def create(
+        cls,
+        *,
+        container: AsyncContainer,
+        bot: Bot,
+        storage: BaseStorage,
+        isolation: BaseEventIsolation,
+    ) -> Self:
         router = Router(name="telegram_connections")
-        router.message.register(handle_start, CommandStart(), F.chat.type == ChatType.PRIVATE)
-        dispatcher = Dispatcher(disable_fsm=True)
+        router.message.register(
+            handle_start,
+            CommandStart(),
+            F.chat.type == ChatType.PRIVATE,
+            F.text.regexp(r"^/start(?:@\w+)?\s"),
+        )
+        dispatcher = Dispatcher(
+            disable_fsm=True,
+            storage=storage,
+            events_isolation=isolation,
+            conversation=FinanceConversation(bot=bot, storage=storage, isolation=isolation),
+        )
         dispatcher.include_router(router)
+        dispatcher.include_router(create_finance_router())
         setup_dishka(container=container, router=dispatcher)
         return cls(bot=bot, dispatcher=dispatcher)
 
@@ -82,4 +102,5 @@ class TelegramBotDispatcher:
         await self.dispatcher.feed_raw_update(bot=self.bot, update=update)
 
     async def close(self) -> None:
+        await self.dispatcher.fsm.close()
         await self.bot.session.close()

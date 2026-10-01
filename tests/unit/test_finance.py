@@ -14,6 +14,11 @@ from core.finance.schemas import (
     FinanceTransactionPricing,
     UpdateFinanceTransactionParams,
 )
+from core.finance.services import (
+    FinanceEventService,
+    FinanceMonthService,
+    FinanceTelegramAccessService,
+)
 from core.finance.storages import FinanceStorage
 from core.finance.use_cases import FinanceUseCase
 from infra.http.finance_rates import BankOfRussiaFinanceRateClient
@@ -130,7 +135,13 @@ class TestFinance(TestCase):
         storage.update_transaction = AsyncMock(return_value=existing)
         rate_client = Mock(spec=FinanceRateClient)
         rate_client.fetch = AsyncMock()
-        use_case = FinanceUseCase(storage=storage, rate_client=rate_client)
+        use_case = FinanceUseCase(
+            storage=storage,
+            months=FinanceMonthService(storage=storage),
+            rate_client=rate_client,
+            telegram_access=Mock(spec=FinanceTelegramAccessService),
+            events=Mock(spec=FinanceEventService),
+        )
         await use_case.update_transaction(
             UpdateFinanceTransactionParams(
                 owner_username="owner",
@@ -156,7 +167,13 @@ class TestFinance(TestCase):
         storage.save_rate_set = AsyncMock()
         rate_client = Mock(spec=FinanceRateClient)
         rate_client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
-        use_case = FinanceUseCase(storage=storage, rate_client=rate_client)
+        use_case = FinanceUseCase(
+            storage=storage,
+            months=FinanceMonthService(storage=storage),
+            rate_client=rate_client,
+            telegram_access=Mock(spec=FinanceTelegramAccessService),
+            events=Mock(spec=FinanceEventService),
+        )
         assert await use_case.resolve_rate_set_id(on_date=date(2026, 9, 26)) == "cached"
         storage.latest_rate_before_date.assert_awaited_once_with(on_date=date(2026, 9, 26))
         storage.save_rate_set.assert_not_awaited()
@@ -170,6 +187,12 @@ class TestFinance(TestCase):
         storage.latest_rate_before_date = AsyncMock(return_value=None)
         rate_client = Mock(spec=FinanceRateClient)
         rate_client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
-        use_case = FinanceUseCase(storage=storage, rate_client=rate_client)
+        use_case = FinanceUseCase(
+            storage=storage,
+            months=FinanceMonthService(storage=storage),
+            rate_client=rate_client,
+            telegram_access=Mock(spec=FinanceTelegramAccessService),
+            events=Mock(spec=FinanceEventService),
+        )
         with pytest.raises(FinanceRateUnavailableError):
             await use_case.resolve_rate_set_id(on_date=date(2026, 9, 26))

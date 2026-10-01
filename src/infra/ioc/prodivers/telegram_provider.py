@@ -19,9 +19,18 @@ from infra.config.settings import settings
 from infra.postgresql.storages.telegram import TelegramDatabaseStorage
 from infra.postgresql.telegram_transaction import TelegramDatabaseTransaction
 from infra.valkey.telegram_limiter import ValkeyTelegramRedemptionLimiter
+from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
 class TelegramProvider(Provider):
+    @provide(scope=Scope.APP)
+    async def provide_runtime_status(self) -> AsyncIterator[TelegramRuntimeStatusStore]:
+        store = TelegramRuntimeStatusStore.create()
+        try:
+            yield store
+        finally:
+            await store.close()
+
     @provide(scope=Scope.APP)
     def provide_token_generator(self) -> InvitationTokenGenerator:
         return InvitationTokenGenerator()

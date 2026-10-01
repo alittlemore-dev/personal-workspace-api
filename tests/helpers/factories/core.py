@@ -1,5 +1,5 @@
 import hashlib
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, Mock
@@ -21,12 +21,13 @@ from core.files.enums import FilePurpose
 from core.files.schemas import FileRead, StoredFile
 from core.files.types import Namespace
 from core.finance.clients import FinanceRateClient
-from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
+from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction, FinanceSource
 from core.finance.exceptions import FinanceRateUnavailableError
 from core.finance.schemas import (
     Amount,
     FinanceCategory,
     FinanceCategoryName,
+    FinanceEventConfig,
     FinanceMonth,
     FinanceRateSet,
     FinanceRevisions,
@@ -36,6 +37,11 @@ from core.finance.schemas import (
     FinanceTransactionRevision,
     FinanceTransactions,
     FinanceTransactionSnapshot,
+)
+from core.finance.services import (
+    FinanceEventService,
+    FinanceMonthService,
+    FinanceTelegramAccessService,
 )
 from core.finance.storages import FinanceStorage
 from core.finance.use_cases import FinanceUseCase
@@ -67,7 +73,11 @@ from core.resumes.schemas import (
     ResumeSkillGroup,
     ResumeSummary,
 )
+from core.telegram.enums import TelegramConnectionState
+from core.telegram.schemas import TelegramConnection
 from core.types import SearchName
+from infra.postgresql.storages.finance import FinanceDatabaseStorage
+from infra.postgresql.storages.finance_notifications import FinanceDatabaseEventDispatcher
 
 
 class CoreFactoryHelper:
@@ -298,7 +308,18 @@ class CoreFactoryHelper:
             client = Mock(spec=FinanceRateClient)
             client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
             rate_client = client
-        return FinanceUseCase(storage=storage, rate_client=rate_client)
+        return FinanceUseCase(
+            storage=storage,
+            months=FinanceMonthService(storage=storage),
+            rate_client=rate_client,
+            telegram_access=Mock(spec=FinanceTelegramAccessService),
+            events=FinanceEventService(
+                dispatcher=FinanceDatabaseEventDispatcher(session=storage.session),
+                config=FinanceEventConfig(lifetime=timedelta(days=1)),
+            )
+            if isinstance(storage, FinanceDatabaseStorage)
+            else Mock(spec=FinanceEventService),
+        )
 
     @classmethod
     def finance_rate_set(cls, on_date: date = date(2026, 9, 15)) -> FinanceRateSet:
@@ -429,6 +450,9 @@ class CoreFactoryHelper:
                 rate_set_id="rate-set",
                 amount_rub=Amount(Amount(amount) * cls.finance_rate_set().rates[currency]),
             ),
+            source=FinanceSource.WEB,
+            author_id="owner",
+            author_label="owner",
         )
 
     @classmethod
@@ -730,3 +754,33 @@ class CoreFactoryHelper:
     @classmethod
     def search_name(cls, value: Any) -> SearchName:
         return SearchName(value)
+
+    @classmethod
+    def telegram_connection(
+        cls,
+        *,
+        owner_username: str = "owner",
+        telegram_user_id: int = 42,
+        connection_id: str = "c" * 32,
+        notify_finance_transaction: bool = True,
+        notify_finance_limit: bool = True,
+    ) -> TelegramConnection:
+        now = datetime(2026, 9, 15, 12, tzinfo=UTC)
+        return TelegramConnection(
+            id=connection_id,
+            owner_username=owner_username,
+            telegram_user_id=telegram_user_id,
+            private_chat_id=telegram_user_id,
+            label="Family",
+            first_name="Boris",
+            username="boris",
+            state=TelegramConnectionState.ACTIVE,
+            requested_at=now,
+            connected_at=now,
+            last_contact_at=now,
+            notify_birthday=False,
+            notify_memorable_date=False,
+            notify_finance_transaction=notify_finance_transaction,
+            notify_finance_limit=notify_finance_limit,
+            language=LanguageEnum.RU,
+        )

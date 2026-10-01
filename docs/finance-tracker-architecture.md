@@ -1,8 +1,8 @@
 # Finance Tracker Architecture
 
-Date: September 22, 2026
+Date: October 1, 2026
 
-Status: architecture with staged delivery
+Status: current-month web tracker, Telegram entry, and finance notifications implemented; historical analytics planned
 
 ## 1. Context
 
@@ -11,9 +11,9 @@ without reproducing a general-purpose spreadsheet engine. It maintains one aggre
 monthly income and expense plans, actual transactions, soft limit visibility, and historical data
 that can be recalculated in different currencies.
 
-The first delivery uses the web application for current-month entry, overview, configuration,
-corrections, and audit access. Telegram transaction entry and historical analytics follow in
-later deliveries.
+The web application provides current-month entry, overview, configuration, corrections, and audit
+access. Telegram provides confirmed transaction entry and subscribed finance notifications.
+Historical analytics remains a later delivery.
 
 The expected data volume is small. The system is therefore designed as a relational module inside
 the existing Personal Workspace modular monolith rather than as a separate service or analytical
@@ -35,7 +35,7 @@ platform.
   hours.
 - Transaction corrections use current-state rows plus immutable revisions and soft deletion.
 - The current month is created lazily and atomically when the web page calls the protected ensure
-  operation. Telegram entry is a later delivery.
+  operation. Telegram may advance an existing tracker through the same month service.
 - One Personal Workspace owner may connect multiple trusted Telegram users to the same tracker.
   Telegram participants have no roles and can only append transactions.
 - The shared Personal Workspace bot owns Telegram connections, invites, and notification settings;
@@ -55,10 +55,10 @@ The feature follows the existing `personal-workspace` layer boundaries:
   Russia dependencies.
 - `infra.postgresql` owns SQLAlchemy models and implementations of finance storage abstractions.
 - `infra.http` owns the Bank of Russia adapter behind a provider-neutral core client interface.
-- `infra.valkey` owns temporary Telegram form state only.
+- aiogram `RedisStorage` over Valkey owns temporary Telegram form state only.
 - `entrypoints.litestar` exposes the protected finance API and uses the shared Personal Workspace
   Telegram webhook.
-- `entrypoints.taskiq` synchronizes exchange rates.
+- `entrypoints.taskiq` synchronizes exchange rates and delivers committed finance events.
 - `infra.ioc` wires adapters and use cases through Dishka.
 - The sibling `frontend` repository owns the Angular workspace pages and navigation.
 
@@ -220,13 +220,14 @@ it matches the immutable category kind.
 - `occurred_at`;
 - non-null `description`;
 - `source` (`web` or `telegram`);
-- author type and identifier;
-- optional Telegram callback/update identifier;
+- immutable `author_id` and `author_label` snapshots (web username or numeric Telegram ID and connection label);
+- confirmed form `operation_id` (empty for web transactions);
 - optimistic `version`;
 - `created_at`, `updated_at`, optional `deleted_at`.
 
-The Telegram identifier has a partial uniqueness constraint for Telegram-created transactions so
-that webhook retries cannot create duplicates.
+The form identifier has a partial uniqueness constraint for Telegram-created transactions. Different
+callback IDs confirming the same form return the saved transaction without another outbox event.
+Source and creator survive connection revocation and subsequent web corrections.
 
 The monetary basis changes only when the transaction's amount, original currency, or occurrence
 date is explicitly edited. Changing the month display currency never rewrites it.
@@ -348,14 +349,14 @@ template provides editable names and ordering; all category plans are unset, dis
 explicit zero. The template never imports amounts or transactions from the reference spreadsheet.
 Changing the interface language later does not change an existing month's currency.
 
-Until the first web initialization completes, future Telegram transaction creation has no valid
-tracker and category context.
+Until the first web initialization completes, Telegram shows an instruction to open Finance on the
+website. The bot never initializes a tracker.
 
 ### 7.2. Lazy month creation
 
-In the first delivery, the current month is created when the web application calls ensure on page
-entry. No midnight scheduler is required. A later Telegram delivery may call the same use case
-after the tracker has been initialized on the web.
+The current month is created when the web application calls ensure on page entry or a Telegram
+participant opens an entry form for an existing tracker. Both use `FinanceMonthService` under the
+tracker lock. No midnight scheduler is required.
 
 Creation runs as an idempotent transaction:
 
@@ -368,7 +369,7 @@ Creation runs as an idempotent transaction:
 6. Persist the transferred closing-balance snapshot.
 7. Rely on `(tracker_id, period_start)` uniqueness as the final race guard.
 
-The web path uses this operation now; the Telegram path is planned for a later delivery.
+Both web and Telegram use this rollover service; their use cases do not call one another.
 
 ### 7.3. Historical corrections
 
@@ -425,12 +426,47 @@ The month currency is presented first at the currency step. The occurrence times
 the current time but may be selected within the current month. Description is optional. Final
 confirmation is mandatory.
 
-Draft state is stored in Valkey under owner and Telegram user ID with an explicit TTL.
-The final confirmation revalidates active connection, current month, category availability, and rate
-selection because those may have changed while the form was open.
+Plain `/start` and `/finance` open a form for an active private-chat participant. `/start <token>`
+retains invitation redemption. Categories are filtered by direction and availability and paginated
+in groups of eight. Amounts accept a decimal point or comma; AMD requires integers and other
+supported currencies allow at most two decimal places. Time is either “Now” or a local
+`DD.MM.YYYY HH:MM` value in the tracker zone. Ambiguous or nonexistent local times are rejected.
+Every step supports back and cancel.
 
-The confirmed operation and its Telegram callback/update idempotency key are persisted atomically
-in PostgreSQL. Telegram retries return the existing outcome or a safe no-op.
+aiogram `RedisStorage` and Redis event isolation store a separate FSM context for bot, private chat,
+participant, owner, and connection, with a 30-minute TTL and absolute form deadline. A form UUID
+and step revision reject old buttons. Connection revocation makes its context unusable; an
+unconfirmed form expires independently of confirmed records. Changing the month or losing the
+selected category invalidates the form.
+
+Confirmation checks access before rate acquisition, then repeats access, owner, month, category,
+amount, and time checks after rate acquisition and database locks. The confirmed operation, form
+identifier, and finance outbox events share one PostgreSQL transaction. Success is sent after
+commit. Temporary failures keep confirmation retryable. A saved confirmation can be recovered by
+its form identifier even after the success response or Valkey data is lost.
+
+### 9.3. Financial outbox and subscriptions
+
+`finance.transaction_by_other` is emitted only for a newly created transaction. Web creations go
+to all subscribed active connections; Telegram creations exclude the numeric Telegram author.
+`finance.expense_limit_exceeded` is emitted after create, update, delete, or restore when rounded
+expenses transition from within a plan to above it, independently for the category and month.
+An unset plan is not a limit; zero is. The existing month's expense-plan calculation determines
+whether a monthly limit exists. Returning within plan rearms the next crossing. Budget and month
+currency edits do not emit events. All subscribed participants, including the author, receive limits.
+
+Finance events and deliveries have separate PostgreSQL tables. Deliveries are unique by
+`(event, connection, type)` and use locked claims with a lease. Every minute TaskIQ plans and sends
+committed events, rechecking source version, deletion state, current limits, connection state,
+account integration and notification switches, and the individual subscription. New subscriptions
+`notifyFinanceTransaction` and `notifyFinanceLimit` start off; calendar settings remain independent.
+Messages follow the connection's RU/EN language. Operation messages show author, direction,
+original amount/currency, and category; limit messages show category/month, plan, expenses, and overrun.
+
+Delivery allows three attempts, retries temporary failures after at least 15 minutes, and expires
+after 24 hours. Permanent errors end delivery. Terminal history is retained for 90 days. A rare
+repeat message remains possible if a worker crashes after Telegram accepts a message but before
+PostgreSQL records its outcome; business transactions remain idempotent.
 
 ## 10. Entry points and authorization boundaries
 
@@ -448,8 +484,8 @@ Transaction create/update requests continue to require a valid category; read re
 
 The protected API exposes domain-oriented operations rather than database-shaped CRUD. The first
 web delivery implements current-month ensure/read, opening balance and currency changes, category
-management, and transaction create/update/soft-delete/restore with revision reads. It does not add
-a statistics page or Telegram transaction form. The broader architecture includes:
+management, and transaction create/update/soft-delete/restore with revision reads. Telegram entry
+uses the shared webhook; historical statistics remain planned. The broader architecture includes:
 
 - tracker initialization and current-month retrieval;
 - idempotent current-month creation;

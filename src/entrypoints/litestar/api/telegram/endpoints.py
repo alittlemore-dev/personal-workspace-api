@@ -13,6 +13,7 @@ from litestar.di import (
 )
 from litestar.exceptions import HTTPException
 
+from core.telegram.enums import TelegramRuntimeStatus
 from core.telegram.schemas import (
     ApproveTelegramConnectionParams,
     CancelTelegramInvitationParams,
@@ -34,10 +35,12 @@ from entrypoints.litestar.api.telegram.dependencies import (
     provide_unblock_connection_params,
     provide_update_connection_settings_params,
 )
+from entrypoints.litestar.api.telegram.guards import require_ready_bot, require_telegram_service
 from entrypoints.litestar.api.telegram.schemas import (
     TelegramConnectionResponse,
     TelegramInvitationResponse,
     TelegramIssuedInvitationResponse,
+    TelegramRuntimeStatusResponse,
     TelegramSettingsResponse,
 )
 from infra.config.settings import settings
@@ -48,7 +51,7 @@ class TelegramApiController(Controller):
     tags = ["telegram"]
     include_in_schema = False
     response_headers = {"Cache-Control": "no-store"}
-    guards = [RequireRole(RoleEnum.USER)]
+    guards = [RequireRole(RoleEnum.USER), require_ready_bot]
 
     @get(
         "",
@@ -67,6 +70,7 @@ class TelegramApiController(Controller):
         owner = request.user.username
         return TelegramSettingsResponse(
             available=settings.telegram.available,
+            status=request.app.state.telegram_runtime_state.status,
             invitations=[
                 TelegramInvitationResponse.from_domain_schema(item)
                 for item in await use_case.list_invitations(
@@ -226,7 +230,10 @@ class TelegramWebhookController(Controller):
         supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
         if not expected or not hmac.compare_digest(supplied, expected):
             raise HTTPException(status_code=403)
-        if not settings.telegram.available:
+        if (
+            not settings.telegram.available
+            or request.app.state.telegram_runtime_state.status != TelegramRuntimeStatus.READY
+        ):
             raise HTTPException(status_code=503)
         update: Any = await request.json()
         if not isinstance(update, dict) or not isinstance(update.get("update_id"), int):
@@ -235,7 +242,19 @@ class TelegramWebhookController(Controller):
         return {"ok": True}
 
 
+class TelegramRuntimeController(Controller):
+    path = "/internal/telegram"
+    include_in_schema = False
+    opt = {"auth_public": True}
+    guards = [require_telegram_service]
+    response_headers = {"Cache-Control": "no-store"}
+
+    @get("/status", name="internal-telegram-runtime-status")
+    async def get_status(self, request: Request) -> TelegramRuntimeStatusResponse:
+        return TelegramRuntimeStatusResponse(status=request.app.state.telegram_runtime_state.status)
+
+
 api_router = DishkaRouter(
     path="",
-    route_handlers=[TelegramApiController, TelegramWebhookController],
+    route_handlers=[TelegramApiController, TelegramWebhookController, TelegramRuntimeController],
 )

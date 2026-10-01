@@ -4,6 +4,12 @@ This roadmap contains the active backlog plus transferred completed capability h
 Calendar, and the Knowledge database. Checked history records what the product already supports;
 unchecked entries remain active work unless a later product decision supersedes them.
 
+## Public system health
+
+- [ ] Build a public system-status page with an extended healthcheck showing overall availability
+  and the state of each service and component, including Telegram bot connectivity. Report which
+  components are working, connecting, or unavailable without exposing credentials or private data.
+
 ## Telegram Bot
 
 Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
@@ -13,8 +19,8 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 - [ ] Configure all notifications and each notification type for every connection.
 - [ ] Deliver birthday and memorable-date reminders to subscribed connections.
 - [ ] Deliver event reminders when calendar events are implemented.
-- [ ] Notify subscribed connections about transactions added by another Telegram participant and soft expense-limit crossings.
-- [ ] Add finance transactions through a confirmed button-driven bot flow.
+- [x] Notify subscribed connections about web/other-participant transactions and category/month expense-limit crossings.
+- [x] Add finance transactions through a confirmed button-driven bot flow with back, cancel, and durable deduplication.
 - [ ] Add TODOs through a button-driven bot flow when TODOs are implemented.
 - [ ] Save links to Recipes, Places, and Watch later through button-driven bot flows when those categories exist.
 
@@ -58,7 +64,8 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
   - [ ] Workspace statistic chosen period
 - [ ] Telegram bot integration
   - [x] Add a Workspace-wide Telegram ON/OFF setting and invitation management.
-  - [ ] Add individual connection notification switches for birthdays, dates, events, and finance.
+  - [x] Add individual connection notification switches for birthdays, memorable dates, transactions, and expense limits.
+  - [ ] Add individual connection event-reminder subscriptions once calendar events exist.
   - [ ] Select available button-driven quick-add categories for the Workspace.
 
 ## Resume

@@ -71,6 +71,15 @@ class TelegramStorage(ABC):
     ) -> TelegramConnection | None: ...
 
     @abstractmethod
+    async def active_connection_for_participant(
+        self,
+        *,
+        telegram_user_id: int,
+        private_chat_id: int,
+        lock: bool,
+    ) -> TelegramConnection | None: ...
+
+    @abstractmethod
     async def has_active_connection(self, *, telegram_user_id: int) -> bool: ...
 
     @abstractmethod

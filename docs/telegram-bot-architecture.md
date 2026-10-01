@@ -1,9 +1,9 @@
 # Personal Workspace Telegram Bot Architecture
 
-Date: September 26, 2026.
+Date: October 1, 2026.
 
-Status: Telegram connections and calendar reminders implemented in code; other scenarios are
-planned.
+Status: Telegram connections, calendar reminders, finance entry, and finance notifications
+implemented in code; other scenarios are planned.
 
 ## 1. Goal and scope
 
@@ -36,10 +36,10 @@ outside the first version.
 - The calendar already reads memorable dates and people's birthdays from the knowledge database
   for the current and next months. Events, reminders, and the per-person "show/notify about
   birthday" filter are planned.
-- The finance tracker, tasks, and the listed link categories are documented but not implemented.
-  `docs/finance-tracker-architecture.md` already specifies one owner, multiple Telegram
-  participants, transaction creation, and actor auditing. This document defines their shared
-  Telegram boundary and replaces the earlier assumption of one bot and token per tracker.
+- The current-month finance tracker and its Telegram entry and notifications are implemented.
+  Tasks and the listed link categories remain planned. `docs/finance-tracker-architecture.md`
+  describes tracker calculations, actor auditing, and finance delivery. This document defines
+  their shared Telegram boundary.
 - `auth-api` owns the per-bot enable switch in `UserModel.settings`. `personal-workspace` owns
   invitations, Telegram connections and chat IDs, its bot token, webhook, and commands. The
   Workspace reads the switch through a protected internal `auth-api` endpoint. The Angular page
@@ -113,7 +113,7 @@ Group chats cannot redeem invitations or run product commands.
 The integration section has a Workspace-wide enable switch, invitations, and participants. Each
 participant row shows an owner-defined label, Telegram ID, username snapshot, connection date,
 state, delivery availability, and last successful contact when known. Actions include approving
-or rejecting a request, changing its label, switching birthday and memorable-date notifications,
+or rejecting a request, changing its label, switching birthday, memorable-date, transaction, and expense-limit notifications,
 revoking the connection, blocking the user, and lifting a block. Destructive actions have a
 clear confirmation and explain their consequences.
 
@@ -123,8 +123,8 @@ deployment secret and is never entered by the owner in web settings. The UI must
 from a single-use invitation token.
 
 The bot has a separate `notify` switch in Auth API, defaulting to off. Each connection stores
-`notify_birthday`, `notify_memorable_date`, and `language` (`ru` or `en`). New connections start
-with both types off and `en`. Reminder scheduling uses the owner's account time zone from Auth
+`notify_birthday`, `notify_memorable_date`, `notify_finance_transaction`, `notify_finance_limit`,
+and `language` (`ru` or `en`). New connections start with all types off and `en`. Reminder scheduling uses the owner's account time zone from Auth
 API, shared by every connection in that Workspace. There is no connection-wide notification
 switch. A person's `notifications_enabled` switch controls birthday reminders;
 a memorable date has its own switch. Both card switches default to on and can suppress future
@@ -137,7 +137,8 @@ roles.
 Each notification event has an `owner_username` and a stable type, such as
 `finance.transaction_by_other`. The sender loads **only active connections for that owner**. For
 each connection it checks the bot enable and notify switches, the type subscription, and the
-source card switch. It then excludes the actor for an "added by someone else" event and calls
+source card switch. It excludes only the Telegram author for a finance transaction event (web operations notify all
+subscribed participants; limits include their author), and calls
 Telegram `sendMessage` separately for each remaining `private_chat_id`. If no connections
 remain, no message is sent.
 
@@ -156,18 +157,20 @@ flow work; unfinished roadmap items do not produce empty switches.
 
 | Domain | Bot action | Notification type | Availability |
 | --- | --- | --- | --- |
-| Finance | Button-guided income/expense → category → amount → currency → date → description → confirmation | `finance.transaction_by_other`: another person added a transaction; `finance.expense_limit_exceeded`: a soft limit was crossed | With finance tracker implementation |
-| Calendar and people | No write action initially | `calendar.birthday`; `calendar.memorable_date` | Data is already read by the calendar; scheduling and source filters are needed |
+| Finance | Button-guided income/expense → category → amount → currency → date → description → confirmation | `finance.transaction_by_other`: another person added a transaction; `finance.expense_limit_exceeded`: a soft limit was crossed | Implemented |
+| Calendar and people | No write action initially | `calendar.birthday`; `calendar.memorable_date` | Implemented for birthdays and memorable dates |
 | Calendar events | No write action initially | `calendar.event_reminder` | After one-time and recurring events exist |
 | Tasks | "Add task" with short guided input | `tasks.due_reminder` if tasks support due dates and reminders | After task and due-date support exists |
 | Links | Recipe, Place, or Watch later button → URL → confirmation | No required notification initially | After those categories exist in the knowledge database or a links domain |
 
 A finance notification about another person's transaction includes the actor, direction, amount,
-currency, and category. Its actor does not receive an echo through
-`finance.transaction_by_other`. Another actor may be a Telegram participant or the web owner. A
-limit notification occurs on a **transition** from within the limit to over it after a confirmed
-data change, rather than after every subsequent transaction. Falling below and crossing again
-produces a new event. Finance notifications are sent only after the PostgreSQL write commits.
+currency, and category. A Telegram actor does not receive an echo through
+`finance.transaction_by_other`; web operations notify all subscribed connections. A limit
+notification includes category or month, plan, actual expenses, and overrun. It occurs on a
+**transition** from within the limit to over it after creation, correction, deletion, or restoration
+of a transaction. Budget or currency edits do not emit events. Unset plans impose no limit; zero
+plans do. Returning within plan rearms a later crossing. Limits notify all subscribers, including
+the author. Finance events are sent only after the PostgreSQL write commits.
 
 Birthday and date sources need their own filters. The existing roadmap item for
 showing/notifying about a particular person's birthday must control event generation before
@@ -190,26 +193,42 @@ the numeric Telegram `user.id` against its own connections. Future product comma
 current connection state from `personal-workspace` before acting; a domain use case never trusts an owner,
 category, or object ID from callback data without an owner-scoped check.
 
-Guided forms use buttons and constrained value input, present a summary before final
-confirmation, and allow cancellation. Temporary draft state with a TTL lives in Valkey; after it
-expires the user starts again. Confirmation rechecks the active connection, integration state,
+Plain `/start` and `/finance` open a finance form; invitation `/start <token>` is preserved.
+The sequence is income/expense → available category (eight per page) → Decimal amount → currency
+(month currency first) → now or local date/time → optional description → confirmation. Back and
+cancel are available. AMD accepts integers; RUB, USD, and EUR accept up to two decimal places.
+Custom `DD.MM.YYYY HH:MM` uses the tracker zone and rejects DST gaps/ambiguities and other months.
+Before initial tracker setup the participant is directed to the web Finance page. Existing
+trackers create missing months through the common rollover service.
+
+aiogram `RedisStorage` and Redis event isolation over Valkey keep contexts per owner/connection
+and participant with a 30-minute absolute deadline and TTL. A form UUID and step revision reject
+stale buttons. Unfinished drafts can expire without affecting PostgreSQL records. Confirmation rechecks the active connection, integration state,
 category ownership, current month, amount, and other domain rules. The confirmed record and the
-Telegram update/callback idempotency key are persisted in one PostgreSQL transaction. A repeated
+confirmed form identifier are persisted in one PostgreSQL transaction. A repeated
 tap, retried webhook, or race between confirmations cannot create another record.
 
-Future change-driven domains create a durable notification event in the same transaction as the
+Finance creates a durable notification event in the same transaction as the
 business change, using a transactional outbox or an equivalent atomic mechanism. After commit,
 background tasks resolve subscribed recipients and send messages. A unique delivery record for
 each (event, connection, type) prevents duplicate internal scheduling and tracks attempts and
 outcome. Before sending, the worker checks the Workspace switch, connection state and preferences, and whether
-the source object is still current. Telegram API failures have bounded retries. Permanent errors
-and a user blocking the bot appear in web settings without undoing the business change.
+the source object is still current. Finance delivery makes at most three attempts, waits at least
+15 minutes after temporary errors,
+and expires events after 24 hours. Permanent errors end delivery without undoing the business
+change. Claimed records use a lease and attempt guard; workers skip locked records.
+Terminal delivery history is retained for 90 days.
 
 A scheduled event key includes its occurrence date, so rerunning the scheduler does not plan
 another delivery. Sending to Telegram and marking success in PostgreSQL cannot be one
 transaction: a crash between them can occasionally duplicate a message. This limitation should
 be disclosed as a delivery property. After a long integration outage, reminders past an explicit
 relevance deadline are skipped rather than sent in a backlog burst.
+
+Finance uses its own outbox and deliveries, unique by event, connection, and type; calendar
+deliveries remain specialized for date reminders. A minute TaskIQ job plans and sends finance
+events after commit, and an hourly cleanup prunes terminal history. Confirmation can return a
+previously saved result even when Valkey state or the initial success response has been lost.
 
 Three TaskIQ schedules handle calendar reminders. Every minute, the planner creates unique
 `PENDING` records for birthdays and memorable dates due in 7 or 1 day, scheduled for 09:00 in
@@ -284,6 +303,24 @@ worker and scheduler boundary for outgoing notifications. Its delivery code can 
 Bot API client without routing an artificial incoming update through the dispatcher. [aiogram
 webhook integration](https://docs.aiogram.dev/en/latest/dispatcher/webhook.html).
 
+Webhook registration runs in a cancellable background task rather than blocking API startup.
+The runtime reports `disabled`, `connecting`, `ready`, or `failed`; attempts have a ten-second
+timeout and retry every thirty seconds. After registration, periodic Bot API checks detect later
+connectivity failures. Logs record exception types without tokens or external exception messages.
+Telegram management mutations and incoming updates return 503 until the local bot runtime is
+ready; the settings read remains available. The web settings page shows connection/failure
+feedback, preserves saved preferences and drafts, and disables Telegram edits until recovery.
+Auth API checks the protected internal status endpoint only when Telegram preferences change,
+so unrelated account preferences remain editable during an outage.
+
+Notification workers require a fresh, expiring readiness lease in Valkey before claiming work.
+Leases are isolated by the deployment slot's auth origin and expire if the backend stops renewing
+them. Missing leases and Valkey failures fail closed; skipped runs do not consume delivery
+attempts. Shutdown cancels connection work, withdraws readiness, and closes clients. This runtime
+status is operational state owned by Personal Workspace, not an account preference or a database
+migration. The internal status endpoint requires the shared service credential and is hidden at
+the public nginx edge.
+
 The bot layer owns Telegram-specific parsing, reply text and buttons, and the steps of guided
 input. Temporary form state may use aiogram's FSM with Valkey-backed Redis storage, explicit
 TTLs, and appropriate event isolation. It must be possible to clear a participant's form when
@@ -323,7 +360,7 @@ button-guided flows. [aiogram FSM storage](https://docs.aiogram.dev/en/latest/di
    states, scheduler, and observability.
 3. Calendar notifications for existing birthdays and memorable dates, followed by events after
    their domain exists.
-4. Finance quick add and notifications with the finance tracker. The shared Telegram model
+4. Implemented: finance quick add and notifications with the finance tracker. The shared Telegram model
    replaces the finance document's former draft bot tables. Tasks and links follow as their
    domains become available.
 

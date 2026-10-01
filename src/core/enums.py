@@ -1,5 +1,8 @@
 from enum import Enum
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
+
+if TYPE_CHECKING:
+    from core.i18n.enums import LanguageEnum
 
 
 class BaseEnum(Enum):
@@ -22,25 +25,16 @@ class StrEnum(str, BaseEnum):
     pass
 
 
-class LabeledStrEnum(StrEnum):
-    label: str
+class TranslationStrEnum(StrEnum):
+    value_ru: str
+    value_en: str
 
-    def __new__(cls, value: str, label: str) -> Self:
+    def __new__(cls, value: str, value_ru: str, value_en: str) -> Self:
         member = str.__new__(cls, value)
         member._value_ = value
-        member.label = label
+        member.value_ru = value_ru
+        member.value_en = value_en
         return member
 
-
-class PublishStatusEnum(LabeledStrEnum):
-    DRAFT = "Draft", "Черновик"
-    PUBLISHED = "Published", "Опубликовано"
-
-    @classmethod
-    def from_storage_value(cls, value: Self | str) -> Self:
-        if isinstance(value, cls):
-            return value
-        try:
-            return cls.from_value(value)
-        except ValueError:
-            return cls[value]
+    def get_translation(self, language: LanguageEnum) -> str:
+        return {"ru": self.value_ru, "en": self.value_en}[language.value]

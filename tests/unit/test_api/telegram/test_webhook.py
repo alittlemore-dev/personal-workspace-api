@@ -6,6 +6,7 @@ from backend_sdk.integrations.litestar import AuthPlugin
 from dishka import AsyncContainer
 from litestar.testing import TestClient
 
+from core.telegram.enums import TelegramRuntimeStatus
 from entrypoints.litestar.initializers.main import create_litestar_app
 from infra.config.settings import settings
 
@@ -25,6 +26,7 @@ def test_valid_webhook_forwards_update_to_dispatcher(
 ) -> None:
     dispatcher = AsyncMock()
     client.app.state.telegram_dispatcher = dispatcher
+    client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus.READY
     monkeypatch.setattr(settings.telegram, "available", True)
     response = client.post(
         "/api/telegram/webhook",
@@ -35,6 +37,42 @@ def test_valid_webhook_forwards_update_to_dispatcher(
     dispatcher.feed_raw_update.assert_awaited_once_with(
         {"update_id": 42, "message": {"message_id": 1}},
     )
+
+
+@pytest.mark.parametrize("runtime_status", ["connecting", "failed", "disabled"])
+def test_unready_webhook_rejects_updates_without_dispatching(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    runtime_status: str,
+) -> None:
+    dispatcher = AsyncMock()
+    client.app.state.telegram_dispatcher = dispatcher
+    client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus(runtime_status)
+    monkeypatch.setattr(settings.telegram, "available", True)
+    response = client.post(
+        "/api/telegram/webhook",
+        json={"update_id": 42},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "TEST_WEBHOOK_SECRET"},
+    )
+    assert response.status_code == 503
+    dispatcher.feed_raw_update.assert_not_awaited()
+
+
+def test_runtime_status_requires_service_secret_and_is_minimal(client: TestClient) -> None:
+    client.app.state.telegram_runtime_state.status = TelegramRuntimeStatus.CONNECTING
+    for supplied in ("", "wrong"):
+        response = client.get(
+            "/api/internal/telegram/status",
+            headers={"X-Telegram-Service-Secret": supplied},
+        )
+        assert response.status_code == 403
+    response = client.get(
+        "/api/internal/telegram/status",
+        headers={"X-Telegram-Service-Secret": settings.telegram.service_secret.get_secret_value()},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"status": "connecting"}
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_webhook_allows_anonymous_telegram_but_management_requires_account(

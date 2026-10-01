@@ -19,6 +19,7 @@ from core.finance.schemas import (
     CreateFinanceTransactionParams,
     DeleteFinanceCategoryParams,
     EnsureFinanceMonthParams,
+    FinanceActor,
     FinanceCategoryName,
     FinanceRateSet,
     SetFinanceCategoryArchivedParams,
@@ -116,7 +117,12 @@ class TestFinanceStorage(StorageTestCase):
             description="Original",
         )
         created = await use_case.create_transaction(
-            CreateFinanceTransactionParams(owner_username="owner", draft=draft, now=now),
+            CreateFinanceTransactionParams(
+                owner_username="owner",
+                draft=draft,
+                now=now,
+                actor=FinanceActor.web("owner"),
+            ),
         )
         updated = await use_case.update_transaction(
             UpdateFinanceTransactionParams(
@@ -132,6 +138,7 @@ class TestFinanceStorage(StorageTestCase):
                 owner_username="owner",
                 draft=replace(draft, amount=Amount(20)),
                 now=now,
+                actor=FinanceActor.web("owner"),
             ),
         )
         deleted = await use_case.set_transaction_deleted(
@@ -285,6 +292,7 @@ class TestFinanceStorage(StorageTestCase):
                     description="Historical",
                 ),
                 now=january,
+                actor=FinanceActor.web("owner"),
             ),
         )
         march_date = datetime(2026, 3, 15, 12, tzinfo=UTC)
@@ -469,6 +477,7 @@ class TestFinanceStorage(StorageTestCase):
                     description="Meal",
                 ),
                 now=now,
+                actor=FinanceActor.web("owner"),
             ),
         )
         converted = await self.factory.core.finance_use_case(storage).change_currency(
@@ -569,6 +578,7 @@ class TestFinanceStorage(StorageTestCase):
                     description="Lunch",
                 ),
                 now=january,
+                actor=FinanceActor.web("owner"),
             ),
         )
         march = await self.factory.core.finance_use_case(storage).ensure_month(
@@ -642,7 +652,12 @@ class TestFinanceStorage(StorageTestCase):
             description="First",
         )
         created = await use_case.create_transaction(
-            CreateFinanceTransactionParams(owner_username="owner", draft=draft, now=now),
+            CreateFinanceTransactionParams(
+                owner_username="owner",
+                draft=draft,
+                now=now,
+                actor=FinanceActor.web("owner"),
+            ),
         )
         assert created.converted_amount == Decimal(10)
         changed = await use_case.update_transaction(
@@ -854,6 +869,7 @@ async def test_creating_transaction_refreshes_a_category_archived_by_another_ses
                     owner_username="owner",
                     now=now,
                     draft=factory.core.finance_transaction_draft(category_id=category.id),
+                    actor=FinanceActor.web("owner"),
                 ),
             ),
         )
@@ -988,6 +1004,7 @@ async def test_transaction_loaded_before_category_delete_refreshes_its_category(
                     description="Meal",
                 ),
                 now=now,
+                actor=FinanceActor.web("owner"),
             ),
         )
         await session.commit()

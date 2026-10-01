@@ -11,6 +11,8 @@ from .finance import FinanceTemplateCategoryModel as FinanceTemplateCategoryMode
 from .finance import FinanceTrackerModel as FinanceTrackerModel
 from .finance import FinanceTransactionModel as FinanceTransactionModel
 from .finance import FinanceTransactionRevisionModel as FinanceTransactionRevisionModel
+from .finance_notifications import FinanceDeliveryModel as FinanceDeliveryModel
+from .finance_notifications import FinanceEventModel as FinanceEventModel
 from .important_info import ImportantInfoModel as ImportantInfoModel
 from .knowledge import KnowledgeDateDetailsModel as KnowledgeDateDetailsModel
 from .knowledge import KnowledgeDatePersonModel as KnowledgeDatePersonModel

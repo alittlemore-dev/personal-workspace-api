@@ -693,6 +693,9 @@ class FinanceDatabaseStorage(FinanceStorage):
     ) -> FinanceTransaction:
         return FinanceTransaction(
             id=model.id,
+            source=model.source,
+            author_id=model.author_id,
+            author_label=model.author_label,
             category_id=model.month_category_id,
             category_name=category.name if category is not None else "",
             kind=model.kind,
@@ -749,6 +752,37 @@ class FinanceDatabaseStorage(FinanceStorage):
                 return self._transaction_view(transaction, category, rate_set, rate, month.currency)
         raise FinanceNotFoundError
 
+    async def confirmed_operation(
+        self,
+        *,
+        owner_username: str,
+        author_id: str,
+        operation_id: str,
+    ) -> FinanceTransaction | None:
+        month = await self.session.scalar(
+            select(FinanceMonthModel)
+            .join(FinanceTrackerModel)
+            .join(FinanceTransactionModel)
+            .where(
+                FinanceTrackerModel.owner_username == owner_username,
+                FinanceTransactionModel.author_id == author_id,
+                FinanceTransactionModel.operation_id == operation_id,
+            )
+            .execution_options(populate_existing=True),
+        )
+        if month is None:
+            return None
+        transaction_id = await self.session.scalar(
+            select(FinanceTransactionModel.id).where(
+                FinanceTransactionModel.month_id == month.id,
+                FinanceTransactionModel.operation_id == operation_id,
+                FinanceTransactionModel.author_id == author_id,
+            ),
+        )
+        if transaction_id is None:
+            return None
+        return await self._transaction_view_by_id(month, transaction_id)
+
     async def create_transaction(
         self,
         *,
@@ -765,6 +799,10 @@ class FinanceDatabaseStorage(FinanceStorage):
             occurred_at=write.params.draft.occurred_at,
             description=write.params.draft.description,
             author_username=write.params.owner_username,
+            source=write.params.actor.source,
+            author_id=write.params.actor.identifier,
+            author_label=write.params.actor.label,
+            operation_id=write.params.actor.operation_id,
             version=1,
             deleted_at=None,
             created_at=write.params.now,

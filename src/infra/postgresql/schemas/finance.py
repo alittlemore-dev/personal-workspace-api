@@ -1,8 +1,11 @@
+from datetime import date
+from decimal import Decimal
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from core.finance.schemas import FinanceTransactionSnapshot
+from core.finance.enums import FinanceCurrency, FinanceKind, FinanceLimitScope
+from core.finance.schemas import Amount, FinanceEventPayload, FinanceTransactionSnapshot
 
 
 class FinanceTransactionSnapshotSchema(BaseModel):
@@ -54,3 +57,41 @@ class FinanceMonthCurrencySnapshotSchema(BaseModel):
 
     opening_balance: str = Field(alias="openingBalance")
     plans: dict[str, str]
+
+
+class FinanceEventPayloadSchema(BaseModel):
+    model_config = ConfigDict(frozen=True, from_attributes=True)
+    month_id: str
+    period_start: date
+    transaction_id: str
+    transaction_version: int
+    author_id: str
+    author_label: str
+    source: str
+    kind: FinanceKind
+    amount: Decimal
+    currency: FinanceCurrency
+    category_id: str | None
+    category_name: str
+    limit_scope: FinanceLimitScope
+    planned_amount: Decimal | None
+    actual_amount: Decimal | None
+
+    def to_domain_schema(self) -> FinanceEventPayload:
+        return FinanceEventPayload(
+            month_id=self.month_id,
+            period_start=self.period_start,
+            transaction_id=self.transaction_id,
+            transaction_version=self.transaction_version,
+            author_id=self.author_id,
+            author_label=self.author_label,
+            source=self.source,
+            kind=self.kind,
+            amount=Amount(self.amount),
+            currency=self.currency,
+            category_id=self.category_id,
+            category_name=self.category_name,
+            limit_scope=self.limit_scope,
+            planned_amount=Amount(self.planned_amount) if self.planned_amount is not None else None,
+            actual_amount=Amount(self.actual_amount) if self.actual_amount is not None else None,
+        )

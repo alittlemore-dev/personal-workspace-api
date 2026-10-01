@@ -192,6 +192,27 @@ class TelegramDatabaseStorage(TelegramStorage):
         )
         return model.to_domain_schema() if model is not None else None
 
+    async def active_connection_for_participant(
+        self,
+        *,
+        telegram_user_id: int,
+        private_chat_id: int,
+        lock: bool,
+    ) -> TelegramConnection | None:
+        query = (
+            select(TelegramConnectionModel)
+            .where(
+                TelegramConnectionModel.telegram_user_id == telegram_user_id,
+                TelegramConnectionModel.private_chat_id == private_chat_id,
+                TelegramConnectionModel.state == TelegramConnectionState.ACTIVE,
+            )
+            .execution_options(populate_existing=True)
+        )
+        if lock:
+            query = query.with_for_update()
+        model = await self.session.scalar(query)
+        return model.to_domain_schema() if model is not None else None
+
     async def has_active_connection(self, *, telegram_user_id: int) -> bool:
         value = await self.session.scalar(
             select(TelegramConnectionModel.id)
@@ -225,6 +246,8 @@ class TelegramDatabaseStorage(TelegramStorage):
             last_contact_at=now,
             notify_birthday=False,
             notify_memorable_date=False,
+            notify_finance_transaction=False,
+            notify_finance_limit=False,
             language=LanguageEnum.EN,
         )
         self.session.add(model)
@@ -284,6 +307,8 @@ class TelegramDatabaseStorage(TelegramStorage):
             .values(
                 notify_birthday=settings.notify_birthday,
                 notify_memorable_date=settings.notify_memorable_date,
+                notify_finance_transaction=settings.notify_finance_transaction,
+                notify_finance_limit=settings.notify_finance_limit,
                 language=settings.language,
             )
             .returning(TelegramConnectionModel),

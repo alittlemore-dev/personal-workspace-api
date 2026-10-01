@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from aiogram import Bot
+from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
 from aiogram.methods import SendMessage
 from dishka import Provider, Scope, make_async_container, provide
 
@@ -47,7 +48,12 @@ async def test_private_start_requests_pending_connection_and_replies() -> None:
     use_case = await container.get(TelegramUseCase)
     transaction = await container.get(TelegramTransaction)
     bot = Bot("123456:TEST_TOKEN")
-    dispatcher = TelegramBotDispatcher.create(container=container, bot=bot)
+    dispatcher = TelegramBotDispatcher.create(
+        container=container,
+        bot=bot,
+        storage=MemoryStorage(),
+        isolation=SimpleEventIsolation(),
+    )
     try:
         with patch.object(Bot, "__call__", new_callable=AsyncMock) as send:
             await dispatcher.feed_raw_update(
@@ -79,7 +85,12 @@ async def test_group_start_cannot_redeem_invitation() -> None:
     use_case = await container.get(TelegramUseCase)
     transaction = await container.get(TelegramTransaction)
     bot = Bot("123456:TEST_TOKEN")
-    dispatcher = TelegramBotDispatcher.create(container=container, bot=bot)
+    dispatcher = TelegramBotDispatcher.create(
+        container=container,
+        bot=bot,
+        storage=MemoryStorage(),
+        isolation=SimpleEventIsolation(),
+    )
     try:
         with patch.object(Bot, "__call__", new_callable=AsyncMock) as send:
             await dispatcher.feed_raw_update(update(chat_type="group", text="/start invite"))
@@ -98,7 +109,12 @@ async def test_capacity_limit_gets_neutral_reply() -> None:
     transaction = await container.get(TelegramTransaction)
     cast("AsyncMock", use_case.request_connection).side_effect = TelegramLimitError
     bot = Bot("123456:TEST_TOKEN")
-    dispatcher = TelegramBotDispatcher.create(container=container, bot=bot)
+    dispatcher = TelegramBotDispatcher.create(
+        container=container,
+        bot=bot,
+        storage=MemoryStorage(),
+        isolation=SimpleEventIsolation(),
+    )
     try:
         with patch.object(Bot, "__call__", new_callable=AsyncMock) as send:
             await dispatcher.feed_raw_update(update(chat_type="private", text="/start invite"))

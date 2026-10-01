@@ -2,6 +2,9 @@ from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 
 from aiogram import Bot
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.fsm.storage.base import DefaultKeyBuilder
+from aiogram.fsm.storage.redis import RedisStorage
 from dishka import AsyncContainer
 from dishka.integrations.litestar import setup_dishka
 from litestar import Litestar, Router
@@ -17,6 +20,7 @@ from litestar.stores.base import Store
 from litestar.stores.valkey import ValkeyStore
 from litestar.types import Middleware
 
+from core.telegram.enums import TelegramRuntimeStatus
 from entrypoints.litestar.api.routers import api_router
 from entrypoints.litestar.cli.plugins import CLIPlugin
 from entrypoints.litestar.exception_handlers import get_litestar_exception_handlers
@@ -31,6 +35,7 @@ from entrypoints.telegram.dispatcher import TelegramBotDispatcher
 from infra.config import loggers
 from infra.config.constants import constants
 from infra.config.settings import settings
+from infra.telegram.runtime import TelegramRuntimeState
 
 Lifespan = Sequence[Callable[[Litestar], AbstractAsyncContextManager] | AbstractAsyncContextManager]
 
@@ -158,9 +163,33 @@ def create_litestar_app(
     )
     setup_dishka(container=container, app=app)
     install_openapi_request_body_metadata()
+    app.state.telegram_runtime_state = TelegramRuntimeState(
+        status=(
+            TelegramRuntimeStatus.CONNECTING
+            if settings.telegram.available
+            else TelegramRuntimeStatus.DISABLED
+        ),
+    )
     if settings.telegram.available:
+        storage = RedisStorage.from_url(
+            settings.valkey.get_url(constants.valkey.databases.response_cache)
+            .get_secret_value()
+            .replace("valkey://", "redis://", 1),
+            key_builder=DefaultKeyBuilder(
+                prefix="workspace_finance_fsm",
+                with_bot_id=True,
+                with_destiny=True,
+            ),
+            state_ttl=constants.finance.draft_ttl_seconds,
+            data_ttl=constants.finance.draft_ttl_seconds,
+        )
         app.state.telegram_dispatcher = TelegramBotDispatcher.create(
             container=container,
-            bot=Bot(settings.telegram.bot_token.get_secret_value()),
+            bot=Bot(
+                settings.telegram.bot_token.get_secret_value(),
+                session=AiohttpSession(timeout=constants.telegram.connection_timeout_seconds),
+            ),
+            storage=storage,
+            isolation=storage.create_isolation(lock_kwargs={"timeout": 120}),
         )
     return app

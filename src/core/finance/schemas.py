@@ -1,10 +1,17 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Self, TypedDict
 from zoneinfo import ZoneInfo
 
-from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
+from core.finance.enums import (
+    FinanceCurrency,
+    FinanceEventKind,
+    FinanceKind,
+    FinanceLimitScope,
+    FinanceRevisionAction,
+    FinanceSource,
+)
 from core.finance.exceptions import (
     FinanceConflictError,
     FinanceNotFoundError,
@@ -158,6 +165,41 @@ class FinanceMonth:
             ).rounded(snapshot.currency),
             categories=categories,
         )
+
+    def crossed_limits(
+        self,
+        before: FinanceMonth,
+        transaction: FinanceTransaction,
+    ) -> list[FinanceEventPayload]:
+        limits = []
+        for category in self.categories:
+            if category.kind != FinanceKind.EXPENSE or category.planned_amount is None:
+                continue
+            previous = before.get_category(category.id)
+            if previous.actual_amount <= category.planned_amount < category.actual_amount:
+                limits.append(
+                    FinanceLimit(
+                        scope=FinanceLimitScope.CATEGORY,
+                        category_id=category.id,
+                        category_name=category.name,
+                        planned=category.planned_amount,
+                        actual=category.actual_amount,
+                    ),
+                )
+        if (
+            self.planned_expense is not None
+            and before.actual_expense <= self.planned_expense < self.actual_expense
+        ):
+            limits.append(
+                FinanceLimit(
+                    scope=FinanceLimitScope.MONTH,
+                    category_id=None,
+                    category_name="",
+                    planned=self.planned_expense,
+                    actual=self.actual_expense,
+                ),
+            )
+        return [FinanceEventPayload.for_limit(self, transaction, limit) for limit in limits]
 
     def get_category(self, category_id: str) -> FinanceCategory:
         for category in self.categories:
@@ -319,6 +361,9 @@ class FinanceTransactionDraft:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceTransaction:
+    source: FinanceSource
+    author_id: str
+    author_label: str
     id: str
     category_id: str | None
     category_name: str
@@ -505,8 +550,41 @@ class ListFinanceTransactionsParams(FinanceMonthParams):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceActor:
+    source: FinanceSource
+    identifier: str
+    label: str
+    connection_id: str
+    telegram_user_id: int | None
+    private_chat_id: int | None
+    operation_id: str
+    month_id: str
+
+    @classmethod
+    def web(cls, owner_username: str) -> FinanceActor:
+        return cls(
+            source=FinanceSource.WEB,
+            identifier=owner_username,
+            label=owner_username,
+            connection_id="",
+            telegram_user_id=None,
+            private_chat_id=None,
+            operation_id="",
+            month_id="",
+        )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TelegramFinanceContextParams:
+    telegram_user_id: int
+    private_chat_id: int
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CreateFinanceTransactionParams(FinanceMonthParams):
     draft: FinanceTransactionDraft
+    actor: FinanceActor
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -589,3 +667,101 @@ class FinanceTransactionDeletionChange:
         return (
             FinanceRevisionAction.DELETE if self.params.deleted else FinanceRevisionAction.RESTORE
         )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceEventPayload:
+    month_id: str
+    period_start: date
+    transaction_id: str
+    transaction_version: int
+    author_id: str
+    author_label: str
+    source: str
+    kind: FinanceKind
+    amount: Amount
+    currency: FinanceCurrency
+    category_id: str | None
+    category_name: str
+    limit_scope: FinanceLimitScope
+    planned_amount: Amount | None
+    actual_amount: Amount | None
+
+    @classmethod
+    def for_limit(
+        cls,
+        month: FinanceMonth,
+        transaction: FinanceTransaction,
+        limit: FinanceLimit,
+    ) -> FinanceEventPayload:
+        return cls(
+            month_id=month.id,
+            period_start=month.period_start,
+            transaction_id=transaction.id,
+            transaction_version=transaction.version,
+            author_id=transaction.author_id,
+            author_label=transaction.author_label,
+            source=transaction.source.value,
+            kind=FinanceKind.EXPENSE,
+            amount=transaction.amount,
+            currency=month.currency,
+            category_id=limit.category_id,
+            category_name=limit.category_name,
+            limit_scope=limit.scope,
+            planned_amount=limit.planned,
+            actual_amount=limit.actual,
+        )
+
+    @classmethod
+    def for_transaction(
+        cls,
+        month: FinanceMonth,
+        transaction: FinanceTransaction,
+    ) -> FinanceEventPayload:
+        return cls(
+            month_id=month.id,
+            period_start=month.period_start,
+            transaction_id=transaction.id,
+            transaction_version=transaction.version,
+            author_id=transaction.author_id,
+            author_label=transaction.author_label,
+            source=transaction.source.value,
+            kind=transaction.kind,
+            amount=transaction.amount,
+            currency=transaction.currency,
+            category_id=transaction.category_id,
+            category_name=transaction.category_name,
+            limit_scope=FinanceLimitScope.CATEGORY,
+            planned_amount=None,
+            actual_amount=None,
+        )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceEvent:
+    owner_username: str
+    kind: FinanceEventKind
+    payload: FinanceEventPayload
+    created_at: datetime
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceEventConfig:
+    lifetime: timedelta
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceLimit:
+    scope: FinanceLimitScope
+    category_id: str | None
+    category_name: str
+    planned: Amount
+    actual: Amount
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConfirmedFinanceOperationParams:
+    actor: FinanceActor
+    owner_username: str
+    now: datetime

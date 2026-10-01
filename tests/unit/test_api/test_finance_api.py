@@ -11,6 +11,7 @@ from core.finance.schemas import (
     CreateFinanceCategoryParams,
     CreateFinanceTransactionParams,
     EnsureFinanceMonthParams,
+    FinanceActor,
     FinanceCategoryName,
 )
 from core.finance.use_cases import FinanceUseCase
@@ -85,8 +86,12 @@ class TestFinanceApi(ApiTestCase):
                     occurred_at=TEST_CURRENT_DATETIME,
                     description="Meal",
                 ),
+                actor=FinanceActor.web(TEST_USERNAME),
             ),
         )
+        assert response.json()["source"] == "web"
+        assert response.json()["authorId"] == "owner"
+        assert response.json()["authorLabel"] == "owner"
         assert isinstance(self.use_case.create_transaction.await_args.args[0].draft.amount, Amount)
 
     def test_list_responses_map_domain_aggregates(self) -> None:

@@ -17,6 +17,7 @@ from core.finance.schemas import (
     CreateFinanceTransactionParams,
     DeleteFinanceCategoryParams,
     EnsureFinanceMonthParams,
+    FinanceActor,
     FinanceCategoryName,
     FinanceMonthParams,
     FinanceTransactionRevisionsParams,
@@ -165,6 +166,7 @@ def provide_create_transaction_params(
         owner_username=month_context.owner_username,
         now=month_context.now,
         draft=data.to_domain_schema(),
+        actor=FinanceActor.web(month_context.owner_username),
     )
 
 

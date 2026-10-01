@@ -76,6 +76,8 @@ class TelegramConnection:
     last_contact_at: datetime
     notify_birthday: bool
     notify_memorable_date: bool
+    notify_finance_transaction: bool
+    notify_finance_limit: bool
     language: LanguageEnum
 
     def require_owner(self, *, owner_username: str) -> None:
@@ -87,6 +89,8 @@ class TelegramConnection:
 class TelegramConnectionSettings:
     notify_birthday: bool
     notify_memorable_date: bool
+    notify_finance_transaction: bool
+    notify_finance_limit: bool
     language: LanguageEnum
 
 

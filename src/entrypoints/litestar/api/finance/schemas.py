@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
+from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction, FinanceSource
 from core.finance.schemas import (
     Amount,
     FinanceMonth,
@@ -110,6 +110,9 @@ class FinanceVersionRequest(CamelCaseSchema):
 
 
 class FinanceTransactionResponse(CamelCaseSchema):
+    source: FinanceSource
+    author_id: str
+    author_label: str
     id: str
     category_id: str | None
     category_name: str

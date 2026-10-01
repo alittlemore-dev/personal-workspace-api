@@ -49,6 +49,8 @@ class ResponseCacheConstants:
 
 
 class TaskiqConstants:
+    send_finance_notifications_task_name: str = "send_finance_notifications"
+    prune_finance_notifications_task_name: str = "prune_finance_notifications"
     queue_name: Literal["personal_workspace_background"] = "personal_workspace_background"
     consumer_group_name: Literal["personal_workspace_background"] = "personal_workspace_background"
     result_prefix: Literal["personal_workspace_taskiq_results"] = (
@@ -70,9 +72,17 @@ class FinanceConstants:
     bank_of_russia_url: str = "https://www.cbr.ru/scripts/XML_daily.asp"
     http_timeout_seconds: int = 10
     sync_interval_seconds: int = 14_400
+    draft_ttl_seconds: int = 1800
+    event_lifetime_seconds: int = 86_400
 
 
 class TelegramConstants:
+    runtime_status_key_prefix: str = "telegram:runtime:"
+    runtime_status_ttl_seconds: int = 90
+    connection_timeout_seconds: int = 10
+    connection_retry_seconds: int = 30
+    connection_check_seconds: int = 30
+    runtime_store_timeout_seconds: int = 3
     redemption_attempt_limit: int = 10
     redemption_attempt_window_seconds: int = 900
     invitation_limit_per_hour: int = 5

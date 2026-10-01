@@ -10,6 +10,7 @@ from aiogram.exceptions import TelegramNetworkError, TelegramServerError
 from aiogram.methods import GetMe, SetWebhook, TelegramMethod
 from aiogram.methods.base import TelegramType
 from aiogram.types import User
+from aiohttp_socks import ProxyConnectionError, ProxyError, ProxyTimeoutError
 from valkey.exceptions import ValkeyError
 
 from infra.config.constants import constants
@@ -18,6 +19,7 @@ from infra.config.settings import TelegramSettings
 from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 TRANSPORT_ERRORS = (TelegramNetworkError, TelegramServerError, TimeoutError)
+PROXY_ERRORS = (ProxyConnectionError, ProxyTimeoutError, ProxyError)
 
 
 class TelegramFailoverSession(BaseSession):
@@ -46,6 +48,24 @@ class TelegramFailoverSession(BaseSession):
     async def set_webhook(self, bot: Bot, index: int, method: SetWebhook) -> bool:
         return await self.request_candidate(bot=bot, method=method, index=index)
 
+    async def request_route(
+        self,
+        *,
+        bot: Bot,
+        method: TelegramMethod[TelegramType],
+        index: int,
+        request_timeout: int | None,
+    ) -> TelegramType:
+        route = self.routes[index]
+        route.api = self.api
+        try:
+            return await route.make_request(bot, method, timeout=request_timeout)
+        except PROXY_ERRORS:
+            raise TelegramNetworkError(
+                method=method,
+                message="Telegram proxy transport failed",
+            ) from None
+
     async def request_candidate(
         self,
         *,
@@ -53,10 +73,13 @@ class TelegramFailoverSession(BaseSession):
         method: TelegramMethod[TelegramType],
         index: int,
     ) -> TelegramType:
-        route = self.routes[index]
-        route.api = self.api
         try:
-            return await route.make_request(bot, method)
+            return await self.request_route(
+                bot=bot,
+                method=method,
+                index=index,
+                request_timeout=None,
+            )
         except TRANSPORT_ERRORS:
             self.cooldowns[index] = monotonic() + constants.telegram.proxy_cooldown_seconds
             raise
@@ -70,10 +93,13 @@ class TelegramFailoverSession(BaseSession):
         index = await self.runtime_status.get_ready_route()
         if index is None or not self.candidate_available(index):
             raise TelegramNetworkError(method=method, message="Telegram transport is unavailable")
-        route = self.routes[index]
-        route.api = self.api
         try:
-            return await route.make_request(bot, method, timeout=timeout)
+            return await self.request_route(
+                bot=bot,
+                method=method,
+                index=index,
+                request_timeout=timeout,
+            )
         except TRANSPORT_ERRORS:
             await self.mark_failed(index, notify_monitor=True)
             raise
@@ -115,6 +141,10 @@ class TelegramFailoverSession(BaseSession):
                 raise_for_status=raise_for_status,
             ):
                 yield chunk
+        except PROXY_ERRORS:
+            await self.mark_failed(index, notify_monitor=True)
+            msg = "Telegram proxy transport failed"
+            raise OSError(msg) from None
         except OSError, TimeoutError:
             await self.mark_failed(index, notify_monitor=True)
             raise

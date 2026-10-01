@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import AsyncGenerator
 from typing import cast
 from unittest.mock import AsyncMock, Mock
 
@@ -13,6 +14,7 @@ from aiogram.exceptions import (
 )
 from aiogram.methods import GetMe, SendMessage
 from aiogram.types import User
+from aiohttp_socks import ProxyConnectionError, ProxyError, ProxyTimeoutError
 from valkey.exceptions import ConnectionError as ValkeyConnectionError
 
 from infra.config.settings import SecretStrExtended, settings
@@ -42,7 +44,10 @@ def transport() -> TelegramFailoverSession:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("error", ["network", "timeout", "server"])
+@pytest.mark.parametrize(
+    "error",
+    ["network", "timeout", "server", "proxy-connection", "proxy-timeout", "proxy-protocol"],
+)
 async def test_failed_send_has_one_attempt_invalidates_route_and_wakes_monitor(
     transport: TelegramFailoverSession,
     monkeypatch: pytest.MonkeyPatch,
@@ -53,14 +58,19 @@ async def test_failed_send_has_one_attempt_invalidates_route_and_wakes_monitor(
         "network": TelegramNetworkError(method=method, message="network"),
         "timeout": TimeoutError(),
         "server": TelegramServerError(method=method, message="server"),
+        "proxy-connection": ProxyConnectionError("PRIVATE_PROXY_PASSWORD"),
+        "proxy-timeout": ProxyTimeoutError("PRIVATE_PROXY_PASSWORD"),
+        "proxy-protocol": ProxyError("PRIVATE_PROXY_PASSWORD"),
     }
     primary = AsyncMock(side_effect=failures[error])
     backup = AsyncMock()
     monkeypatch.setattr(transport.routes[0], "make_request", primary)
     monkeypatch.setattr(transport.routes[1], "make_request", backup)
     bot = Bot(token=TEST_BOT_TOKEN, session=transport)
-    with pytest.raises(type(failures[error])):
+    expected = TelegramNetworkError if error.startswith("proxy-") else type(failures[error])
+    with pytest.raises(expected) as caught:
         await bot(method)
+    assert "PRIVATE_PROXY_PASSWORD" not in str(caught.value)
     primary.assert_awaited_once()
     backup.assert_not_awaited()
     cast("Mock", transport.runtime_status).mark_failed.assert_awaited_once_with(0)
@@ -70,6 +80,47 @@ async def test_failed_send_has_one_attempt_invalidates_route_and_wakes_monitor(
     with pytest.raises(TelegramNetworkError):
         await bot(method)
     assert primary.await_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [ProxyConnectionError, ProxyTimeoutError, ProxyError])
+async def test_proxy_probe_failure_enters_cooldown_without_waiting_for_retry_cycle(
+    transport: TelegramFailoverSession,
+    monkeypatch: pytest.MonkeyPatch,
+    error: type[Exception],
+) -> None:
+    monkeypatch.setattr(
+        transport.routes[0],
+        "make_request",
+        AsyncMock(side_effect=error("PRIVATE_PROXY_PASSWORD")),
+    )
+    with pytest.raises(TelegramNetworkError) as caught:
+        await transport.probe(Bot(token=TEST_BOT_TOKEN, session=transport), 0)
+    assert "PRIVATE_PROXY_PASSWORD" not in str(caught.value)
+    assert not transport.candidate_available(0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [ProxyConnectionError, ProxyTimeoutError, ProxyError])
+async def test_proxy_download_failure_invalidates_route_without_replaying(
+    transport: TelegramFailoverSession,
+    monkeypatch: pytest.MonkeyPatch,
+    error: type[Exception],
+) -> None:
+    async def failed_stream(*_: object, **__: object) -> AsyncGenerator[bytes]:
+        yield b"partial content"
+        message = "PRIVATE_PROXY_PASSWORD"
+        raise error(message)
+
+    monkeypatch.setattr(transport.routes[0], "stream_content", failed_stream)
+    backup = Mock()
+    monkeypatch.setattr(transport.routes[1], "stream_content", backup)
+    with pytest.raises(OSError, match="Telegram proxy transport failed") as caught:
+        _ = [chunk async for chunk in transport.stream_content("https://files.test/content")]
+    assert "PRIVATE_PROXY_PASSWORD" not in str(caught.value)
+    backup.assert_not_called()
+    cast("Mock", transport.runtime_status).mark_failed.assert_awaited_once_with(0)
+    assert transport.wake.is_set()
 
 
 @pytest.mark.asyncio

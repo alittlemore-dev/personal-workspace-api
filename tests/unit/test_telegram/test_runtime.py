@@ -9,6 +9,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter, TelegramUnauthorizedError
 from aiogram.methods import GetMe
 from aiogram.types import User
+from aiohttp_socks import ProxyConnectionError, ProxyError, ProxyTimeoutError
 from taskiq import AsyncTaskiqDecoratedTask
 from valkey.exceptions import ConnectionError as ValkeyConnectionError
 
@@ -46,14 +47,24 @@ def runtime() -> TelegramBotRuntime:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        TelegramNetworkError(method=GetMe(), message="failed"),
+        ProxyConnectionError("failed"),
+        ProxyTimeoutError("failed"),
+        ProxyError("failed"),
+    ],
+)
 async def test_primary_failure_uses_backup_and_recovered_primary_does_not_displace_it(
     runtime: TelegramBotRuntime,
     monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
 ) -> None:
     clock = [0.0]
     monkeypatch.setattr("infra.telegram.bot.monotonic", lambda: clock[0])
     user = User(id=123456, is_bot=True, first_name="Test")
-    primary = AsyncMock(side_effect=[TelegramNetworkError(method=GetMe(), message="failed"), user])
+    primary = AsyncMock(side_effect=[error, user])
     backup = AsyncMock(return_value=user)
     monkeypatch.setattr(runtime.transport.routes[0], "make_request", primary)
     monkeypatch.setattr(runtime.transport.routes[1], "make_request", backup)

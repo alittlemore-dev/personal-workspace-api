@@ -132,11 +132,11 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 
 Each knowledge item has its own subfolder in the Knowledge section of the workspace sidebar.
 
-- [ ] Workspace
-  - [ ] Main page
-    - [x] Important info (in-dashboard CRUD – only text oneline items)
-    - [x] Dates and birthdays (current and next month)
-    - [ ] Recently changed files
+- [ ] Dashboard
+  - [x] Important info (in-dashboard CRUD – only text oneline items)
+  - [x] Dates and birthdays (current and next month)
+  - [ ] Recently changed files
+  - [ ] Vault statistic
 - [ ] Knowledge item
   - [ ] Books
     - [ ] All books page
@@ -230,10 +230,7 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
   - [ ] Techchecks
   - [ ] Techniques
   - [ ] Technologies
-- [ ] Export Obsidian vault to knowledge database
 - [x] Add reminders for knowledge dates and birthdays.
-- [ ] Add extended knowledge database search across item types and fields.
-- [ ] Automate and test backup/restore for the private knowledge object bucket.
 
 ## Refactoring
 

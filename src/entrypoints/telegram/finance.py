@@ -8,10 +8,15 @@ from uuid import uuid4
 
 from aiogram import Bot, F, Router
 from aiogram.enums import ChatType
-from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.storage.base import BaseEventIsolation, BaseStorage, StorageKey
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.fsm.storage.base import BaseEventIsolation, BaseStorage
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+)
 from dishka.integrations.aiogram import FromDishka, inject
 
 from core.finance.enums import FinanceCurrency, FinanceKind, FinanceSource
@@ -36,7 +41,8 @@ from core.i18n.enums import LanguageEnum
 from core.telegram.exceptions import TelegramAccessError, TelegramServiceError
 from core.telegram.schemas import TelegramConnection
 from core.telegram.storages import TelegramTransaction
-from entrypoints.telegram.enums import FinanceConversationText
+from entrypoints.telegram.enums import FinanceConversationText, TelegramNavigationAction
+from entrypoints.telegram.keyboards import conversation_key, main_keyboard, navigation_action
 from infra.config.constants import constants
 
 CATEGORY_PAGE_SIZE = 8
@@ -92,15 +98,11 @@ class FinanceConversation:
             if month is None:
                 await message.answer(
                     FinanceConversationText.INITIALIZE.get_translation(language),
+                    reply_markup=main_keyboard(language),
                     parse_mode=None,
                 )
                 return
-            key = StorageKey(
-                bot_id=self.bot.id,
-                chat_id=message.chat.id,
-                user_id=user.id,
-                destiny=f"{connection.owner_username}:{connection.id}",
-            )
+            key = conversation_key(self.bot.id, connection)
             async with self.isolation.lock(key=key):
                 state = FSMContext(storage=self.storage, key=key)
                 await self.advance(
@@ -119,12 +121,14 @@ class FinanceConversation:
             await transaction.rollback()
             await message.answer(
                 FinanceConversationText.ACCESS.get_translation(language),
+                reply_markup=ReplyKeyboardRemove(),
                 parse_mode=None,
             )
         except FinanceNotFoundError:
             await transaction.rollback()
             await message.answer(
                 FinanceConversationText.INITIALIZE.get_translation(language),
+                reply_markup=main_keyboard(language),
                 parse_mode=None,
             )
         except FinanceRateUnavailableError, TelegramServiceError:
@@ -178,11 +182,24 @@ class FinanceConversation:
             day=1,
         )
         text = message.text or ""
-        if (
+        is_entry = (
+            isinstance(event, Message)
+            and navigation_action(text) == TelegramNavigationAction.FINANCE
+        )
+        is_current_draft = (
             month_is_current
-            and isinstance(event, Message)
-            and text.split("@", 1)[0].split(" ", 1)[0] in ("/finance", "/start")
-        ):
+            and bool(data)
+            and data.get("month_id") == month.id
+            and datetime.fromisoformat(data["expires_at"]) > now
+        )
+        if month_is_current and is_entry and not is_current_draft:
+            if data:
+                await state.clear()
+                await message.answer(
+                    FinanceConversationText.STALE.get_translation(language),
+                    reply_markup=main_keyboard(language),
+                    parse_mode=None,
+                )
             data = {
                 "id": uuid4().hex,
                 "revision": 0,
@@ -196,22 +213,11 @@ class FinanceConversation:
                     c.id for c in sorted(month.categories, key=lambda c: (c.position, c.id))
                 ],
             }
-        elif isinstance(event, Message) and text == "/cancel":
-            await state.clear()
-            await message.answer(
-                FinanceConversationText.CANCELED.get_translation(language),
-                parse_mode=None,
-            )
-            return
-        elif (
-            not month_is_current
-            or not data
-            or data.get("month_id") != month.id
-            or datetime.fromisoformat(data["expires_at"]) <= now
-        ):
+        elif not is_current_draft:
             await state.clear()
             await message.answer(
                 FinanceConversationText.STALE.get_translation(language),
+                reply_markup=main_keyboard(language),
                 parse_mode=None,
             )
             return
@@ -219,7 +225,7 @@ class FinanceConversation:
             if isinstance(event, CallbackQuery):
                 if await self.callback_event(callback=callback, data=data, session=session):
                     return
-            else:
+            elif not is_entry:
                 try:
                     self.input(text=text, data=data, month=month)
                 except ValueError, InvalidOperation, InvalidFinanceDataError:
@@ -237,6 +243,7 @@ class FinanceConversation:
                 await state.clear()
                 await message.answer(
                     FinanceConversationText.STALE.get_translation(language),
+                    reply_markup=main_keyboard(language),
                     parse_mode=None,
                 )
                 return
@@ -257,6 +264,7 @@ class FinanceConversation:
         if callback is None or callback[1] != data["id"] or int(callback[2]) != data["revision"]:
             await message.answer(
                 FinanceConversationText.STALE.get_translation(language),
+                reply_markup=main_keyboard(language),
                 parse_mode=None,
             )
             return True
@@ -265,6 +273,7 @@ class FinanceConversation:
             await state.clear()
             await message.answer(
                 FinanceConversationText.CANCELED.get_translation(language),
+                reply_markup=main_keyboard(language),
                 parse_mode=None,
             )
             return True
@@ -284,6 +293,7 @@ class FinanceConversation:
                 await state.clear()
                 await message.answer(
                     FinanceConversationText.STALE.get_translation(language),
+                    reply_markup=main_keyboard(language),
                     parse_mode=None,
                 )
                 return True
@@ -291,6 +301,7 @@ class FinanceConversation:
                 await state.clear()
                 await message.answer(
                     FinanceConversationText.SAVED.get_translation(language),
+                    reply_markup=main_keyboard(language),
                     parse_mode=None,
                 )
                 return True
@@ -325,6 +336,7 @@ class FinanceConversation:
                     await state.clear()
                 await message.answer(
                     FinanceConversationText.SAVED.get_translation(language),
+                    reply_markup=main_keyboard(language),
                     parse_mode=None,
                 )
                 return True
@@ -567,17 +579,6 @@ async def handle_finance(
 
 def create_finance_router() -> Router:
     router = Router(name="telegram_finance")
-    router.message.register(
-        handle_finance,
-        Command("finance", "cancel"),
-        F.chat.type == ChatType.PRIVATE,
-    )
-    router.message.register(
-        handle_finance,
-        CommandStart(deep_link=False),
-        F.text.regexp(r"^/start(?:@\w+)?$"),
-        F.chat.type == ChatType.PRIVATE,
-    )
     router.callback_query.register(handle_finance, F.data.startswith("fin:"))
     router.message.register(handle_finance, F.chat.type == ChatType.PRIVATE)
     return router

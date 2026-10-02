@@ -10,6 +10,7 @@ from aiogram.types import Update, User
 from core.telegram.enums import TelegramRuntimeStatus
 from infra.config.settings import settings
 from infra.telegram.bot import TelegramFailoverSession
+from infra.telegram.commands import TelegramCommandMenu
 from infra.telegram.polling import TelegramPollingReceiver
 from infra.telegram.runtime import TelegramBotRuntime, TelegramRuntimeState
 from infra.valkey.telegram_delivery import TelegramDeliveryLease, TelegramDeliveryLeaseLostError
@@ -18,6 +19,7 @@ from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 @pytest.fixture
 def polling_runtime(monkeypatch: pytest.MonkeyPatch) -> TelegramBotRuntime:
+    monkeypatch.setattr(TelegramCommandMenu, "configure", AsyncMock())
     monkeypatch.setattr(settings.telegram, "delivery_mode", "polling")
     transport = Mock(spec=TelegramFailoverSession)
     transport.routes = (Mock(), Mock())
@@ -93,6 +95,7 @@ async def test_polling_reports_ready_after_response_and_confirms_only_handled_up
     assert calls[1].timeout is not None
     assert calls[1].timeout > 0
     assert calls[0].allowed_updates == ["message", "callback_query"]
+    cast("AsyncMock", TelegramCommandMenu.configure).assert_awaited_once_with(0)
 
 
 @pytest.mark.asyncio

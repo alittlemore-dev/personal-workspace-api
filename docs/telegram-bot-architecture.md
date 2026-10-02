@@ -194,7 +194,25 @@ the numeric Telegram `user.id` against its own connections. Future product comma
 current connection state from `personal-workspace` before acting; a domain use case never trusts an owner,
 category, or object ID from callback data without an owner-scoped check.
 
-Plain `/start` and `/finance` open a finance form; invitation `/start <token>` is preserved.
+Plain `/start` and `/menu` show a persistent reply keyboard with Finance, Help, and Cancel.
+Finance and `/finance` open a finance form or resume a valid unfinished draft without changing its
+operation identifier or absolute deadline. Reopening a step advances its button revision. Help
+and menu leave drafts untouched; Cancel discards the draft even before tracker setup. The menu
+requires an active connection and the Workspace integration switch, but no initialized tracker.
+Invitation `/start <token>` is preserved. Expired drafts and drafts from another month cannot be
+resumed; Finance starts a new form with an explanation. Amounts, descriptions, and custom dates
+remain plain-text input. Unknown commands never become transaction descriptions.
+
+The menu and form use the connection language (RU/EN), and both translated button labels are
+recognized after a language change. Completion and cancellation restore the reply keyboard;
+the finance steps retain inline keyboards. Existing chats receive the menu on their next incoming
+interaction, without a broadcast. New chats use Telegram's standard Start button.
+
+The delivery runtime registers Start, Menu, Finance, Help, and Cancel commands for private chats
+with RU/EN descriptions and a general English list, and configures Telegram's command menu
+button. Webhook and polling delivery retry optional menu setup after temporary failures without
+blocking update handling; registration respects API retry-after delays.
+
 The sequence is income/expense → available category (eight per page) → Decimal amount → currency
 (month currency first) → now or local date/time → optional description → confirmation. Back and
 cancel are available. AMD accepts integers; RUB, USD, and EUR accept up to two decimal places.

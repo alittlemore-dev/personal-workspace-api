@@ -12,6 +12,7 @@ from infra.config.constants import constants
 from infra.config.loggers import log_sanitized_exception
 from infra.config.settings import settings
 from infra.telegram.bot import TRANSPORT_ERRORS, TelegramFailoverSession
+from infra.telegram.commands import TelegramCommandMenu
 from infra.telegram.polling import TelegramPollingReceiver
 from infra.valkey.telegram_delivery import TelegramDeliveryLease
 from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
@@ -105,6 +106,12 @@ class TelegramBotRuntime:
         active: int | None = None
         registered: int | None = None
         backup_cursor = 0
+        command_menu = TelegramCommandMenu(
+            bot=self.bot,
+            transport=self.transport,
+            registered=False,
+            next_attempt_at=0,
+        )
         while True:
             self.transport.wake.clear()
             try:
@@ -115,6 +122,7 @@ class TelegramBotRuntime:
                 await self.delivery_lease.ensure_owned()
                 await self.status_store.publish_ready(active)
                 self.state.status = TelegramRuntimeStatus.READY
+                await command_menu.configure(active)
                 backup_cursor = await self.check_backup(active, backup_cursor)
             except Exception as exc:  # noqa: BLE001
                 await self.delivery_lease.ensure_owned()

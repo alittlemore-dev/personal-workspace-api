@@ -62,6 +62,12 @@ class TelegramParticipant:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ResolveTelegramConnectionParams:
+    telegram_user_id: int
+    private_chat_id: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TelegramConnection:
     id: str
     owner_username: str

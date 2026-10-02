@@ -1,4 +1,65 @@
-from core.enums import TranslationStrEnum
+from core.enums import StrEnum, TranslationStrEnum
+
+
+class TelegramNavigationAction(StrEnum):
+    MENU = "menu"
+    FINANCE = "finance"
+    HELP = "help"
+    CANCEL = "cancel"
+    UNKNOWN = "unknown"
+
+
+class TelegramNavigationText(TranslationStrEnum):
+    FINANCE = ("finance", "Финансы", "Finance")
+    HELP = ("help", "Помощь", "Help")
+    CANCEL = ("cancel", "Отмена", "Cancel")
+    MENU = (
+        "menu",
+        "Добро пожаловать в Personal Workspace. Выберите действие кнопками ниже.",
+        "Welcome to Personal Workspace. Choose an action using the buttons below.",
+    )
+    FINANCE_ENTRY = (
+        "finance_entry",
+        "Финансы: добавьте операцию или продолжите текущую. «Отмена» сбросит её.",
+        "Finance: continue your current transaction or start a new one. Use Cancel to discard it.",
+    )
+    HELP_MESSAGE = (
+        "help_message",
+        (
+            "«Финансы» — добавить доход или расход либо продолжить незавершённую операцию. "
+            "«Отмена» — отменить операцию. Выборы доступны кнопками под сообщениями. "
+            "Сумму, описание и другую дату вводите обычным текстом. "
+            "Для подключения откройте приглашение владельца Workspace и дождитесь подтверждения. "
+            "Команды тоже доступны: /start, /menu, /finance, /help, /cancel."
+        ),
+        (
+            "Finance adds income or expenses, or resumes your unfinished transaction. "
+            "Cancel discards the transaction. Use the buttons below messages to select options. "
+            "Enter amounts, descriptions and custom dates as plain text. "
+            "To connect, open the Workspace owner's invitation and wait for approval. "
+            "Commands are also available: /start, /menu, /finance, /help, /cancel."
+        ),
+    )
+    NOTHING_TO_CANCEL = (
+        "nothing_to_cancel",
+        "Нет незавершённой операции. Выберите действие кнопками ниже.",
+        "There is no unfinished transaction. Choose an action using the buttons below.",
+    )
+    UNKNOWN = (
+        "unknown",
+        "Выберите действие кнопками ниже. «Финансы» также продолжит незавершённую операцию.",
+        "Choose an action using the buttons below. Finance also resumes an unfinished transaction.",
+    )
+    ACCESS = (
+        "access",
+        "Для доступа откройте приглашение владельца Workspace и дождитесь подтверждения.",
+        "To access the bot, open the Workspace owner's invitation and wait for approval.",
+    )
+    RETRY = (
+        "retry",
+        "Бот временно недоступен. Попробуйте позже.",
+        "The bot is temporarily unavailable. Try again later.",
+    )
 
 
 class FinanceConversationText(TranslationStrEnum):
@@ -79,8 +140,8 @@ class FinanceConversationText(TranslationStrEnum):
     )
     STALE = (
         "stale",
-        "Форма устарела. Начните заново: /finance.",
-        "This form has expired. Start again: /finance.",
+        "Форма устарела. Нажмите «Финансы», чтобы продолжить или начать заново.",
+        "This form has expired. Press Finance to continue or start again.",
     )
     INVALID = (
         "invalid",

@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, cast
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -19,9 +19,9 @@ from aiogram.exceptions import (
 )
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
-from aiogram.methods import AnswerCallbackQuery, SendMessage
+from aiogram.methods import AnswerCallbackQuery, GetMe, SendMessage
 from aiogram.methods.base import TelegramMethod, TelegramType
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, User
 from dishka import Provider, Scope, make_async_container, provide
 
 from core.finance.enums import FinanceKind, FinanceSource
@@ -33,6 +33,7 @@ from core.telegram.enums import TelegramConnectionState
 from core.telegram.exceptions import TelegramAccessError, TelegramServiceError
 from core.telegram.schemas import TelegramConnection
 from core.telegram.storages import TelegramTransaction
+from core.telegram.use_cases import TelegramUseCase
 from entrypoints.telegram.dispatcher import TelegramBotDispatcher
 from infra.telegram.reminder_sender import AiogramReminderSender
 from tests.helpers.factory import FactoryHelper
@@ -58,6 +59,11 @@ class FinanceBotApiSession(BaseSession):
         _ = (bot, timeout)
         if isinstance(method, SendMessage):
             self.calls.append(method)
+        if isinstance(method, GetMe):
+            return cast(
+                "TelegramType",
+                User(id=bot.id, is_bot=True, first_name="Test", username="TEST_BOT"),
+            )
         return cast("TelegramType", True)
 
     async def stream_content(
@@ -110,6 +116,8 @@ class FinanceBotHarness:
             notify_finance_limit=False,
             language=LanguageEnum.EN,
         )
+        self.telegram_use_case = cast("Mock", await self.container.get(TelegramUseCase))
+        self.telegram_use_case.resolve_active_connection = AsyncMock(return_value=self.connection)
         factory = FactoryHelper()
         self.month = factory.core.finance_month(
             categories=[
@@ -193,6 +201,171 @@ async def harness() -> AsyncGenerator[FinanceBotHarness]:
         await harness.close()
 
 
+@pytest.mark.parametrize("text", ["/start", "/menu", "/help", "hello"])
+async def test_entry_shows_persistent_menu_without_opening_finance(
+    harness: FinanceBotHarness,
+    text: str,
+) -> None:
+    await harness.feed(text)
+    keyboard = harness.calls[-1].reply_markup
+    assert isinstance(keyboard, ReplyKeyboardMarkup)
+    assert keyboard.is_persistent is True
+    assert keyboard.resize_keyboard is True
+    assert keyboard.one_time_keyboard is False
+    assert [button.text for row in keyboard.keyboard for button in row] == [
+        "Finance",
+        "Help",
+        "Cancel",
+    ]
+    harness.use_case.telegram_context.assert_not_awaited()
+
+
+async def test_button_only_expense_entry_and_resume_preserve_draft(
+    harness: FinanceBotHarness,
+) -> None:
+    await harness.feed("/start")
+    await harness.feed("Finance")
+    await harness.choose("expense")
+    await harness.choose("cat_0")
+    await harness.feed("12,50")
+    old_currency = harness.button("USD")
+    key = StorageKey(bot_id=harness.bot.id, chat_id=42, user_id=42, destiny="owner:" + "c" * 32)
+    before = await harness.storage.get_data(key)
+    await harness.feed("Help")
+    await harness.feed("/start")
+    assert await harness.storage.get_data(key) == before
+    await harness.feed("Finance")
+    resumed = await harness.storage.get_data(key)
+    assert resumed["id"] == before["id"]
+    assert resumed["expires_at"] == before["expires_at"]
+    assert resumed["amount"] == "12.50"
+    assert resumed["revision"] > before["revision"]
+    assert harness.button("USD") != old_currency
+    await harness.choose("USD")
+    await harness.choose("now")
+    await harness.choose("skip")
+    await harness.choose("confirm")
+    assert harness.calls[-1].text == "Transaction saved."
+    assert isinstance(harness.calls[-1].reply_markup, ReplyKeyboardMarkup)
+    assert await harness.storage.get_data(key) == {}
+
+
+@pytest.mark.parametrize("language", list(LanguageEnum))
+async def test_translated_menu_buttons_work_after_language_change(
+    harness: FinanceBotHarness,
+    language: LanguageEnum,
+) -> None:
+    connection = replace(harness.connection, language=language)
+    harness.telegram_use_case.resolve_active_connection.return_value = connection
+    harness.use_case.telegram_context.return_value = (connection, harness.month)
+    await harness.feed("/start")
+    keyboard = harness.calls[-1].reply_markup
+    assert isinstance(keyboard, ReplyKeyboardMarkup)
+    labels = [button.text for row in keyboard.keyboard for button in row]
+    assert labels == (
+        ["Финансы", "Помощь", "Отмена"]
+        if language == LanguageEnum.RU
+        else ["Finance", "Help", "Cancel"]
+    )
+    await harness.feed("Finance" if language == LanguageEnum.RU else "Финансы")
+    await harness.choose("expense")
+    await harness.feed("Cancel" if language == LanguageEnum.RU else "Отмена")
+    assert isinstance(harness.calls[-1].reply_markup, ReplyKeyboardMarkup)
+    key = StorageKey(bot_id=harness.bot.id, chat_id=42, user_id=42, destiny="owner:" + "c" * 32)
+    assert await harness.storage.get_data(key) == {}
+    await harness.feed("/finance")
+    await harness.choose("expense")
+
+
+@pytest.mark.parametrize("text", ["/cancel", "/cancel@TEST_BOT", "Cancel", "Отмена"])
+async def test_cancel_without_tracker_or_draft_keeps_menu_available(
+    harness: FinanceBotHarness,
+    text: str,
+) -> None:
+    harness.use_case.telegram_context.return_value = (harness.connection, None)
+    await harness.feed(text)
+    assert "no unfinished transaction" in harness.calls[-1].text
+    assert isinstance(harness.calls[-1].reply_markup, ReplyKeyboardMarkup)
+    harness.use_case.telegram_context.assert_not_awaited()
+    await harness.feed("Finance")
+    assert "initialize" in harness.calls[-1].text
+    assert isinstance(harness.calls[-1].reply_markup, ReplyKeyboardMarkup)
+
+
+async def test_unknown_command_does_not_become_a_transaction_description(
+    harness: FinanceBotHarness,
+) -> None:
+    await harness.feed("Finance")
+    await harness.choose("expense")
+    await harness.choose("cat_0")
+    await harness.feed("10")
+    await harness.choose("USD")
+    await harness.choose("now")
+    key = StorageKey(bot_id=harness.bot.id, chat_id=42, user_id=42, destiny="owner:" + "c" * 32)
+    before = await harness.storage.get_data(key)
+    await harness.feed("/not_a_command")
+    assert await harness.storage.get_data(key) == before
+    await harness.feed("Dinner")
+    await harness.choose("confirm")
+    assert harness.use_case.create_transaction.call_args.args[0].draft.description == "Dinner"
+
+
+@pytest.mark.parametrize("mode", ["expired", "another_month"])
+async def test_finance_entry_replaces_unusable_draft_with_an_explanation(
+    harness: FinanceBotHarness,
+    mode: str,
+) -> None:
+    await harness.feed("Finance")
+    await harness.choose("expense")
+    key = StorageKey(bot_id=harness.bot.id, chat_id=42, user_id=42, destiny="owner:" + "c" * 32)
+    old = await harness.storage.get_data(key)
+    if mode == "expired":
+        harness.time_provider.now += timedelta(hours=1)
+    else:
+        harness.month = replace(harness.month, id="next_month", period_start=date(2026, 10, 1))
+        harness.use_case.telegram_context.return_value = (harness.connection, harness.month)
+        harness.time_provider.now = harness.time_provider.now.replace(month=10, day=1)
+    start = len(harness.calls)
+    await harness.feed("Finance")
+    current = await harness.storage.get_data(key)
+    assert current["id"] != old["id"]
+    assert current["step"] == "kind"
+    assert any("expired" in call.text for call in harness.calls[start:])
+    harness.use_case.create_transaction.assert_not_awaited()
+
+
+@pytest.mark.parametrize("text", ["/start", "Finance", "Help", "Cancel"])
+async def test_unavailable_navigation_access_removes_keyboard(
+    harness: FinanceBotHarness,
+    text: str,
+) -> None:
+    harness.telegram_use_case.resolve_active_connection.side_effect = TelegramAccessError
+    await harness.feed(text)
+    assert "invitation" in harness.calls[-1].text
+    assert isinstance(harness.calls[-1].reply_markup, ReplyKeyboardRemove)
+    harness.use_case.telegram_context.assert_not_awaited()
+
+
+async def test_button_only_income_entry(harness: FinanceBotHarness) -> None:
+    harness.month = replace(
+        harness.month,
+        categories=[replace(harness.month.categories[0], kind=FinanceKind.INCOME)],
+    )
+    harness.use_case.telegram_context.return_value = (harness.connection, harness.month)
+    await harness.feed("Finance")
+    await harness.choose("income")
+    await harness.choose("cat_0")
+    await harness.feed("250")
+    await harness.choose("USD")
+    await harness.choose("now")
+    await harness.choose("skip")
+    await harness.choose("confirm")
+    assert harness.calls[-1].text == "Transaction saved."
+    assert harness.use_case.create_transaction.call_args.args[0].draft.category_id == (
+        harness.month.categories[0].id
+    )
+
+
 async def test_guided_expense_confirms_with_trusted_actor_and_commit(
     harness: FinanceBotHarness,
 ) -> None:
@@ -273,7 +446,7 @@ async def test_old_buttons_and_expired_forms_cannot_change_input(
 async def test_pagination_uses_short_callbacks_and_cancel_clears_state(
     harness: FinanceBotHarness,
 ) -> None:
-    await harness.feed("/start")
+    await harness.feed("/finance")
     await harness.choose("expense")
     keyboard = harness.calls[-1].reply_markup
     assert isinstance(keyboard, InlineKeyboardMarkup)

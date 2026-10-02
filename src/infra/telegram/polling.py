@@ -10,6 +10,7 @@ from core.telegram.enums import TelegramRuntimeStatus
 from infra.config.constants import constants
 from infra.config.loggers import log_sanitized_exception, logger
 from infra.telegram.bot import TRANSPORT_ERRORS
+from infra.telegram.commands import TelegramCommandMenu
 
 if TYPE_CHECKING:
     from infra.telegram.runtime import TelegramBotRuntime
@@ -37,6 +38,12 @@ class TelegramPollingReceiver:
         registered: int | None = None
         offset: int | None = None
         backup_cursor = 0
+        command_menu = TelegramCommandMenu(
+            bot=runtime.bot,
+            transport=runtime.transport,
+            registered=False,
+            next_attempt_at=0,
+        )
         while True:
             runtime.transport.wake.clear()
             try:
@@ -76,6 +83,8 @@ class TelegramPollingReceiver:
                     offset = update.update_id + 1
                     if isinstance(error, (*TRANSPORT_ERRORS, TelegramRetryAfter)):
                         raise error
+                await runtime.delivery_lease.ensure_owned()
+                await command_menu.configure(active)
                 backup_cursor = await runtime.check_backup(active, backup_cursor)
             except (*TRANSPORT_ERRORS, TelegramRetryAfter) as exc:
                 await runtime.delivery_lease.ensure_owned()

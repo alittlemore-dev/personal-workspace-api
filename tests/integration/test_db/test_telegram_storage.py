@@ -10,6 +10,7 @@ from core.telegram.schemas import (
     CreateTelegramInvitationParams,
     InvitationToken,
     RequestTelegramConnectionParams,
+    ResolveTelegramConnectionParams,
     SetTelegramConnectionSettingsParams,
     TelegramConnectionSettings,
     TelegramParticipant,
@@ -23,6 +24,60 @@ NOW = datetime(2026, 9, 26, 12, tzinfo=UTC)
 
 
 class TestTelegramStorage(StorageTestCase):
+    @pytest.mark.parametrize(
+        "mode",
+        ["active", "pending", "revoked", "blocked", "disabled", "user", "chat", "unavailable"],
+    )
+    async def test_menu_context_requires_current_private_connection_without_tracker(
+        self,
+        mode: str,
+    ) -> None:
+        storage = TelegramDatabaseStorage(session=self.db_session)
+        connection = await storage.create_pending_connection(
+            owner_username="owner",
+            participant=TelegramParticipant(
+                user_id=42,
+                private_chat_id=42,
+                first_name="Boris",
+                username="boris",
+            ),
+            label="Family",
+            now=NOW,
+        )
+        if mode != "pending":
+            connection = await storage.set_connection_state(
+                connection_id=connection.id,
+                state=(
+                    TelegramConnectionState(mode)
+                    if mode in ("blocked", "revoked")
+                    else TelegramConnectionState.ACTIVE
+                ),
+                now=NOW,
+            )
+        reader = AsyncMock()
+        reader.is_enabled.return_value = mode != "disabled"
+        use_case = TelegramUseCase(
+            storage=storage,
+            settings_reader=reader,
+            token_generator=Mock(),
+            config=TelegramUseCaseConfig(
+                bot_username="test_bot",
+                invitation_limit=5,
+                connection_limit=20,
+                available=mode != "unavailable",
+            ),
+            limiter=None,
+        )
+        params = ResolveTelegramConnectionParams(
+            telegram_user_id=43 if mode == "user" else 42,
+            private_chat_id=43 if mode == "chat" else 42,
+        )
+        if mode == "active":
+            assert await use_case.resolve_active_connection(params=params) == connection
+        else:
+            with pytest.raises(TelegramAccessError):
+                await use_case.resolve_active_connection(params=params)
+
     async def test_issued_link_creates_one_pending_connection_and_cannot_be_reused(self) -> None:
         reader = AsyncMock()
         reader.is_enabled.return_value = True

@@ -17,6 +17,7 @@ from core.telegram.schemas import (
     ListTelegramInvitationsParams,
     RenameTelegramConnectionParams,
     RequestTelegramConnectionParams,
+    ResolveTelegramConnectionParams,
     SetTelegramConnectionSettingsParams,
     TelegramConnection,
     TelegramInvitation,
@@ -36,6 +37,24 @@ class TelegramUseCase:
     token_generator: InvitationTokenGenerator
     config: TelegramUseCaseConfig
     limiter: TelegramRedemptionLimiter | None
+
+    async def resolve_active_connection(
+        self,
+        *,
+        params: ResolveTelegramConnectionParams,
+    ) -> TelegramConnection:
+        if not self.config.available:
+            raise TelegramAccessError
+        connection = await self.storage.active_connection_for_participant(
+            telegram_user_id=params.telegram_user_id,
+            private_chat_id=params.private_chat_id,
+            lock=False,
+        )
+        if connection is None or not await self.settings_reader.is_enabled(
+            owner_username=connection.owner_username,
+        ):
+            raise TelegramAccessError
+        return connection
 
     async def create_invitation(
         self,

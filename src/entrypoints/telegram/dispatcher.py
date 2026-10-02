@@ -26,6 +26,7 @@ from core.telegram.schemas import (
 from core.telegram.storages import TelegramTransaction
 from core.telegram.use_cases import TelegramUseCase
 from entrypoints.telegram.finance import FinanceConversation, create_finance_router
+from entrypoints.telegram.navigation import TelegramNavigation, create_navigation_router
 
 
 @inject
@@ -83,17 +84,19 @@ class TelegramBotDispatcher:
         router = Router(name="telegram_connections")
         router.message.register(
             handle_start,
-            CommandStart(),
             F.chat.type == ChatType.PRIVATE,
             F.text.regexp(r"^/start(?:@\w+)?\s"),
+            CommandStart(),
         )
         dispatcher = Dispatcher(
             disable_fsm=True,
             storage=storage,
             events_isolation=isolation,
             conversation=FinanceConversation(bot=bot, storage=storage, isolation=isolation),
+            navigation=TelegramNavigation(bot=bot, storage=storage, isolation=isolation),
         )
         dispatcher.include_router(router)
+        dispatcher.include_router(create_navigation_router())
         dispatcher.include_router(create_finance_router())
         setup_dishka(container=container, router=dispatcher)
         return cls(bot=bot, dispatcher=dispatcher)

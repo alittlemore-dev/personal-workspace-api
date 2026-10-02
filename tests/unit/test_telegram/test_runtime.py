@@ -19,13 +19,15 @@ from entrypoints.taskiq.notifications.tasks import send_reminders
 from infra.config.constants import constants
 from infra.config.settings import SecretStrExtended, settings
 from infra.telegram.bot import create_telegram_bot
+from infra.telegram.commands import TelegramCommandMenu
 from infra.telegram.runtime import TelegramBotRuntime, TelegramRuntimeState
 from infra.valkey.telegram_delivery import TelegramDeliveryLease
 from infra.valkey.telegram_runtime import TelegramRuntimeStatusStore
 
 
 @pytest.fixture
-def runtime() -> TelegramBotRuntime:
+def runtime(monkeypatch: pytest.MonkeyPatch) -> TelegramBotRuntime:
+    monkeypatch.setattr(TelegramCommandMenu, "configure", AsyncMock())
     config = settings.telegram.model_copy(
         update={
             "proxy_urls": [
@@ -135,6 +137,8 @@ async def test_total_outage_recovers_and_publishes_ready_only_after_webhook(
     assert [call.args[0] for call in store.publish_ready.await_args_list] == [1, 0]
     store.publish.assert_awaited_once_with(TelegramRuntimeStatus.FAILED)
     assert "PRIVATE_TOKEN" not in capsys.readouterr().out
+    cast("AsyncMock", TelegramCommandMenu.configure).assert_any_await(1)
+    cast("AsyncMock", TelegramCommandMenu.configure).assert_any_await(0)
 
 
 @pytest.mark.asyncio

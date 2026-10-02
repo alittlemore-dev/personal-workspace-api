@@ -1,8 +1,9 @@
 # Roadmap
 
-This roadmap contains the active backlog plus transferred completed capability history for Resume,
-Calendar, and the Knowledge database. Checked history records what the product already supports;
-unchecked entries remain active work unless a later product decision supersedes them.
+This roadmap contains the active backlog and completed capability history for Personal Workspace.
+Statuses were checked against the current backend and shared frontend code, including uncommitted
+changes, on October 2, 2026. Checked entries record implemented capabilities; unchecked entries
+remain active work unless a later product decision supersedes them.
 
 ## Public system health
 
@@ -16,9 +17,9 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 
 - [x] Connect multiple Telegram accounts to one Personal Workspace through one-time invitations.
 - [x] Manage pending, active, revoked, and blocked connections in web settings.
-- [ ] Configure all notifications and each notification type for every connection.
-- [ ] Deliver birthday and memorable-date reminders to subscribed connections.
-- [ ] Deliver event reminders when calendar events are implemented.
+- [x] Configure Workspace-wide notifications and per-connection subscriptions for birthdays, memorable dates, transactions, and expense limits.
+- [x] Deliver birthday and memorable-date reminders to subscribed connections.
+- [ ] Deliver reminders for calendar events.
 - [x] Notify subscribed connections about web/other-participant transactions and category/month expense-limit crossings.
 - [x] Add finance transactions through a confirmed button-driven bot flow with back, cancel, and durable deduplication.
 - [ ] Add TODOs through a button-driven bot flow when TODOs are implemented.
@@ -26,12 +27,12 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 
 ## Finance tracker
 
-- [ ] Categories
-- [ ] CRUD for income and expences items
+- [x] Categories
+- [x] CRUD for income and expences items
 - [ ] Limits
-  - [ ] Initial balance amount
-  - [ ] Set limits to expences (no solid limits, only soft notifications about limits overdraft)
-  - [ ] Shows limits overdraft 
+  - [x] Initial balance amount
+  - [x] Set limits to expences (no solid limits, only soft notifications about limits overdraft)
+  - [x] Shows limits overdraft
   - [ ] Add a restricted formula editor for category limits with suggestions after `=`: percentage, multiplier, and difference based on selected income or expense categories (for example, a children's allowance of 5% of salary), with typed rules and dependency-cycle validation instead of arbitrary spreadsheet formulas.
 - [x] Statistic
   - [x] Main page
@@ -62,11 +63,12 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 ## Per-user settings
 
 - [ ] Layout
-  - [ ] Workspace items opened or closed
+  - [x] Remember opened/closed dashboard sections in browser local storage.
+  - [ ] Persist opened/closed Workspace sections in per-user settings.
 - [ ] Telegram bot integration
   - [x] Add a Workspace-wide Telegram ON/OFF setting and invitation management.
   - [x] Add individual connection notification switches for birthdays, memorable dates, transactions, and expense limits.
-  - [ ] Add individual connection event-reminder subscriptions once calendar events exist.
+  - [ ] Add individual connection event-reminder subscriptions.
   - [ ] Select available button-driven quick-add categories for the Workspace.
 
 ## Resume
@@ -78,8 +80,8 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
   - [x] Scope resume CRUD to the authenticated author so users only list and mutate their own resumes.
   - [x] Add workspace navigation and routes at `/resumes` and `/resumes/:id`.
   - [x] Add list, create with language selection, detail edit, language badge, selected-language preview, and delete UI.
-  - [x] Keep resumes private: no public pages, sitemap entries, SEO, or themes in v1.
-  - [ ] Improve validation: min/max for all parts 
+  - [x] Keep resumes private: no public pages, sitemap entries, or SEO.
+  - [x] Improve validation: field lengths, list sizes, required content, total text limits, duplicate checks, and date consistency in the API and editor.
   - [x] Fix resume multilines fields: text with \\n to array.
   - [ ] AI
     - [ ] Advices of resume improvement
@@ -101,7 +103,7 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
       - [ ] Modern
       - [ ] Two columns
   - [ ] Preview
-    - [ ] Show real DOCS/PDF preview
+    - [ ] Show actual DOCX/PDF document preview; the current preview renders resume content as HTML.
   - [x] Resume export
     - [x] To PDF
     - [x] To DOCX
@@ -111,14 +113,15 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 ## Calendar
 
 - [x] Base calendar view in dashboard.
-- [ ] Add day, week, and year views alongside the dashboard calendar month view.
-- [ ] Clickable calendar day
-  - [ ] Click on empty area -> Open 1 day detail modal
-  - [ ] Click on event -> Open event detail modal
+- [x] Add day, week, and year views alongside the dashboard calendar month view.
+- [x] Clickable calendar day
+  - [x] Click on empty area in month/year views -> Open 1 day detail modal
+  - [x] Click on event -> Open event detail modal
+- [x] Show knowledge birthdays and memorable dates automatically alongside calendar events.
 - [ ] Add events from calendar
-  - [ ] Person birthdays
-  - [ ] Memorable Dates
-  - [ ] One-time or recurring Events
+  - [ ] Create person birthday entries from the calendar.
+  - [ ] Create memorable dates from the calendar.
+  - [x] One-time or recurring Events
 
 ## TODOs
 
@@ -131,7 +134,7 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
 
 - [ ] Workspace
   - [ ] Main page
-    - [ ] Important info (in-dashboard CRUD – only text oneline items)
+    - [x] Important info (in-dashboard CRUD – only text oneline items)
     - [x] Dates and birthdays (current and next month)
     - [ ] Recently changed files
 - [ ] Knowledge item
@@ -218,7 +221,8 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
         - [ ] Add additional date for specific year
         - [ ] Example: normally calculated date, but manually set different date in 2028
   - [x] People
-    - [ ] Show/Hide (and Notify/Not) persons birthdays in calendar
+    - [x] Enable/disable birthday reminders for each person.
+    - [ ] Show/hide each person's birthday in the calendar independently of reminders.
   - [ ] Places
   - [ ] Projects
   - [ ] Recipes
@@ -227,7 +231,7 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
   - [ ] Techniques
   - [ ] Technologies
 - [ ] Export Obsidian vault to knowledge database
-- [ ] Add reminders for knowledge dates and birthdays.
+- [x] Add reminders for knowledge dates and birthdays.
 - [ ] Add extended knowledge database search across item types and fields.
 - [ ] Automate and test backup/restore for the private knowledge object bucket.
 
@@ -237,7 +241,3 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
 - [x] Serve the protected workspace dashboard directly at `/` and protected product APIs at
   `/api/<domain>`.
 - [x] Remove the inherited how-this-site-is-built, updates, sitemap, robots, SEO, and SSR artifacts.
-
-## Errors
-
-...

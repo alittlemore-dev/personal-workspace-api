@@ -75,7 +75,9 @@ must not lose or duplicate a confirmed transaction.
 
 A tracker belongs to exactly one Personal Workspace identity and contains all of that owner's
 months, categories, and transactions. Telegram connections belong to the Workspace-wide integration.
-The tracker has an explicit IANA time zone used for month boundaries and exchange-rate dates.
+The tracker synchronizes its IANA time zone with account settings when opened on the web or through
+Telegram. Calendar month boundaries and exchange-rate dates follow that zone; timestamps are stored
+in UTC. Synchronization preserves existing month assignments, amounts, and opening balances.
 
 ### 4.2. Month
 
@@ -345,7 +347,7 @@ Official provider references:
 ### 7.1. Initial month
 
 The first web visit sends the selected interface language to an idempotent protected ensure
-operation. The tracker copies the account time zone, and the first month starts in RUB for Russian
+operation. The tracker synchronizes the account time zone, and the first month starts in RUB for Russian
 or USD for English. The initial opening balance is zero. A migration-backed bilingual category
 template provides editable names and ordering; all category plans are unset, distinct from an
 explicit zero. The template never imports amounts or transactions from the reference spreadsheet.

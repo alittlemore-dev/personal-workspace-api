@@ -1,7 +1,9 @@
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
+from core.account_time_zone.clients import AccountTimeZoneReader
 from core.finance.enums import (
     FinanceCurrency,
     FinanceEventKind,
@@ -95,6 +97,28 @@ class FinanceTelegramAccessService:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceMonthService:
     storage: FinanceStorage
+    time_zone_reader: AccountTimeZoneReader
+
+    async def sync_account_time_zone(
+        self,
+        *,
+        tracker: FinanceTracker,
+        owner_username: str,
+    ) -> FinanceTracker:
+        time_zone = await self.time_zone_reader.get_time_zone(owner_username=owner_username)
+        return await self.sync_tracker_time_zone(tracker=tracker, time_zone=time_zone)
+
+    async def sync_tracker_time_zone(
+        self,
+        *,
+        tracker: FinanceTracker,
+        time_zone: ZoneInfo,
+    ) -> FinanceTracker:
+        if tracker.time_zone == time_zone:
+            return tracker
+        return await self.storage.update_tracker_time_zone(
+            tracker=replace(tracker, time_zone=time_zone),
+        )
 
     async def for_transaction(self, params: FinanceTransactionMonthParams) -> FinanceMonth:
         current = await (
@@ -117,11 +141,29 @@ class FinanceMonthService:
             )
         )
 
-    async def advance(self, *, tracker: FinanceTracker, now: datetime) -> FinanceMonth:
+    async def advance(
+        self,
+        *,
+        tracker: FinanceTracker,
+        owner_username: str,
+        now: datetime,
+    ) -> FinanceMonth:
         current_period = tracker.current_period(now)
         month = await self.storage.latest_month(tracker=tracker)
         if month is None:
             raise FinanceNotFoundError
+        # A changed account zone can move the current period back across a month boundary.
+        # Preserve the saved later month and return the existing local-current month.
+        if month.period_start > current_period:
+            try:
+                return await self.storage.get_month(owner_username=owner_username, now=now)
+            except FinanceNotFoundError:
+                return await self.storage.create_preceding_month(
+                    tracker=tracker,
+                    following=month,
+                    period_start=current_period,
+                    now=now,
+                )
         archived = await self.storage.archived_category_ids(tracker=tracker)
         while month.period_start < current_period:
             month = await self.storage.create_rollover_month(

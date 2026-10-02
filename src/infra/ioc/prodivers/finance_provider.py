@@ -5,6 +5,7 @@ import httpx
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.account_time_zone.clients import AccountTimeZoneReader
 from core.finance.clients import FinanceRateClient
 from core.finance.event_dispatchers import FinanceEventDispatcher
 from core.finance.schemas import FinanceEventConfig
@@ -66,8 +67,12 @@ class FinanceProvider(Provider):
         )
 
     @provide(scope=Scope.REQUEST)
-    def provide_months(self, storage: FinanceStorage) -> FinanceMonthService:
-        return FinanceMonthService(storage=storage)
+    def provide_months(
+        self,
+        storage: FinanceStorage,
+        time_zone_reader: AccountTimeZoneReader,
+    ) -> FinanceMonthService:
+        return FinanceMonthService(storage=storage, time_zone_reader=time_zone_reader)
 
     @provide(scope=Scope.REQUEST)
     def provide_telegram_access(

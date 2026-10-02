@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.finance.clients import FinanceRateClient
 from core.finance.enums import FinanceCurrency, FinanceKind
-from core.finance.exceptions import FinanceConflictError, FinanceNotFoundError
+from core.finance.exceptions import (
+    FinanceConflictError,
+    FinanceNotFoundError,
+    InvalidFinanceDataError,
+)
 from core.finance.schemas import (
     Amount,
     ChangeFinanceCurrencyParams,
@@ -21,6 +25,7 @@ from core.finance.schemas import (
     EnsureFinanceMonthParams,
     FinanceActor,
     FinanceCategoryName,
+    FinanceHistoricalMonthParams,
     FinanceRateSet,
     SetFinanceCategoryArchivedParams,
     SetFinanceTransactionDeletedParams,
@@ -43,6 +48,249 @@ from tests.test_cases import StorageTestCase
 
 
 class TestFinanceStorage(StorageTestCase):
+    async def test_zone_shift_before_first_month_creates_empty_current_without_changing_saved_month(
+        self,
+    ) -> None:
+        await self.factory.db.seed_finance_templates(self.db_session)
+        storage = FinanceDatabaseStorage(session=self.db_session)
+        use_case = self.factory.core.finance_use_case(storage)
+        now = datetime(2026, 10, 31, 22, tzinfo=UTC)
+        november = await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("Asia/Yerevan"),
+                language=LanguageEnum.EN,
+                now=now,
+            ),
+        )
+        november = await use_case.update_opening_balance(
+            UpdateOpeningBalanceParams(owner_username="owner", amount=Amount(123), now=now),
+        )
+        october = await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("Pacific/Honolulu"),
+                language=LanguageEnum.EN,
+                now=now,
+            ),
+        )
+        assert october.period_start == date(2026, 10, 1)
+        assert october.opening_balance == 0
+        assert {row.stable_id for row in october.categories} == {
+            row.stable_id for row in november.categories
+        }
+        saved = await storage.get_month_for_period(
+            owner_username="owner",
+            period_start=november.period_start,
+        )
+        assert saved.id == november.id
+        assert saved.opening_balance == Decimal(123)
+        assert (
+            await use_case.ensure_month(
+                EnsureFinanceMonthParams(
+                    owner_username="owner",
+                    time_zone=ZoneInfo("Pacific/Honolulu"),
+                    language=LanguageEnum.EN,
+                    now=now,
+                ),
+            )
+        ).id == october.id
+
+    async def test_late_operation_keeps_original_timestamp_when_zone_change_moves_local_date(
+        self,
+    ) -> None:
+        await self.factory.db.seed_finance_templates(self.db_session)
+        storage = FinanceDatabaseStorage(session=self.db_session)
+        use_case = self.factory.core.finance_use_case(storage)
+        october = await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("UTC"),
+                language=LanguageEnum.EN,
+                now=datetime(2026, 10, 15, tzinfo=UTC),
+            ),
+        )
+        now = datetime(2026, 11, 4, 12, tzinfo=UTC)
+        await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("UTC"),
+                language=LanguageEnum.EN,
+                now=now,
+            ),
+        )
+        occurred_at = datetime(2026, 10, 31, 22, tzinfo=UTC)
+        await storage.save_rate_set(rate_set=self.factory.core.finance_rate_set(occurred_at.date()))
+        draft = self.factory.core.finance_transaction_draft(
+            category_id=next(
+                row.id for row in october.categories if row.kind == FinanceKind.EXPENSE
+            ),
+            amount=Amount(5),
+            currency=FinanceCurrency.USD,
+            occurred_at=occurred_at,
+        )
+        created = await use_case.create_transaction(
+            CreateFinanceTransactionParams(
+                owner_username="owner",
+                period_start=october.period_start,
+                now=now,
+                actor=FinanceActor.web("owner"),
+                draft=draft,
+            ),
+        )
+        await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("Asia/Yerevan"),
+                language=LanguageEnum.EN,
+                now=now,
+            ),
+        )
+        changed = await use_case.update_transaction(
+            UpdateFinanceTransactionParams(
+                owner_username="owner",
+                period_start=october.period_start,
+                transaction_id=created.id,
+                version=created.version,
+                now=now,
+                draft=replace(draft, description="Corrected"),
+            ),
+        )
+        assert changed.occurred_at == occurred_at
+        assert changed.description == "Corrected"
+        with pytest.raises(InvalidFinanceDataError):
+            await use_case.update_transaction(
+                UpdateFinanceTransactionParams(
+                    owner_username="owner",
+                    period_start=october.period_start,
+                    transaction_id=created.id,
+                    version=changed.version,
+                    now=now,
+                    draft=replace(draft, occurred_at=occurred_at.replace(hour=23)),
+                ),
+            )
+
+    async def test_account_zone_sync_preserves_history_and_accepts_local_month_boundary(
+        self,
+    ) -> None:
+        await self.factory.db.seed_finance_templates(self.db_session)
+        storage = FinanceDatabaseStorage(session=self.db_session)
+        use_case = self.factory.core.finance_use_case(storage)
+        september_now = datetime(2026, 9, 15, 12, tzinfo=UTC)
+        september = await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("UTC"),
+                language=LanguageEnum.EN,
+                now=september_now,
+            ),
+        )
+        await use_case.update_opening_balance(
+            UpdateOpeningBalanceParams(
+                owner_username="owner",
+                amount=Amount(100),
+                now=september_now,
+            ),
+        )
+        await storage.save_rate_set(
+            rate_set=self.factory.core.finance_rate_set(september_now.date()),
+        )
+        old = await use_case.create_transaction(
+            CreateFinanceTransactionParams(
+                owner_username="owner",
+                period_start=None,
+                now=september_now,
+                actor=FinanceActor.web("owner"),
+                draft=self.factory.core.finance_transaction_draft(
+                    category_id=next(
+                        row.id for row in september.categories if row.kind == FinanceKind.EXPENSE
+                    ),
+                    amount=Amount(10),
+                    currency=FinanceCurrency.USD,
+                    occurred_at=september_now,
+                ),
+            ),
+        )
+        # November 1 at 02:00 in Yerevan is still October 31 in UTC.
+        boundary = datetime(2026, 10, 31, 22, tzinfo=UTC)
+        november = await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("Asia/Yerevan"),
+                language=LanguageEnum.EN,
+                now=boundary,
+            ),
+        )
+        assert november.period_start == date(2026, 11, 1)
+        assert november.time_zone == ZoneInfo("Asia/Yerevan")
+        assert november.opening_balance == Decimal(90)
+        history = await use_case.historical_month(
+            FinanceHistoricalMonthParams(
+                owner_username="owner",
+                period_start=september.period_start,
+                now=boundary,
+            ),
+        )
+        assert history.id == september.id
+        assert history.opening_balance == Decimal(100)
+        assert history.actual_expense == Decimal(10)
+        stored = await storage.get_transaction(
+            owner_username="owner",
+            transaction_id=old.id,
+            now=september_now,
+        )
+        assert stored.occurred_at == september_now
+        assert (
+            await self.db_session.scalar(
+                select(FinanceTransactionModel.month_id).where(
+                    FinanceTransactionModel.id == old.id,
+                ),
+            )
+            == september.id
+        )
+        await storage.save_rate_set(rate_set=self.factory.core.finance_rate_set(date(2026, 11, 1)))
+        transaction = await use_case.create_transaction(
+            CreateFinanceTransactionParams(
+                owner_username="owner",
+                period_start=None,
+                now=boundary,
+                actor=FinanceActor.web("owner"),
+                draft=self.factory.core.finance_transaction_draft(
+                    category_id=next(
+                        row.id for row in november.categories if row.kind == FinanceKind.EXPENSE
+                    ),
+                    amount=Amount(5),
+                    currency=FinanceCurrency.USD,
+                    occurred_at=boundary,
+                ),
+            ),
+        )
+        assert (
+            await self.db_session.scalar(
+                select(FinanceTransactionModel.month_id).where(
+                    FinanceTransactionModel.id == transaction.id,
+                ),
+            )
+            == november.id
+        )
+        assert transaction.occurred_at == boundary
+        # Changing to a zone where it is still October preserves the saved November month.
+        october = await use_case.ensure_month(
+            EnsureFinanceMonthParams(
+                owner_username="owner",
+                time_zone=ZoneInfo("Pacific/Honolulu"),
+                language=LanguageEnum.EN,
+                now=boundary,
+            ),
+        )
+        assert october.period_start == date(2026, 10, 1)
+        preserved = await storage.get_month_for_period(
+            owner_username="owner",
+            period_start=date(2026, 11, 1),
+        )
+        assert preserved.id == november.id
+        assert preserved.opening_balance == Decimal(90)
+
     async def test_archiving_historical_category_excludes_its_future_rollovers(self) -> None:
         await self.factory.db.seed_finance_templates(self.db_session)
         storage = FinanceDatabaseStorage(session=self.db_session)

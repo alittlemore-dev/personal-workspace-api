@@ -449,6 +449,21 @@ class TestFinanceTelegram(StorageTestCase):
             == 0
         )
 
+    async def test_bot_context_synchronizes_account_zone_before_local_rollover(self) -> None:
+        reader = cast("AsyncMock", self.use_case.months.time_zone_reader)
+        reader.get_time_zone.return_value = ZoneInfo("Asia/Yerevan")
+        _, month = await self.use_case.telegram_context(
+            TelegramFinanceContextParams(
+                telegram_user_id=42,
+                private_chat_id=42,
+                now=datetime(2026, 10, 31, 22, tzinfo=UTC),
+            ),
+        )
+        assert month is not None
+        assert month.time_zone == ZoneInfo("Asia/Yerevan")
+        assert month.period_start == date(2026, 11, 1)
+        reader.get_time_zone.assert_awaited_once_with(owner_username="owner")
+
     async def test_lazy_bot_month_creation_requires_existing_tracker(self) -> None:
         _, month = await self.use_case.telegram_context(
             TelegramFinanceContextParams(

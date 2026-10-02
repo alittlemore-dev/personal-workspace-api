@@ -213,6 +213,15 @@ class FinanceDatabaseStorage(FinanceStorage):
         await self.session.flush()
         return FinanceTracker(id=model.id, time_zone=model.time_zone)
 
+    async def update_tracker_time_zone(self, *, tracker: FinanceTracker) -> FinanceTracker:
+        await self.session.execute(
+            update(FinanceTrackerModel)
+            .where(FinanceTrackerModel.id == tracker.id)
+            .values(time_zone=tracker.time_zone),
+        )
+        await self.session.flush()
+        return tracker
+
     async def latest_month(self, *, tracker: FinanceTracker) -> FinanceMonth | None:
         model = await self.session.scalar(
             select(FinanceMonthModel)
@@ -294,6 +303,43 @@ class FinanceDatabaseStorage(FinanceStorage):
                     source_month_category_id=None,
                 ),
             )
+        await self.session.flush()
+        return await self._view(tracker, month)
+
+    async def create_preceding_month(
+        self,
+        *,
+        tracker: FinanceTracker,
+        following: FinanceMonth,
+        period_start: date,
+        now: datetime,
+    ) -> FinanceMonth:
+        month = FinanceMonthModel(
+            tracker_id=tracker.id,
+            period_start=period_start,
+            currency=following.currency,
+            opening_balance=Amount(0),
+            previous_month_id=None,
+            transferred_balance=None,
+            version=1,
+            created_at=now,
+        )
+        self.session.add(month)
+        await self.session.flush()
+        self.session.add_all(
+            FinanceMonthCategoryModel(
+                month_id=month.id,
+                category_id=category.stable_id,
+                kind=category.kind,
+                name=category.name,
+                normalized_name=category.name.normalized,
+                planned_amount=None,
+                position=category.position,
+                accepting_transactions=not category.archived,
+                source_month_category_id=None,
+            )
+            for category in following.categories
+        )
         await self.session.flush()
         return await self._view(tracker, month)
 

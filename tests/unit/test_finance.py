@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
+from core.account_time_zone.clients import AccountTimeZoneReader
 from core.finance.clients import FinanceRateClient
 from core.finance.enums import FinanceCurrency
 from core.finance.exceptions import FinanceRateUnavailableError, InvalidFinanceDataError
@@ -139,7 +140,13 @@ class TestFinance(TestCase):
         use_case = FinanceUseCase(
             statistics_service=FinanceStatisticsService(),
             storage=storage,
-            months=FinanceMonthService(storage=storage),
+            months=FinanceMonthService(
+                storage=storage,
+                time_zone_reader=AsyncMock(
+                    spec=AccountTimeZoneReader,
+                    get_time_zone=AsyncMock(return_value=ZoneInfo("UTC")),
+                ),
+            ),
             rate_client=rate_client,
             telegram_access=Mock(spec=FinanceTelegramAccessService),
             events=Mock(spec=FinanceEventService),
@@ -173,7 +180,13 @@ class TestFinance(TestCase):
         use_case = FinanceUseCase(
             statistics_service=FinanceStatisticsService(),
             storage=storage,
-            months=FinanceMonthService(storage=storage),
+            months=FinanceMonthService(
+                storage=storage,
+                time_zone_reader=AsyncMock(
+                    spec=AccountTimeZoneReader,
+                    get_time_zone=AsyncMock(return_value=ZoneInfo("UTC")),
+                ),
+            ),
             rate_client=rate_client,
             telegram_access=Mock(spec=FinanceTelegramAccessService),
             events=Mock(spec=FinanceEventService),
@@ -194,7 +207,13 @@ class TestFinance(TestCase):
         use_case = FinanceUseCase(
             statistics_service=FinanceStatisticsService(),
             storage=storage,
-            months=FinanceMonthService(storage=storage),
+            months=FinanceMonthService(
+                storage=storage,
+                time_zone_reader=AsyncMock(
+                    spec=AccountTimeZoneReader,
+                    get_time_zone=AsyncMock(return_value=ZoneInfo("UTC")),
+                ),
+            ),
             rate_client=rate_client,
             telegram_access=Mock(spec=FinanceTelegramAccessService),
             events=Mock(spec=FinanceEventService),

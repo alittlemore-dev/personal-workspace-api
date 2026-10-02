@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 from zoneinfo import ZoneInfo
 
+from core.account_time_zone.clients import AccountTimeZoneReader
 from core.cache_tools.enums import CacheWarmOperationStatusEnum
 from core.cache_tools.schemas import CacheToolsStatus, CacheWarmOperation, CacheWarmSummary
 from core.calendar.enums import CalendarEntryKind, CalendarEntryPeriod, CalendarWindow
@@ -312,7 +313,13 @@ class CoreFactoryHelper:
         return FinanceUseCase(
             statistics_service=FinanceStatisticsService(),
             storage=storage,
-            months=FinanceMonthService(storage=storage),
+            months=FinanceMonthService(
+                storage=storage,
+                time_zone_reader=AsyncMock(
+                    spec=AccountTimeZoneReader,
+                    get_time_zone=AsyncMock(return_value=ZoneInfo("UTC")),
+                ),
+            ),
             rate_client=rate_client,
             telegram_access=Mock(spec=FinanceTelegramAccessService),
             events=FinanceEventService(

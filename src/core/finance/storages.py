@@ -42,6 +42,9 @@ class FinanceStorage(ABC):
     async def latest_month(self, *, tracker: FinanceTracker) -> FinanceMonth | None: ...
 
     @abstractmethod
+    async def update_tracker_time_zone(self, *, tracker: FinanceTracker) -> FinanceTracker: ...
+
+    @abstractmethod
     async def archived_category_ids(self, *, tracker: FinanceTracker) -> set[str]: ...
 
     @abstractmethod
@@ -55,6 +58,16 @@ class FinanceStorage(ABC):
         period_start: date,
         currency: FinanceCurrency,
         templates: list[FinanceTemplateCategory],
+        now: datetime,
+    ) -> FinanceMonth: ...
+
+    @abstractmethod
+    async def create_preceding_month(
+        self,
+        *,
+        tracker: FinanceTracker,
+        following: FinanceMonth,
+        period_start: date,
         now: datetime,
     ) -> FinanceMonth: ...
 

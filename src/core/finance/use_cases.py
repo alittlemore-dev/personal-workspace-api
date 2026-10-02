@@ -79,6 +79,10 @@ class FinanceUseCase:
                 time_zone=params.time_zone,
                 now=params.now,
             )
+        tracker = await self.months.sync_tracker_time_zone(
+            tracker=tracker,
+            time_zone=params.time_zone,
+        )
         current_period = tracker.current_period(params.now)
         month = await self.storage.latest_month(tracker=tracker)
         if month is None:
@@ -92,6 +96,7 @@ class FinanceUseCase:
             )
         return await self.months.advance(
             tracker=tracker,
+            owner_username=params.owner_username,
             now=params.now,
         )
 
@@ -103,8 +108,13 @@ class FinanceUseCase:
         tracker = await self.storage.lock_tracker(owner_username=connection.owner_username)
         if tracker is None:
             return connection, None
+        tracker = await self.months.sync_account_time_zone(
+            tracker=tracker,
+            owner_username=connection.owner_username,
+        )
         month = await self.months.advance(
             tracker=tracker,
+            owner_username=connection.owner_username,
             now=params.now,
         )
         return connection, month
@@ -319,7 +329,6 @@ class FinanceUseCase:
             ),
         )
         zone = month.time_zone
-        params.draft.validate(period_start=month.period_start, time_zone=zone)
         existing = await (
             self.storage.get_transaction(
                 owner_username=params.owner_username,
@@ -335,6 +344,7 @@ class FinanceUseCase:
         )
         existing.check_writable(month, params.now)
         existing.check_updatable(params.version)
+        existing.validate_update(params.draft, month)
         rate_set_id = (
             await self.resolve_rate_set_id(on_date=params.draft.occurred_at.astimezone(zone).date())
             if existing.has_monetary_change(params.draft, zone)
@@ -372,6 +382,7 @@ class FinanceUseCase:
         )
         existing.check_writable(month, params.now)
         existing.check_updatable(params.version)
+        existing.validate_update(params.draft, month)
         category = month.get_category(params.draft.category_id)
         category.check_accepting_transaction(existing.category_id)
         result = await self.storage.update_transaction(

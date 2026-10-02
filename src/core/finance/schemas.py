@@ -427,11 +427,14 @@ class FinanceTransactionDraft:
     description: str
 
     def validate(self, *, period_start: date, time_zone: ZoneInfo) -> None:
-        self.currency.validate_money(self.amount, positive=True)
-        if self.occurred_at.tzinfo is None:
-            raise InvalidFinanceDataError
+        self.validate_values()
         local_date = self.occurred_at.astimezone(time_zone).date()
         if local_date.year != period_start.year or local_date.month != period_start.month:
+            raise InvalidFinanceDataError
+
+    def validate_values(self) -> None:
+        self.currency.validate_money(self.amount, positive=True)
+        if self.occurred_at.tzinfo is None:
             raise InvalidFinanceDataError
         if len(self.description) > TRANSACTION_DESCRIPTION_MAX_LENGTH:
             raise InvalidFinanceDataError
@@ -464,6 +467,12 @@ class FinanceTransaction:
             or self.created_at.astimezone(month.time_zone).date().replace(day=1) != current
         ):
             raise FinanceConflictError
+
+    def validate_update(self, draft: FinanceTransactionDraft, month: FinanceMonth) -> None:
+        if draft.occurred_at == self.occurred_at:
+            draft.validate_values()
+        else:
+            draft.validate(period_start=month.period_start, time_zone=month.time_zone)
 
     def check_updatable(self, version: int) -> None:
         if self.version != version or self.deleted:

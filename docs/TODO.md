@@ -133,10 +133,11 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
 Each knowledge item has its own subfolder in the Knowledge section of the workspace sidebar.
 
 - [ ] Dashboard
-  - [x] Important info (in-dashboard CRUD – only text oneline items)
-  - [x] Dates and birthdays (current and next month)
-  - [ ] Recently changed files
-  - [ ] Vault statistic
+  - [ ] Main page
+    - [x] Important info (in-dashboard CRUD – only text oneline items)
+    - [x] Dates and birthdays (current and next month)
+    - [ ] Recently changed knowledge items
+    - [ ] Vault statistic
 - [ ] Knowledge item
   - [ ] Books
     - [ ] All books page

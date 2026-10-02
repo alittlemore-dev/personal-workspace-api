@@ -2,7 +2,7 @@
 
 Date: October 1, 2026
 
-Status: current-month web tracker, Telegram entry, and finance notifications implemented; historical analytics planned
+Status: current-month web tracker, Telegram entry, and finance notifications implemented; historical overview and analytics implemented
 
 ## 1. Context
 
@@ -13,7 +13,7 @@ that can be recalculated in different currencies.
 
 The web application provides current-month entry, overview, configuration, corrections, and audit
 access. Telegram provides confirmed transaction entry and subscribed finance notifications.
-Historical analytics remains a later delivery.
+Historical overview and period analytics are available on separate web routes.
 
 The expected data volume is small. The system is therefore designed as a relational module inside
 the existing Personal Workspace modular monolith rather than as a separate service or analytical
@@ -86,8 +86,10 @@ A month is a calendar month in the tracker's time zone. It contains:
 - category plan snapshots denominated in that currency;
 - transactions whose occurrence timestamps fall within the month.
 
-Only the current month is exposed in the initial web interface, but completed months are not made
-immutable at the domain or persistence level.
+The current month is fully editable. The immediately preceding month accepts late transactions
+and changes to transactions created during the current tracker-local month. Earlier transactions
+and all older months are read-only. Historical budgets, month currencies, and opening balances
+are locked; late changes preserve the current month's opening balance.
 
 ### 4.3. Category
 
@@ -485,7 +487,7 @@ Transaction create/update requests continue to require a valid category; read re
 The protected API exposes domain-oriented operations rather than database-shaped CRUD. The first
 web delivery implements current-month ensure/read, opening balance and currency changes, category
 management, and transaction create/update/soft-delete/restore with revision reads. Telegram entry
-uses the shared webhook; historical statistics remain planned. The broader architecture includes:
+uses the shared webhook; historical overview and statistics are available. The broader architecture includes:
 
 - tracker initialization and current-month retrieval;
 - idempotent current-month creation;
@@ -567,3 +569,51 @@ calendar months and are not proportionally projected into arbitrary sliding wind
 
 Materialized aggregates or ClickHouse should be introduced only after measured query latency or
 data volume demonstrates that indexed PostgreSQL aggregation is insufficient.
+
+
+## Historical overview and statistics
+
+Overview opens the current tracker-local month without query parameters. Explicit `month` and
+`year` parameters restore a concrete month. Month arrows update browser history; the current-month
+button removes both parameters. Future months are unavailable, and missing historical months show
+an empty state without creating snapshots. Historical reads preserve their own currency and plans.
+
+Protected read endpoints under `/api/finance/months/{year}/{month}` expose the monthly view,
+`/transactions?include_deleted=...`, and `/transactions/{id}/revisions`. They validate the calendar
+period, reject future months, and scope every query and transaction lookup to the authenticated
+owner. The same historical transaction paths support create, update, soft-delete, and restore.
+Only the immediately preceding month accepts new operations. Historical changes require the
+operation's persisted creation month to equal the current tracker-local month. Earlier records,
+older months, and future months reject mutation, including direct API calls. Category plans,
+month currency, and opening balances remain locked for past months. Late transaction changes do
+not update the current month's opening balance. Existing current-month mutation endpoints retain
+full editing and Telegram confirmation semantics.
+
+`GET /api/finance/statistics?period=...&currency=...` accepts `today`, `thisWeek`, `thisMonth`,
+`thisYear`, `last7Days`, `last30Days`, and `last365Days`; currency is `month`, AMD, RUB, USD, or EUR. Responses contain a `reports` collection.
+The `month` mode (also the frontend default) groups records by their stored month currency, with
+independent totals, trends, pies, and comparisons for each currency; mixed currencies are never
+summed. A concrete selected currency produces one converted report. Select options display
+`֏`, `₽`, `$`, and `€`, plus a localized month-currency option.
+Calendar periods include all recorded transactions within the entire period, including future-dated
+entries. Rolling periods include today and the preceding N−1 local dates. Weeks start on Monday.
+Every period compares with the complete immediately preceding equivalent period. Half-open UTC
+query boundaries are derived from tracker-local calendar boundaries, and hourly buckets preserve
+23/25-hour daylight-saving days.
+
+Active transaction reference amounts are converted using each operation's saved rate snapshot,
+without fetching or changing rates. Decimal aggregates use the existing currency rounding rules.
+Stable category identities survive renames; the latest available name in the selected period is
+shown. Permanently deleted categories appear as an uncategorized group. Soft-deleted transactions
+are excluded. Zero timeline buckets remain visible; the first stored month marks history coverage.
+A zero previous total has no percentage change.
+
+Statistics provides summary, income, and expense tabs. The current-month summary also contains
+opening/closing balance charts, budget tables, and planned/actual category charts. In a selected
+currency, all of these use the same reporting currency. Transaction facts retain each operation's
+saved rates; opening balances and plans use the newest stored rate effective on or before the
+report date, and its effective date is displayed. Reads never fetch new rates or mutate stored
+month values. An unavailable required conversion produces an explicit rate error. In `month` mode,
+the budget is included only in the current month's own currency group. Categoryless amounts remain included in both analytics and monthly fact charts.
+Filters are URL-backed and are not persisted in account settings. Charts use feature-owned SVG
+with localized text tables, existing theme colors, and no new chart dependency or inline styles.

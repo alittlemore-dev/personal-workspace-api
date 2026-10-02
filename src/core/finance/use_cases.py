@@ -3,7 +3,12 @@ from datetime import date, timedelta
 from time import monotonic
 
 from core.finance.clients import FinanceRateClient
-from core.finance.enums import FinanceCurrency, FinanceSource
+from core.finance.enums import (
+    FinanceCurrency,
+    FinanceSource,
+    FinanceStatisticsCurrency,
+    FinanceStatisticsPeriod,
+)
 from core.finance.exceptions import (
     FinanceConflictError,
     FinanceRateUnavailableError,
@@ -20,18 +25,26 @@ from core.finance.schemas import (
     FinanceCategoryDeletion,
     FinanceCategoryUpdate,
     FinanceCurrencyChange,
+    FinanceHistoricalMonthParams,
     FinanceMonth,
     FinanceMonthParams,
     FinanceOpeningBalanceUpdate,
     FinanceRevisions,
+    FinanceStatisticsComposition,
+    FinanceStatisticsParams,
+    FinanceStatisticsResult,
+    FinanceStatisticsWindow,
     FinanceTransaction,
     FinanceTransactionCreation,
     FinanceTransactionDeletionChange,
+    FinanceTransactionMonthParams,
     FinanceTransactionPricing,
     FinanceTransactionRevisionsParams,
     FinanceTransactions,
     FinanceTransactionUpdate,
+    HistoricalFinanceRevisionsParams,
     ListFinanceTransactionsParams,
+    ListHistoricalFinanceTransactionsParams,
     SetFinanceCategoryArchivedParams,
     SetFinanceTransactionDeletedParams,
     TelegramFinanceContextParams,
@@ -42,6 +55,7 @@ from core.finance.schemas import (
 from core.finance.services import (
     FinanceEventService,
     FinanceMonthService,
+    FinanceStatisticsService,
     FinanceTelegramAccessService,
 )
 from core.finance.storages import FinanceStorage
@@ -55,6 +69,7 @@ class FinanceUseCase:
     telegram_access: FinanceTelegramAccessService
     events: FinanceEventService
     months: FinanceMonthService
+    statistics_service: FinanceStatisticsService
 
     async def ensure_month(self, params: EnsureFinanceMonthParams) -> FinanceMonth:
         tracker = await self.storage.lock_tracker(owner_username=params.owner_username)
@@ -213,7 +228,14 @@ class FinanceUseCase:
             )
             if existing is not None:
                 return existing
-        month = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        month = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=False,
+            ),
+        )
         zone = month.time_zone
         params.draft.validate(period_start=month.period_start, time_zone=zone)
         if params.actor.source == FinanceSource.TELEGRAM and month.id != params.actor.month_id:
@@ -225,7 +247,14 @@ class FinanceUseCase:
         rate_set = await self.storage.get_rate_set(rate_set_id=rate_set_id)
         if params.actor.source == FinanceSource.TELEGRAM:
             params = replace(params, now=started_at + timedelta(seconds=monotonic() - started))
-        month = await self.storage.lock_month(owner_username=params.owner_username, now=params.now)
+        month = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=True,
+            ),
+        )
         if params.actor.source == FinanceSource.TELEGRAM:
             connection = await self.telegram_access.validate(
                 actor=params.actor,
@@ -260,7 +289,14 @@ class FinanceUseCase:
                 pricing=FinanceTransactionPricing.from_draft(params.draft, rate_set_id, rate_set),
             ),
         )
-        after = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        after = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=False,
+            ),
+        )
         await self.events.created(
             owner_username=params.owner_username,
             before=month,
@@ -274,14 +310,30 @@ class FinanceUseCase:
         self,
         params: UpdateFinanceTransactionParams,
     ) -> FinanceTransaction:
-        month = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        month = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=False,
+            ),
+        )
         zone = month.time_zone
         params.draft.validate(period_start=month.period_start, time_zone=zone)
-        existing = await self.storage.get_transaction(
-            owner_username=params.owner_username,
-            transaction_id=params.transaction_id,
-            now=params.now,
+        existing = await (
+            self.storage.get_transaction(
+                owner_username=params.owner_username,
+                transaction_id=params.transaction_id,
+                now=params.now,
+            )
+            if params.period_start is None
+            else self.storage.transaction_for_period(
+                owner_username=params.owner_username,
+                transaction_id=params.transaction_id,
+                period_start=month.period_start,
+            )
         )
+        existing.check_writable(month, params.now)
         existing.check_updatable(params.version)
         rate_set_id = (
             await self.resolve_rate_set_id(on_date=params.draft.occurred_at.astimezone(zone).date())
@@ -297,12 +349,28 @@ class FinanceUseCase:
             if rate_set_id is not None
             else None
         )
-        month = await self.storage.lock_month(owner_username=params.owner_username, now=params.now)
-        existing = await self.storage.get_transaction(
-            owner_username=params.owner_username,
-            transaction_id=params.transaction_id,
-            now=params.now,
+        month = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=True,
+            ),
         )
+        existing = await (
+            self.storage.get_transaction(
+                owner_username=params.owner_username,
+                transaction_id=params.transaction_id,
+                now=params.now,
+            )
+            if params.period_start is None
+            else self.storage.transaction_for_period(
+                owner_username=params.owner_username,
+                transaction_id=params.transaction_id,
+                period_start=month.period_start,
+            )
+        )
+        existing.check_writable(month, params.now)
         existing.check_updatable(params.version)
         category = month.get_category(params.draft.category_id)
         category.check_accepting_transaction(existing.category_id)
@@ -315,7 +383,14 @@ class FinanceUseCase:
                 pricing=pricing,
             ),
         )
-        after = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        after = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=False,
+            ),
+        )
         await self.events.changed(
             owner_username=params.owner_username,
             before=month,
@@ -329,12 +404,28 @@ class FinanceUseCase:
         self,
         params: SetFinanceTransactionDeletedParams,
     ) -> FinanceTransaction:
-        month = await self.storage.lock_month(owner_username=params.owner_username, now=params.now)
-        existing = await self.storage.get_transaction(
-            owner_username=params.owner_username,
-            transaction_id=params.transaction_id,
-            now=params.now,
+        month = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=True,
+            ),
         )
+        existing = await (
+            self.storage.get_transaction(
+                owner_username=params.owner_username,
+                transaction_id=params.transaction_id,
+                now=params.now,
+            )
+            if params.period_start is None
+            else self.storage.transaction_for_period(
+                owner_username=params.owner_username,
+                transaction_id=params.transaction_id,
+                period_start=month.period_start,
+            )
+        )
+        existing.check_writable(month, params.now)
         existing.check_deletion_change(params.version, deleted=params.deleted)
         result = await self.storage.set_transaction_deleted(
             write=FinanceTransactionDeletionChange(
@@ -343,7 +434,14 @@ class FinanceUseCase:
                 params=params,
             ),
         )
-        after = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        after = await self.months.for_transaction(
+            FinanceTransactionMonthParams(
+                owner_username=params.owner_username,
+                now=params.now,
+                period_start=params.period_start,
+                lock=False,
+            ),
+        )
         await self.events.changed(
             owner_username=params.owner_username,
             before=month,
@@ -378,3 +476,75 @@ class FinanceUseCase:
     async def refresh_rates(self, *, on_date: date) -> None:
         rate_set = await self.rate_client.fetch(on_date=on_date)
         await self.storage.save_rate_set(rate_set=rate_set)
+
+    async def historical_month(self, params: FinanceHistoricalMonthParams) -> FinanceMonth:
+        current = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        params.check_period(current)
+        return await self.storage.get_month_for_period(
+            owner_username=params.owner_username,
+            period_start=params.period_start,
+        )
+
+    async def historical_transactions(
+        self,
+        params: ListHistoricalFinanceTransactionsParams,
+    ) -> FinanceTransactions:
+        current = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        params.check_period(current)
+        return FinanceTransactions(
+            transactions=await self.storage.transactions_for_period(
+                owner_username=params.owner_username,
+                period_start=params.period_start,
+                include_deleted=params.include_deleted,
+            ),
+        )
+
+    async def historical_revisions(
+        self,
+        params: HistoricalFinanceRevisionsParams,
+    ) -> FinanceRevisions:
+        current = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        params.check_period(current)
+        return FinanceRevisions(
+            revisions=await self.storage.revisions_for_period(
+                owner_username=params.owner_username,
+                period_start=params.period_start,
+                transaction_id=params.transaction_id,
+            ),
+        )
+
+    async def statistics(self, params: FinanceStatisticsParams) -> FinanceStatisticsResult:
+        month = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        window, previous_window = FinanceStatisticsWindow.for_period(
+            params.period,
+            params.now,
+            month.time_zone,
+        )
+        budget_rate = None
+        if params.period == FinanceStatisticsPeriod.THIS_MONTH and month.needs_budget_rate(
+            params.currency,
+        ):
+            stored_rate = await self.storage.latest_rate_before_date(
+                on_date=params.now.astimezone(month.time_zone).date(),
+            )
+            if stored_rate is None:
+                raise FinanceRateUnavailableError
+            budget_rate = await self.storage.get_rate_set(rate_set_id=stored_rate[0])
+        source = await self.storage.statistics_source(
+            owner_username=params.owner_username,
+            start=previous_window.start,
+            end=window.end,
+            currency=None
+            if params.currency == FinanceStatisticsCurrency.MONTH
+            else FinanceCurrency(params.currency),
+        )
+        return self.statistics_service.compose_result(
+            FinanceStatisticsComposition(
+                params=params,
+                month=month,
+                window=window,
+                previous_window=previous_window,
+                source=source,
+                budget_rate=budget_rate,
+            ),
+        )

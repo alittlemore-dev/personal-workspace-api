@@ -9,9 +9,13 @@ from core.finance.schemas import (
     CreateFinanceTransactionParams,
     DeleteFinanceCategoryParams,
     EnsureFinanceMonthParams,
+    FinanceHistoricalMonthParams,
     FinanceMonthParams,
+    FinanceStatisticsParams,
     FinanceTransactionRevisionsParams,
+    HistoricalFinanceRevisionsParams,
     ListFinanceTransactionsParams,
+    ListHistoricalFinanceTransactionsParams,
     SetFinanceCategoryArchivedParams,
     SetFinanceTransactionDeletedParams,
     UpdateFinanceCategoryParams,
@@ -28,10 +32,18 @@ from entrypoints.litestar.api.finance.dependencies import (
     provide_delete_transaction_params,
     provide_ensure_month_params,
     provide_finance_context,
+    provide_historical_context,
+    provide_historical_create_transaction_params,
+    provide_historical_delete_transaction_params,
+    provide_historical_restore_transaction_params,
+    provide_historical_revisions_params,
+    provide_historical_transactions_params,
+    provide_historical_update_transaction_params,
     provide_list_transactions_params,
     provide_opening_balance_params,
     provide_restore_category_params,
     provide_restore_transaction_params,
+    provide_statistics_params,
     provide_transaction_revisions_params,
     provide_update_category_params,
     provide_update_transaction_params,
@@ -39,6 +51,7 @@ from entrypoints.litestar.api.finance.dependencies import (
 from entrypoints.litestar.api.finance.schemas import (
     FinanceMonthResponse,
     FinanceRevisionsResponse,
+    FinanceStatisticsResultResponse,
     FinanceTransactionResponse,
     FinanceTransactionsResponse,
 )
@@ -240,6 +253,125 @@ class FinanceApiController(Controller):
         params: NamedDependency[FinanceTransactionRevisionsParams],
     ) -> FinanceRevisionsResponse:
         return FinanceRevisionsResponse.from_domain(await use_case.revisions(params))
+
+    @get(
+        "/months/{year:int}/{month:int}",
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+        },
+    )
+    async def historical_month(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        historical_context: NamedDependency[FinanceHistoricalMonthParams],
+    ) -> FinanceMonthResponse:
+        return FinanceMonthResponse.from_domain(await use_case.historical_month(historical_context))
+
+    @get(
+        "/months/{year:int}/{month:int}/transactions",
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+            "params": Provide(provide_historical_transactions_params, sync_to_thread=False),
+        },
+    )
+    async def historical_transactions(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[ListHistoricalFinanceTransactionsParams],
+    ) -> FinanceTransactionsResponse:
+        return FinanceTransactionsResponse.from_domain(
+            await use_case.historical_transactions(params),
+        )
+
+    @get(
+        "/months/{year:int}/{month:int}/transactions/{transaction_id:str}/revisions",
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+            "params": Provide(provide_historical_revisions_params, sync_to_thread=False),
+        },
+    )
+    async def historical_revisions(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[HistoricalFinanceRevisionsParams],
+    ) -> FinanceRevisionsResponse:
+        return FinanceRevisionsResponse.from_domain(await use_case.historical_revisions(params))
+
+    @post(
+        "/months/{year:int}/{month:int}/transactions",
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+            "params": Provide(provide_historical_create_transaction_params, sync_to_thread=False),
+        },
+    )
+    async def historical_create_transaction(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[CreateFinanceTransactionParams],
+    ) -> FinanceTransactionResponse:
+        return FinanceTransactionResponse.from_domain(await use_case.create_transaction(params))
+
+    @put(
+        "/months/{year:int}/{month:int}/transactions/{transaction_id:str}",
+        status_code=status_codes.HTTP_200_OK,
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+            "params": Provide(provide_historical_update_transaction_params, sync_to_thread=False),
+        },
+    )
+    async def historical_update_transaction(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[UpdateFinanceTransactionParams],
+    ) -> FinanceTransactionResponse:
+        return FinanceTransactionResponse.from_domain(await use_case.update_transaction(params))
+
+    @delete(
+        "/months/{year:int}/{month:int}/transactions/{transaction_id:str}",
+        status_code=status_codes.HTTP_200_OK,
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+            "params": Provide(provide_historical_delete_transaction_params, sync_to_thread=False),
+        },
+    )
+    async def historical_delete_transaction(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[SetFinanceTransactionDeletedParams],
+    ) -> FinanceTransactionResponse:
+        return FinanceTransactionResponse.from_domain(
+            await use_case.set_transaction_deleted(params),
+        )
+
+    @post(
+        "/months/{year:int}/{month:int}/transactions/{transaction_id:str}/restore",
+        status_code=status_codes.HTTP_200_OK,
+        dependencies={
+            "historical_context": Provide(provide_historical_context, sync_to_thread=False),
+            "params": Provide(provide_historical_restore_transaction_params, sync_to_thread=False),
+        },
+    )
+    async def historical_restore_transaction(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[SetFinanceTransactionDeletedParams],
+    ) -> FinanceTransactionResponse:
+        return FinanceTransactionResponse.from_domain(
+            await use_case.set_transaction_deleted(params),
+        )
+
+    @get(
+        "/statistics",
+        dependencies={
+            "params": Provide(provide_statistics_params, sync_to_thread=False),
+        },
+    )
+    async def statistics(
+        self,
+        use_case: FromDishka[FinanceUseCase],
+        params: NamedDependency[FinanceStatisticsParams],
+    ) -> FinanceStatisticsResultResponse:
+        return FinanceStatisticsResultResponse.from_domain(await use_case.statistics(params))
 
 
 api_router = DishkaRouter("", route_handlers=[FinanceApiController])

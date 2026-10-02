@@ -17,6 +17,7 @@ from core.finance.schemas import (
 from core.finance.services import (
     FinanceEventService,
     FinanceMonthService,
+    FinanceStatisticsService,
     FinanceTelegramAccessService,
 )
 from core.finance.storages import FinanceStorage
@@ -136,6 +137,7 @@ class TestFinance(TestCase):
         rate_client = Mock(spec=FinanceRateClient)
         rate_client.fetch = AsyncMock()
         use_case = FinanceUseCase(
+            statistics_service=FinanceStatisticsService(),
             storage=storage,
             months=FinanceMonthService(storage=storage),
             rate_client=rate_client,
@@ -144,6 +146,7 @@ class TestFinance(TestCase):
         )
         await use_case.update_transaction(
             UpdateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=existing.id,
                 draft=self.factory.core.finance_transaction_draft(
@@ -168,6 +171,7 @@ class TestFinance(TestCase):
         rate_client = Mock(spec=FinanceRateClient)
         rate_client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
         use_case = FinanceUseCase(
+            statistics_service=FinanceStatisticsService(),
             storage=storage,
             months=FinanceMonthService(storage=storage),
             rate_client=rate_client,
@@ -188,6 +192,7 @@ class TestFinance(TestCase):
         rate_client = Mock(spec=FinanceRateClient)
         rate_client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
         use_case = FinanceUseCase(
+            statistics_service=FinanceStatisticsService(),
             storage=storage,
             months=FinanceMonthService(storage=storage),
             rate_client=rate_client,

@@ -11,6 +11,7 @@ from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionActi
 from core.finance.exceptions import (
     FinanceConflictError,
     FinanceNotFoundError,
+    FinanceRateUnavailableError,
     InvalidFinanceDataError,
 )
 from core.finance.schemas import (
@@ -28,6 +29,8 @@ from core.finance.schemas import (
     FinanceMonthSnapshot,
     FinanceOpeningBalanceUpdate,
     FinanceRateSet,
+    FinanceStatisticsFact,
+    FinanceStatisticsSource,
     FinanceTemplateCategory,
     FinanceTracker,
     FinanceTransaction,
@@ -692,6 +695,7 @@ class FinanceDatabaseStorage(FinanceStorage):
         month_currency: FinanceCurrency,
     ) -> FinanceTransaction:
         return FinanceTransaction(
+            created_at=model.created_at,
             id=model.id,
             source=model.source,
             author_id=model.author_id,
@@ -930,6 +934,9 @@ class FinanceDatabaseStorage(FinanceStorage):
     ) -> list[FinanceTransactionRevision]:
         _, month = await self._month(owner_username, now)
         await self._owned_transaction(month, transaction_id)
+        return await self._revisions(transaction_id)
+
+    async def _revisions(self, transaction_id: str) -> list[FinanceTransactionRevision]:
         rows = await self.session.scalars(
             select(FinanceTransactionRevisionModel)
             .where(FinanceTransactionRevisionModel.transaction_id == transaction_id)
@@ -945,3 +952,173 @@ class FinanceDatabaseStorage(FinanceStorage):
             )
             for row in rows
         ]
+
+    async def _period_month(
+        self,
+        owner_username: str,
+        period_start: date,
+    ) -> tuple[FinanceTrackerModel, FinanceMonthModel]:
+        tracker = await self._tracker(owner_username)
+        month = await self.session.scalar(
+            select(FinanceMonthModel).where(
+                FinanceMonthModel.tracker_id == tracker.id,
+                FinanceMonthModel.period_start == period_start,
+            ),
+        )
+        if month is None:
+            raise FinanceNotFoundError
+        return tracker, month
+
+    async def get_month_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+    ) -> FinanceMonth:
+        tracker, month = await self._period_month(owner_username, period_start)
+        return await self._view(tracker, month)
+
+    async def transactions_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+        include_deleted: bool,
+    ) -> list[FinanceTransaction]:
+        _, month = await self._period_month(owner_username, period_start)
+        return [
+            self._transaction_view(transaction, category, rate_set, rate, month.currency)
+            for transaction, category, rate_set, rate in await self._transaction_rows(
+                month,
+                include_deleted=include_deleted,
+            )
+        ]
+
+    async def revisions_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+        transaction_id: str,
+    ) -> list[FinanceTransactionRevision]:
+        _, month = await self._period_month(owner_username, period_start)
+        await self._owned_transaction(month, transaction_id)
+        return await self._revisions(transaction_id)
+
+    async def statistics_source(
+        self,
+        *,
+        owner_username: str,
+        start: datetime,
+        end: datetime,
+        currency: FinanceCurrency | None,
+    ) -> FinanceStatisticsSource:
+        tracker = await self._tracker(owner_username)
+        available_since = await self.session.scalar(
+            select(func.min(FinanceMonthModel.period_start)).where(
+                FinanceMonthModel.tracker_id == tracker.id,
+            ),
+        )
+        if available_since is None:
+            raise FinanceNotFoundError
+        rows = await self.session.execute(
+            select(
+                FinanceTransactionModel,
+                FinanceMonthCategoryModel,
+                FinanceMonthModel.period_start,
+                FinanceRateModel.rub_per_unit,
+                FinanceMonthModel.currency,
+            )
+            .join(FinanceMonthModel, FinanceMonthModel.id == FinanceTransactionModel.month_id)
+            .outerjoin(
+                FinanceMonthCategoryModel,
+                FinanceMonthCategoryModel.id == FinanceTransactionModel.month_category_id,
+            )
+            .outerjoin(
+                FinanceRateModel,
+                (FinanceRateModel.rate_set_id == FinanceTransactionModel.rate_set_id)
+                & (
+                    FinanceRateModel.currency
+                    == (currency if currency is not None else FinanceMonthModel.currency)
+                ),
+            )
+            .where(
+                FinanceMonthModel.tracker_id == tracker.id,
+                FinanceTransactionModel.deleted_at.is_(None),
+                FinanceTransactionModel.occurred_at >= start,
+                FinanceTransactionModel.occurred_at < end,
+            ),
+        )
+        snapshots = await self.session.execute(
+            select(FinanceMonthCategoryModel, FinanceMonthModel.period_start)
+            .join(FinanceMonthModel, FinanceMonthModel.id == FinanceMonthCategoryModel.month_id)
+            .where(
+                FinanceMonthModel.tracker_id == tracker.id,
+                FinanceMonthModel.period_start < end.astimezone(tracker.time_zone).date(),
+            )
+            .order_by(FinanceMonthModel.period_start),
+        )
+        latest_names = {row.category_id: (period, row.name) for row, period in snapshots}
+        facts = []
+        for transaction, category, period_start, rate, month_currency in rows:
+            if rate is None or rate <= 0:
+                raise FinanceRateUnavailableError
+            facts.append(
+                FinanceStatisticsFact(
+                    currency=currency if currency is not None else month_currency,
+                    occurred_at=transaction.occurred_at,
+                    kind=transaction.kind,
+                    amount=Amount(transaction.amount_rub / rate),
+                    category_id=category.category_id if category is not None else "",
+                    category_name=latest_names[category.category_id][1]
+                    if category is not None
+                    else "",
+                    category_period=latest_names[category.category_id][0]
+                    if category is not None
+                    else period_start,
+                ),
+            )
+        currencies = (
+            [currency]
+            if currency is not None
+            else list(
+                await self.session.scalars(
+                    select(FinanceMonthModel.currency)
+                    .where(
+                        FinanceMonthModel.tracker_id == tracker.id,
+                        FinanceMonthModel.period_start
+                        >= start.astimezone(tracker.time_zone).date().replace(day=1),
+                        FinanceMonthModel.period_start < end.astimezone(tracker.time_zone).date(),
+                    )
+                    .distinct()
+                    .order_by(FinanceMonthModel.currency),
+                ),
+            )
+        )
+        return FinanceStatisticsSource(
+            available_since=available_since,
+            facts=facts,
+            currencies=currencies,
+        )
+
+    async def lock_month_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+    ) -> FinanceMonth:
+        await self.session.execute(
+            select(func.pg_advisory_xact_lock(func.hashtext(owner_username))),
+        )
+        tracker, month = await self._period_month(owner_username, period_start)
+        return await self._view(tracker, month)
+
+    async def transaction_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+        transaction_id: str,
+    ) -> FinanceTransaction:
+        _, month = await self._period_month(owner_username, period_start)
+        return await self._transaction_view_by_id(month, transaction_id)

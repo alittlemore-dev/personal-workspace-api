@@ -49,3 +49,27 @@ class FinanceRevisionAction(StrEnum):
     UPDATE = "update"
     DELETE = "delete"
     RESTORE = "restore"
+
+
+class FinanceStatisticsPeriod(StrEnum):
+    TODAY = "today"
+    THIS_WEEK = "thisWeek"
+    THIS_MONTH = "thisMonth"
+    THIS_YEAR = "thisYear"
+    LAST_7_DAYS = "last7Days"
+    LAST_30_DAYS = "last30Days"
+    LAST_365_DAYS = "last365Days"
+
+
+class FinanceStatisticsGranularity(StrEnum):
+    HOUR = "hour"
+    DAY = "day"
+    MONTH = "month"
+
+
+class FinanceStatisticsCurrency(StrEnum):
+    AMD = "AMD"
+    RUB = "RUB"
+    USD = "USD"
+    EUR = "EUR"
+    MONTH = "month"

@@ -3,11 +3,21 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction, FinanceSource
+from core.finance.enums import (
+    FinanceCurrency,
+    FinanceKind,
+    FinanceRevisionAction,
+    FinanceSource,
+    FinanceStatisticsCurrency,
+    FinanceStatisticsGranularity,
+    FinanceStatisticsPeriod,
+)
 from core.finance.schemas import (
     Amount,
     FinanceMonth,
     FinanceRevisions,
+    FinanceStatistics,
+    FinanceStatisticsResult,
     FinanceTransaction,
     FinanceTransactionDraft,
     FinanceTransactionRevision,
@@ -110,6 +120,7 @@ class FinanceVersionRequest(CamelCaseSchema):
 
 
 class FinanceTransactionResponse(CamelCaseSchema):
+    created_at: datetime
     source: FinanceSource
     author_id: str
     author_label: str
@@ -157,3 +168,83 @@ class FinanceRevisionsResponse(CamelCaseSchema):
     @classmethod
     def from_domain(cls, revisions: FinanceRevisions) -> FinanceRevisionsResponse:
         return cls.model_validate(revisions)
+
+
+class FinanceStatisticsWindowResponse(CamelCaseSchema):
+    start: datetime
+    end: datetime
+    granularity: FinanceStatisticsGranularity
+
+
+class FinanceStatisticsPointResponse(CamelCaseSchema):
+    start: datetime
+    end: datetime
+    amount: Decimal
+
+
+class FinanceStatisticsCategoryResponse(CamelCaseSchema):
+    id: str
+    name: str
+    amount: Decimal
+    percentage: Decimal
+
+
+class FinanceStatisticsBreakdownResponse(CamelCaseSchema):
+    actual: Decimal
+    previous: Decimal
+    change: Decimal
+    change_percent: Decimal | None
+    timeline: list[FinanceStatisticsPointResponse]
+    categories: list[FinanceStatisticsCategoryResponse]
+
+
+class FinanceStatisticsResponse(CamelCaseSchema):
+    budget_rate_effective_on: date | None
+    period: FinanceStatisticsPeriod
+    currency: FinanceCurrency
+    timezone_name: str
+    window: FinanceStatisticsWindowResponse
+    previous_window: FinanceStatisticsWindowResponse
+    available_since: date
+    income: FinanceStatisticsBreakdownResponse
+    expense: FinanceStatisticsBreakdownResponse
+    net: Decimal
+    previous_net: Decimal
+    uncategorized_income: Decimal
+    uncategorized_expense: Decimal
+    monthly: FinanceMonthResponse | None
+
+    @classmethod
+    def from_domain(cls, statistics: FinanceStatistics) -> FinanceStatisticsResponse:
+        return cls(
+            budget_rate_effective_on=statistics.budget_rate_effective_on,
+            period=statistics.period,
+            currency=statistics.currency,
+            timezone_name=statistics.timezone_name,
+            window=FinanceStatisticsWindowResponse.model_validate(statistics.window),
+            previous_window=FinanceStatisticsWindowResponse.model_validate(
+                statistics.previous_window,
+            ),
+            available_since=statistics.available_since,
+            income=FinanceStatisticsBreakdownResponse.model_validate(statistics.income),
+            expense=FinanceStatisticsBreakdownResponse.model_validate(statistics.expense),
+            net=statistics.net,
+            previous_net=statistics.previous_net,
+            uncategorized_income=statistics.uncategorized_income,
+            uncategorized_expense=statistics.uncategorized_expense,
+            monthly=FinanceMonthResponse.from_domain(statistics.monthly)
+            if statistics.monthly is not None
+            else None,
+        )
+
+
+class FinanceStatisticsResultResponse(CamelCaseSchema):
+    currency: FinanceStatisticsCurrency
+    reports: list[FinanceStatisticsResponse]
+
+    @classmethod
+    def from_domain(cls, result: FinanceStatisticsResult) -> FinanceStatisticsResultResponse:
+        return cls(
+            currency=result.currency,
+            reports=[FinanceStatisticsResponse.from_domain(report) for report in result.reports],
+        )

@@ -33,34 +33,36 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
   - [ ] Set limits to expences (no solid limits, only soft notifications about limits overdraft)
   - [ ] Shows limits overdraft 
   - [ ] Add a restricted formula editor for category limits with suggestions after `=`: percentage, multiplier, and difference based on selected income or expense categories (for example, a children's allowance of 5% of salary), with typed rules and dependency-cycle validation instead of arbitrary spreadsheet formulas.
-- [ ] Statistic
-  - [ ] Main page
-    - [ ] 2 vertical bar charts with initial balance amount and balance at the end of the period
-    - [ ] 2 separated tables - income and expences with columns: category name, estimated (limit), actual, diff (estimated minus actual)
-    - [ ] 2 horizontal bar charts for income: estimated and actual
-    - [ ] 2 horizontal bar charts for expences: estimated and actual
-  - [ ] Income
-    - [ ] Dynamic by previous periods
-    - [ ] Pie chart by categories
-  - [ ] Expences
-    - [ ] Dynamic by previous periods
-    - [ ] Pie chart by categiries
-  - [ ] Periods - no limits incuded. Limits applies and shows only on current month.
-    - [ ] this month (only current month)
-    - [ ] this year (only current year)
-    - [ ] this week (only current week)
-    - [ ] this day (only today)
-    - [ ] last week (7 days to current date)
-    - [ ] last month (30 days to current date)
-    - [ ] last year (365 days to cuurent date)
-    - [ ] save filter preset in settings
+- [x] Statistic
+  - [x] Main page
+    - [x] 2 vertical bar charts with initial balance amount and balance at the end of the period
+    - [x] 2 separated tables - income and expences with columns: category name, estimated (limit), actual, diff (actual minus estimated for income; estimated minus actual for expenses)
+    - [x] 2 horizontal bar charts for income: estimated and actual
+    - [x] 2 horizontal bar charts for expences: estimated and actual
+  - [x] Income
+    - [x] Dynamic by previous periods
+    - [x] Pie chart by categories
+  - [x] Expences
+    - [x] Dynamic by previous periods
+    - [x] Pie chart by categiries
+  - [x] Periods - plans/limits and balance charts appear only for the current month.
+    - [x] this month (only current month)
+    - [x] this year (only current year)
+    - [x] this week (only current week)
+    - [x] this day (only today)
+    - [x] last week (7 days to current date)
+    - [x] last month (30 days to current date)
+    - [x] last year (365 days to cuurent date)
+
+- [x] Browse previous months in Overview with URL-backed month/year navigation and historical budgets, transactions, and revisions.
+- [x] Allow late transactions in the immediately previous month and restrict edits to records created after that month ended; preserve the current opening balance.
+- [x] Present all statistics in one selected currency or in separate native month-currency groups, with currency symbols in the selector.
+- [x] Compare income and expenses with complete previous periods, and choose an analytics currency using saved operation rates.
 
 ## Per-user settings
 
 - [ ] Layout
   - [ ] Workspace items opened or closed
-- [ ] Finance tracker
-  - [ ] Workspace statistic chosen period
 - [ ] Telegram bot integration
   - [x] Add a Workspace-wide Telegram ON/OFF setting and invitation management.
   - [x] Add individual connection notification switches for birthdays, memorable dates, transactions, and expense limits.

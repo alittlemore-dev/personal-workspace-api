@@ -425,6 +425,7 @@ class FinanceConversation:
         elif step == "confirmation" and action == "confirm":
             await use_case.create_transaction(
                 CreateFinanceTransactionParams(
+                    period_start=None,
                     owner_username=connection.owner_username,
                     now=now,
                     draft=self.draft(data),

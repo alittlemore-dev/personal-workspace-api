@@ -41,6 +41,7 @@ from core.finance.schemas import (
 from core.finance.services import (
     FinanceEventService,
     FinanceMonthService,
+    FinanceStatisticsService,
     FinanceTelegramAccessService,
 )
 from core.finance.storages import FinanceStorage
@@ -309,6 +310,7 @@ class CoreFactoryHelper:
             client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
             rate_client = client
         return FinanceUseCase(
+            statistics_service=FinanceStatisticsService(),
             storage=storage,
             months=FinanceMonthService(storage=storage),
             rate_client=rate_client,
@@ -432,6 +434,7 @@ class CoreFactoryHelper:
         pricing: FinanceTransactionPricing | None = None,
     ) -> FinanceTransaction:
         return FinanceTransaction(
+            created_at=datetime(2026, 9, 15, tzinfo=UTC),
             id=transaction_id,
             category_id=category_id,
             category_name=category_name,

@@ -13,6 +13,7 @@ from core.finance.schemas import (
     FinanceMonthRollover,
     FinanceOpeningBalanceUpdate,
     FinanceRateSet,
+    FinanceStatisticsSource,
     FinanceTemplateCategory,
     FinanceTracker,
     FinanceTransaction,
@@ -166,3 +167,56 @@ class FinanceStorage(ABC):
 
     @abstractmethod
     async def save_rate_set(self, *, rate_set: FinanceRateSet) -> str: ...
+
+    @abstractmethod
+    async def get_month_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+    ) -> FinanceMonth: ...
+
+    @abstractmethod
+    async def transactions_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+        include_deleted: bool,
+    ) -> list[FinanceTransaction]: ...
+
+    @abstractmethod
+    async def revisions_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+        transaction_id: str,
+    ) -> list[FinanceTransactionRevision]: ...
+
+    @abstractmethod
+    async def statistics_source(
+        self,
+        *,
+        owner_username: str,
+        start: datetime,
+        end: datetime,
+        currency: FinanceCurrency | None,
+    ) -> FinanceStatisticsSource: ...
+
+    @abstractmethod
+    async def lock_month_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+    ) -> FinanceMonth: ...
+
+    @abstractmethod
+    async def transaction_for_period(
+        self,
+        *,
+        owner_username: str,
+        period_start: date,
+        transaction_id: str,
+    ) -> FinanceTransaction: ...

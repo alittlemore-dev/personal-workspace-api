@@ -11,6 +11,7 @@ from core.finance.schemas import FinanceEventConfig
 from core.finance.services import (
     FinanceEventService,
     FinanceMonthService,
+    FinanceStatisticsService,
     FinanceTelegramAccessService,
 )
 from core.finance.storages import FinanceStorage
@@ -56,6 +57,7 @@ class FinanceProvider(Provider):
         months: FinanceMonthService,
     ) -> FinanceUseCase:
         return FinanceUseCase(
+            statistics_service=FinanceStatisticsService(),
             storage=storage,
             rate_client=rate_client,
             telegram_access=telegram_access,

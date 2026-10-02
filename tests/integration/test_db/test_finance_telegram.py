@@ -97,6 +97,7 @@ class TestFinanceTelegram(StorageTestCase):
             month_id=self.month.id,
         )
         self.params = CreateFinanceTransactionParams(
+            period_start=None,
             owner_username="owner",
             now=NOW,
             actor=self.actor,
@@ -345,6 +346,7 @@ class TestFinanceTelegram(StorageTestCase):
         created = await self.use_case.create_transaction(self.params)
         deleted = await self.use_case.set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 now=NOW,
                 transaction_id=created.id,
@@ -354,6 +356,7 @@ class TestFinanceTelegram(StorageTestCase):
         )
         await self.use_case.set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 now=NOW,
                 transaction_id=created.id,
@@ -404,6 +407,7 @@ class TestFinanceTelegram(StorageTestCase):
         for amount in (20, 1, 10):
             transaction = await self.use_case.update_transaction(
                 UpdateFinanceTransactionParams(
+                    period_start=None,
                     owner_username="owner",
                     now=NOW,
                     transaction_id=transaction.id,
@@ -507,6 +511,7 @@ async def test_concurrent_confirmations_create_one_transaction_and_outbox_event(
         month_id=month.id,
     )
     params = CreateFinanceTransactionParams(
+        period_start=None,
         owner_username="owner",
         now=NOW,
         actor=actor,

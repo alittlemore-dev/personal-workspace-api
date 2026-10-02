@@ -118,6 +118,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         created = await use_case.create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=draft,
                 now=now,
@@ -126,6 +127,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         updated = await use_case.update_transaction(
             UpdateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=created.id,
                 draft=replace(draft, description="Corrected"),
@@ -135,6 +137,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         second = await use_case.create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=replace(draft, amount=Amount(20)),
                 now=now,
@@ -143,6 +146,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         deleted = await use_case.set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=second.id,
                 version=second.version,
@@ -218,6 +222,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         restored = await use_case.set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=deleted.id,
                 version=deleted.version,
@@ -242,6 +247,7 @@ class TestFinanceStorage(StorageTestCase):
         with pytest.raises(FinanceNotFoundError):
             await use_case.update_transaction(
                 UpdateFinanceTransactionParams(
+                    period_start=None,
                     owner_username="owner",
                     transaction_id=created.id,
                     draft=draft,
@@ -252,6 +258,7 @@ class TestFinanceStorage(StorageTestCase):
         remaining = after.categories[0]
         recategorized = await use_case.update_transaction(
             UpdateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=created.id,
                 draft=replace(draft, category_id=remaining.id),
@@ -283,6 +290,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         transaction = await use_case.create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=self.factory.core.finance_transaction_draft(
                     category_id=category.id,
@@ -468,6 +476,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         await use_case.create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=self.factory.core.finance_transaction_draft(
                     category_id=expense.id,
@@ -569,6 +578,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         await use_case.create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=self.factory.core.finance_transaction_draft(
                     category_id=expense.id,
@@ -653,6 +663,7 @@ class TestFinanceStorage(StorageTestCase):
         )
         created = await use_case.create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=draft,
                 now=now,
@@ -662,6 +673,7 @@ class TestFinanceStorage(StorageTestCase):
         assert created.converted_amount == Decimal(10)
         changed = await use_case.update_transaction(
             UpdateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=created.id,
                 draft=self.factory.core.finance_transaction_draft(
@@ -679,6 +691,7 @@ class TestFinanceStorage(StorageTestCase):
         with pytest.raises(FinanceConflictError):
             await use_case.update_transaction(
                 UpdateFinanceTransactionParams(
+                    period_start=None,
                     owner_username="owner",
                     transaction_id=created.id,
                     draft=draft,
@@ -689,6 +702,7 @@ class TestFinanceStorage(StorageTestCase):
         with pytest.raises(FinanceNotFoundError):
             await use_case.set_transaction_deleted(
                 SetFinanceTransactionDeletedParams(
+                    period_start=None,
                     owner_username="other",
                     transaction_id=created.id,
                     version=changed.version,
@@ -698,6 +712,7 @@ class TestFinanceStorage(StorageTestCase):
             )
         deleted = await use_case.set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=created.id,
                 version=changed.version,
@@ -709,6 +724,7 @@ class TestFinanceStorage(StorageTestCase):
         assert (await storage.get_month(owner_username="owner", now=now)).actual_expense == 0
         restored = await use_case.set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=created.id,
                 version=deleted.version,
@@ -866,6 +882,7 @@ async def test_creating_transaction_refreshes_a_category_archived_by_another_ses
         task = asyncio.create_task(
             use_case.create_transaction(
                 CreateFinanceTransactionParams(
+                    period_start=None,
                     owner_username="owner",
                     now=now,
                     draft=factory.core.finance_transaction_draft(category_id=category.id),
@@ -995,6 +1012,7 @@ async def test_transaction_loaded_before_category_delete_refreshes_its_category(
         )
         transaction = await factory.core.finance_use_case(storage).create_transaction(
             CreateFinanceTransactionParams(
+                period_start=None,
                 owner_username="owner",
                 draft=factory.core.finance_transaction_draft(
                     category_id=category.id,
@@ -1035,6 +1053,7 @@ async def test_transaction_loaded_before_category_delete_refreshes_its_category(
             return
         deleted = await factory.core.finance_use_case(storage).set_transaction_deleted(
             SetFinanceTransactionDeletedParams(
+                period_start=None,
                 owner_username="owner",
                 transaction_id=transaction.id,
                 version=transaction.version,

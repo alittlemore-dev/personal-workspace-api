@@ -11,6 +11,9 @@ from core.finance.enums import (
     FinanceLimitScope,
     FinanceRevisionAction,
     FinanceSource,
+    FinanceStatisticsCurrency,
+    FinanceStatisticsGranularity,
+    FinanceStatisticsPeriod,
 )
 from core.finance.exceptions import (
     FinanceConflictError,
@@ -166,6 +169,13 @@ class FinanceMonth:
             categories=categories,
         )
 
+    def check_transaction_period(self, period: date | None) -> None:
+        if period is not None and period not in (
+            self.period_start,
+            (self.period_start - timedelta(days=1)).replace(day=1),
+        ):
+            raise FinanceConflictError
+
     def crossed_limits(
         self,
         before: FinanceMonth,
@@ -242,6 +252,74 @@ class FinanceMonth:
                 for category in self.categories
                 if category.planned_amount is not None
             },
+        )
+
+    def needs_budget_rate(self, currency: FinanceStatisticsCurrency) -> bool:
+        return currency not in {FinanceStatisticsCurrency.MONTH, self.currency} and (
+            self.opening_balance != 0
+            or any(category.planned_amount for category in self.categories)
+        )
+
+    def statistics_projection(
+        self,
+        currency: FinanceCurrency,
+        facts: list[FinanceStatisticsFact],
+        rate: FinanceRateSet | None,
+    ) -> FinanceMonth:
+        factor = rate.conversion_factor(self.currency, currency) if rate is not None else Decimal(1)
+        current = [
+            fact
+            for fact in facts
+            if fact.occurred_at.astimezone(self.time_zone).date().replace(day=1)
+            == self.period_start
+        ]
+        by_category = {
+            category.id: Amount(
+                sum(
+                    (fact.amount for fact in current if fact.category_id == category.stable_id),
+                    Amount(0),
+                ),
+            )
+            for category in self.categories
+        }
+        return FinanceMonth.compose(
+            FinanceMonthSnapshot(
+                id=self.id,
+                tracker_id=self.tracker_id,
+                period_start=self.period_start,
+                time_zone=self.time_zone,
+                currency=currency,
+                opening_balance=self.opening_balance.converted(currency, factor),
+                categories=[
+                    FinanceCategorySnapshot(
+                        id=row.id,
+                        stable_id=row.stable_id,
+                        kind=row.kind,
+                        name=row.name,
+                        planned_amount=row.planned_amount.converted(currency, factor)
+                        if row.planned_amount is not None
+                        else None,
+                        position=row.position,
+                        archived=row.archived,
+                    )
+                    for row in self.categories
+                ],
+            ),
+            FinanceActuals(
+                income=Amount(
+                    sum(
+                        (fact.amount for fact in current if fact.kind == FinanceKind.INCOME),
+                        Amount(0),
+                    ),
+                ),
+                expense=Amount(
+                    sum(
+                        (fact.amount for fact in current if fact.kind == FinanceKind.EXPENSE),
+                        Amount(0),
+                    ),
+                ),
+                by_category=by_category,
+            ),
         )
 
     def amount_snapshot(self) -> FinanceCurrencyConversion:
@@ -361,6 +439,7 @@ class FinanceTransactionDraft:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceTransaction:
+    created_at: datetime
     source: FinanceSource
     author_id: str
     author_label: str
@@ -377,6 +456,14 @@ class FinanceTransaction:
     version: int
     deleted: bool
     pricing: FinanceTransactionPricing
+
+    def check_writable(self, month: FinanceMonth, now: datetime) -> None:
+        current = now.astimezone(month.time_zone).date().replace(day=1)
+        if month.period_start != current and (
+            next_month(month.period_start) != current
+            or self.created_at.astimezone(month.time_zone).date().replace(day=1) != current
+        ):
+            raise FinanceConflictError
 
     def check_updatable(self, version: int) -> None:
         if self.version != version or self.deleted:
@@ -583,12 +670,14 @@ class TelegramFinanceContextParams:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CreateFinanceTransactionParams(FinanceMonthParams):
+    period_start: date | None
     draft: FinanceTransactionDraft
     actor: FinanceActor
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class UpdateFinanceTransactionParams(FinanceMonthParams):
+    period_start: date | None
     transaction_id: str
     draft: FinanceTransactionDraft
     version: int
@@ -596,6 +685,7 @@ class UpdateFinanceTransactionParams(FinanceMonthParams):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SetFinanceTransactionDeletedParams(FinanceMonthParams):
+    period_start: date | None
     transaction_id: str
     version: int
     deleted: bool
@@ -765,3 +855,172 @@ class ConfirmedFinanceOperationParams:
     actor: FinanceActor
     owner_username: str
     now: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceHistoricalMonthParams(FinanceMonthParams):
+    period_start: date
+
+    def check_period(self, month: FinanceMonth) -> None:
+        if self.period_start.day != 1 or self.period_start > month.period_start:
+            raise InvalidFinanceDataError
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListHistoricalFinanceTransactionsParams(FinanceHistoricalMonthParams):
+    include_deleted: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class HistoricalFinanceRevisionsParams(FinanceHistoricalMonthParams):
+    transaction_id: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsParams(FinanceMonthParams):
+    period: FinanceStatisticsPeriod
+    currency: FinanceStatisticsCurrency
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsWindow:
+    start: datetime
+    end: datetime
+    granularity: FinanceStatisticsGranularity
+
+    @classmethod
+    def for_period(
+        cls,
+        period: FinanceStatisticsPeriod,
+        now: datetime,
+        time_zone: ZoneInfo,
+    ) -> tuple[FinanceStatisticsWindow, FinanceStatisticsWindow]:
+        today = now.astimezone(time_zone).date()
+        granularity = FinanceStatisticsGranularity.DAY
+        if period == FinanceStatisticsPeriod.TODAY:
+            start = today
+            end = today + timedelta(days=1)
+            previous_start = start - timedelta(days=1)
+            granularity = FinanceStatisticsGranularity.HOUR
+        elif period == FinanceStatisticsPeriod.THIS_WEEK:
+            start = today - timedelta(days=today.weekday())
+            end = start + timedelta(days=7)
+            previous_start = start - timedelta(days=7)
+        elif period == FinanceStatisticsPeriod.THIS_MONTH:
+            start = today.replace(day=1)
+            end = next_month(start)
+            previous_start = (start - timedelta(days=1)).replace(day=1)
+        elif period == FinanceStatisticsPeriod.THIS_YEAR:
+            start = date(today.year, 1, 1)
+            end = date(today.year + 1, 1, 1)
+            previous_start = date(today.year - 1, 1, 1)
+            granularity = FinanceStatisticsGranularity.MONTH
+        else:
+            days = {
+                FinanceStatisticsPeriod.LAST_7_DAYS: 7,
+                FinanceStatisticsPeriod.LAST_30_DAYS: 30,
+                FinanceStatisticsPeriod.LAST_365_DAYS: 365,
+            }[period]
+            end = today + timedelta(days=1)
+            start = end - timedelta(days=days)
+            previous_start = start - timedelta(days=days)
+            if period == FinanceStatisticsPeriod.LAST_365_DAYS:
+                granularity = FinanceStatisticsGranularity.MONTH
+        return (
+            cls(
+                start=datetime.combine(start, datetime.min.time(), time_zone),
+                end=datetime.combine(end, datetime.min.time(), time_zone),
+                granularity=granularity,
+            ),
+            cls(
+                start=datetime.combine(previous_start, datetime.min.time(), time_zone),
+                end=datetime.combine(start, datetime.min.time(), time_zone),
+                granularity=granularity,
+            ),
+        )
+
+    def contains(self, occurred_at: datetime) -> bool:
+        return self.start <= occurred_at < self.end
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsFact:
+    currency: FinanceCurrency
+    occurred_at: datetime
+    kind: FinanceKind
+    amount: Amount
+    category_id: str
+    category_name: str
+    category_period: date
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsSource:
+    available_since: date
+    facts: list[FinanceStatisticsFact]
+    currencies: list[FinanceCurrency]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsPoint:
+    start: datetime
+    end: datetime
+    amount: Amount
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsCategory:
+    id: str
+    name: str
+    amount: Amount
+    percentage: Decimal
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsBreakdown:
+    actual: Amount
+    previous: Amount
+    change: Amount
+    change_percent: Decimal | None
+    timeline: list[FinanceStatisticsPoint]
+    categories: list[FinanceStatisticsCategory]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatistics:
+    budget_rate_effective_on: date | None
+    period: FinanceStatisticsPeriod
+    currency: FinanceCurrency
+    timezone_name: str
+    window: FinanceStatisticsWindow
+    previous_window: FinanceStatisticsWindow
+    available_since: date
+    income: FinanceStatisticsBreakdown
+    expense: FinanceStatisticsBreakdown
+    net: Amount
+    previous_net: Amount
+    uncategorized_income: Amount
+    uncategorized_expense: Amount
+    monthly: FinanceMonth | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransactionMonthParams(FinanceMonthParams):
+    period_start: date | None
+    lock: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsResult:
+    currency: FinanceStatisticsCurrency
+    reports: list[FinanceStatistics]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceStatisticsComposition:
+    params: FinanceStatisticsParams
+    month: FinanceMonth
+    window: FinanceStatisticsWindow
+    previous_window: FinanceStatisticsWindow
+    source: FinanceStatisticsSource
+    budget_rate: FinanceRateSet | None

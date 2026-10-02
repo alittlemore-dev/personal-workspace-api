@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from backend_sdk import RoleEnum
@@ -8,12 +8,15 @@ from dishka import AsyncContainer
 from httpx import codes
 from litestar.testing import TestClient
 
+from core.cache_tools.enums import CacheWarmOperationStatusEnum
+from core.cache_tools.schemas import CacheWarmOperation
 from core.calendar.enums import CalendarWindow
 from core.calendar.schemas import Calendar, CalendarSummary
 from core.wiki_links.schemas import WikiLinkTargets
 from entrypoints.litestar.initializers.main import create_litestar_app
 from tests.helpers.api import APIHelper
 from tests.helpers.app import IocContainerHelper
+from tests.helpers.factories.core import CoreFactoryHelper
 
 
 def build_sdk_auth_app(
@@ -52,7 +55,10 @@ class TestSdkAuthentication:
 
         assert response.status_code == codes.UNAUTHORIZED
 
-    @pytest.mark.parametrize("role", [RoleEnum.OWNER, RoleEnum.ADMIN, RoleEnum.MODERATOR])
+    @pytest.mark.parametrize(
+        "role",
+        [RoleEnum.OWNER, RoleEnum.ADMIN, RoleEnum.MODERATOR, RoleEnum.USER],
+    )
     async def test_authenticated_principal_reaches_author_scoped_endpoint(
         self,
         container: AsyncContainer,
@@ -87,15 +93,89 @@ class TestSdkAuthentication:
             "entries": [],
         }
 
-    def test_rejects_regular_user_from_workspace(self, container: AsyncContainer) -> None:
-        auth_client = FakeAuthenticationClient(username="regular-user", role=RoleEnum.USER)
+    @pytest.mark.parametrize("role", [RoleEnum.ADMIN, RoleEnum.OWNER])
+    async def test_admins_can_manage_cache(
+        self,
+        container: AsyncContainer,
+        role: RoleEnum,
+    ) -> None:
+        auth_client = FakeAuthenticationClient(username="cache-manager", role=role)
+        use_case = await IocContainerHelper(container=container).get_cache_tools_use_case()
+        cache_status = CoreFactoryHelper.cache_tools_status()
+        operation = CacheWarmOperation(
+            operation_id="operation-id",
+            status=CacheWarmOperationStatusEnum.QUEUED,
+            queued_at=datetime(2026, 7, 16, 12, 0, tzinfo=UTC),
+            summary=None,
+        )
+        use_case.get_status.return_value = cache_status
+        use_case.clear.return_value = cache_status
+        use_case.enqueue_manual_warm.return_value = operation
+        use_case.get_manual_warm_operation.return_value = operation
+        headers = bearer_headers(token="admin-token")  # noqa: S106
+
         with build_sdk_auth_app(container=container, auth_client=auth_client) as client:
-            response = client.get(
-                "/api/calendar",
-                params={"referenceDate": "2026-07-31", "window": "currentAndNextMonths"},
-                headers=bearer_headers(token="user-token"),  # noqa: S106
+            assert client.get("/api/tools/cache", headers=headers).status_code == codes.OK
+            assert client.post("/api/tools/cache/clear", headers=headers).status_code == codes.OK
+            warm_response = client.post("/api/tools/cache/warm", headers=headers)
+            assert warm_response.status_code == codes.ACCEPTED
+            operation_id = warm_response.json()["operationId"]
+            poll_response = client.get(f"/api/tools/cache/warm/{operation_id}", headers=headers)
+            assert poll_response.status_code == codes.OK
+            assert poll_response.json()["status"] == "queued"
+
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [
+            ("GET", "/api/tools/cache"),
+            ("POST", "/api/tools/cache/clear"),
+            ("POST", "/api/tools/cache/warm"),
+            ("GET", "/api/tools/cache/warm/operation-id"),
+        ],
+    )
+    def test_rejects_anonymous_cache_tools(
+        self,
+        container: AsyncContainer,
+        method: str,
+        path: str,
+    ) -> None:
+        auth_client = FakeAuthenticationClient()
+        with build_sdk_auth_app(container=container, auth_client=auth_client) as client:
+            response = client.request(method, path)
+        assert response.status_code == codes.UNAUTHORIZED
+
+    @pytest.mark.parametrize("role", [RoleEnum.USER, RoleEnum.MODERATOR])
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [
+            ("GET", "/api/tools/cache"),
+            ("POST", "/api/tools/cache/clear"),
+            ("POST", "/api/tools/cache/warm"),
+            ("GET", "/api/tools/cache/warm/operation-id"),
+        ],
+    )
+    async def test_rejects_non_admin_cache_tools(
+        self,
+        container: AsyncContainer,
+        role: RoleEnum,
+        method: str,
+        path: str,
+    ) -> None:
+        auth_client = FakeAuthenticationClient(username="workspace-reader", role=role)
+        use_case = await IocContainerHelper(container=container).get_cache_tools_use_case()
+
+        with build_sdk_auth_app(container=container, auth_client=auth_client) as client:
+            response = client.request(
+                method,
+                path,
+                headers=bearer_headers(token="reader-token"),  # noqa: S106
             )
+
         assert response.status_code == codes.FORBIDDEN
+        use_case.get_status.assert_not_awaited()
+        use_case.clear.assert_not_awaited()
+        use_case.enqueue_manual_warm.assert_not_awaited()
+        use_case.get_manual_warm_operation.assert_not_awaited()
 
     async def test_authenticated_response_disables_shared_caching(
         self,

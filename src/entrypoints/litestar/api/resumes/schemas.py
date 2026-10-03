@@ -5,7 +5,12 @@ from litestar.datastructures.upload_file import UploadFile
 from pydantic import AfterValidator, ConfigDict, Field, model_validator
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
+from core.resumes.enums import (
+    ResumeCurrentStatusEnum,
+    ResumeDateFormatEnum,
+    ResumeExportFormatEnum,
+    ResumeThemeEnum,
+)
 from core.resumes.schemas import (
     Resume,
     ResumeAdditionalSection,
@@ -20,6 +25,7 @@ from core.resumes.schemas import (
     ResumeProfile,
     ResumeProjectItem,
     Resumes,
+    ResumeSettings,
     ResumeSkillGroup,
     ResumeSummary,
     ResumeUpdateParams,
@@ -142,7 +148,7 @@ class ResumeSkillGroupSchema(CamelCaseSchema):
 
 class ResumeProjectItemSchema(CamelCaseSchema):
     name: Annotated[RequiredShortText, Field(title="Project name")]
-    role: Annotated[RequiredShortText, Field(title="Project role")]
+    role: Annotated[ResumeOptionalShortText, Field(title="Project role")]
     team_size: Annotated[ResumeOptionalShortText, Field(title="Team size")]
     scale: Annotated[ResumeOptionalShortText, Field(title="Project scale")]
     description: Annotated[
@@ -195,7 +201,7 @@ class ResumeExperienceItemSchema(CamelCaseSchema):
     company_website_url: Annotated[BlankableHttpUrlString, Field(title="Company website URL")]
     position: Annotated[RequiredShortText, Field(title="Position")]
     location: Annotated[ResumeOptionalShortText, Field(title="Location")]
-    start_date: Annotated[date, Field(title="Start date")]
+    start_date: Annotated[date | None, Field(title="Start date")]
     end_date: Annotated[date | None, Field(title="End date")]
     current_status: Annotated[ResumeCurrentStatusEnum, Field(title="Current status")]
     summary: Annotated[
@@ -241,7 +247,7 @@ class ResumeExperienceItemSchema(CamelCaseSchema):
                 company_website_url=schema.company_website_url,
                 position=schema.position,
                 location=schema.location,
-                start_date=cast("date", schema.start_date),
+                start_date=schema.start_date,
                 end_date=schema.end_date,
                 current_status=schema.current_status,
                 summary=schema.summary,
@@ -260,7 +266,7 @@ class ResumeEducationItemSchema(CamelCaseSchema):
     degree: Annotated[RequiredShortText, Field(title="Degree")]
     field: Annotated[RequiredShortText, Field(title="Field")]
     location: Annotated[RequiredShortText, Field(title="Location")]
-    start_date: Annotated[date, Field(title="Start date")]
+    start_date: Annotated[date | None, Field(title="Start date")]
     end_date: Annotated[date | None, Field(title="End date")]
     description: Annotated[
         ResumeLongText,
@@ -289,7 +295,7 @@ class ResumeEducationItemSchema(CamelCaseSchema):
                 degree=schema.degree,
                 field=schema.field,
                 location=schema.location,
-                start_date=cast("date", schema.start_date),
+                start_date=schema.start_date,
                 end_date=schema.end_date,
                 description=schema.description,
             ),
@@ -407,7 +413,19 @@ class ResumeAdditionalSectionSchema(CamelCaseSchema):
         )
 
 
+class ResumeSettingsSchema(CamelCaseSchema):
+    date_format: Annotated[ResumeDateFormatEnum, Field(title="Date format")]
+
+    def to_domain_schema(self) -> ResumeSettings:
+        return ResumeSettings(date_format=self.date_format)
+
+    @classmethod
+    def from_domain_schema(cls, *, schema: ResumeSettings) -> Self:
+        return cls(date_format=schema.date_format)
+
+
 class ResumeContentSchema(CamelCaseSchema):
+    settings: Annotated[ResumeSettingsSchema, Field(title="Resume settings")]
     profile: Annotated[ResumeProfileSchema, Field(title="Profile")]
     summary: Annotated[ResumeSummarySchema, Field(title="Summary")]
     skills: Annotated[
@@ -439,6 +457,7 @@ class ResumeContentSchema(CamelCaseSchema):
 
     def to_domain_schema(self) -> ResumeContent:
         return ResumeContent(
+            settings=self.settings.to_domain_schema(),
             profile=self.profile.to_domain_schema(),
             summary=self.summary.to_domain_schema(),
             skills=[skill.to_domain_schema() for skill in self.skills],
@@ -458,6 +477,7 @@ class ResumeContentSchema(CamelCaseSchema):
         return cast(
             "Self",
             cls.model_construct(
+                settings=ResumeSettingsSchema.from_domain_schema(schema=schema.settings),
                 profile=ResumeProfileSchema.from_domain_schema(schema=schema.profile),
                 summary=ResumeSummarySchema.from_domain_schema(schema=schema.summary),
                 skills=[

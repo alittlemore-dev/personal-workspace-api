@@ -56,7 +56,7 @@ def visible_text_length(value: object) -> int:
             for key, item in value.items()
             if isinstance(key, str)
             and not key.endswith("url")
-            and key not in {"current_status", "photo_file_id"}
+            and key not in {"current_status", "photo_file_id", "settings"}
         )
     return 0
 
@@ -78,7 +78,14 @@ def validate_experience_content(value: ResumeExperienceItemSchema) -> ResumeExpe
     if not value.summary.strip() and not value.highlights and not value.projects:
         message = "experience requires a summary, highlight or project"
         raise ValueError(message)
-    if value.end_date is not None and value.end_date < value.start_date:
+    if value.end_date is not None and value.start_date is None:
+        message = "end date requires a start date"
+        raise ValueError(message)
+    if (
+        value.start_date is not None
+        and value.end_date is not None
+        and value.end_date < value.start_date
+    ):
         message = "experience end date must not precede start date"
         raise ValueError(message)
     if value.current_status is ResumeCurrentStatusEnum.CURRENT and value.end_date is not None:
@@ -89,7 +96,14 @@ def validate_experience_content(value: ResumeExperienceItemSchema) -> ResumeExpe
 
 
 def validate_education_dates(value: ResumeEducationItemSchema) -> ResumeEducationItemSchema:
-    if value.end_date is not None and value.end_date < value.start_date:
+    if value.end_date is not None and value.start_date is None:
+        message = "end date requires a start date"
+        raise ValueError(message)
+    if (
+        value.start_date is not None
+        and value.end_date is not None
+        and value.end_date < value.start_date
+    ):
         message = "education end date must not precede start date"
         raise ValueError(message)
     return value
@@ -98,6 +112,9 @@ def validate_education_dates(value: ResumeEducationItemSchema) -> ResumeEducatio
 def validate_certification_dates(
     value: ResumeCertificationItemSchema,
 ) -> ResumeCertificationItemSchema:
+    if value.expires_on is not None and value.issued_on is None:
+        message = "certification expiration requires an issue date"
+        raise ValueError(message)
     if (
         value.issued_on is not None
         and value.expires_on is not None

@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, synonym
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum
 from core.resumes.schemas import (
     Resume,
     ResumeAdditionalSection,
@@ -19,6 +19,7 @@ from core.resumes.schemas import (
     ResumeLanguageItem,
     ResumeProfile,
     ResumeProjectItem,
+    ResumeSettings,
     ResumeSkillGroup,
     ResumeSummary,
 )
@@ -99,6 +100,7 @@ class ResumeModel(VaultEntryModel, BaseModel):
     @classmethod
     def _content_to_json(cls, *, content: ResumeContent) -> dict[str, Any]:
         return {
+            "settings": {"date_format": content.settings.date_format.value},
             "profile": cls._profile_to_json(profile=content.profile),
             "summary": {
                 "text": content.summary.text,
@@ -220,6 +222,9 @@ class ResumeModel(VaultEntryModel, BaseModel):
     @classmethod
     def _content_from_json(cls, *, data: dict[str, Any]) -> ResumeContent:
         return ResumeContent(
+            settings=ResumeSettings(
+                date_format=ResumeDateFormatEnum(data["settings"]["date_format"]),
+            ),
             profile=cls._profile_from_json(data=data["profile"]),
             summary=ResumeSummary(
                 text=cls._string_from_json(value=data["summary"]["text"]),

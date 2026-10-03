@@ -4,19 +4,27 @@ from dataclasses import replace
 from datetime import date
 from zipfile import ZipFile
 
+import pytest
 from docx import Document
 from PIL import Image
 from pypdf import PdfReader
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
+from core.resumes.enums import (
+    ResumeCurrentStatusEnum,
+    ResumeDateFormatEnum,
+    ResumeExportFormatEnum,
+    ResumeThemeEnum,
+)
 from core.resumes.schemas import (
     ResumeAdditionalSection,
     ResumeAdditionalSectionItem,
     ResumeExperienceItem,
     ResumeExportParams,
+    ResumeSettings,
 )
 from infra.config.constants import constants
+from infra.resume_export.context import ResumeTemplateContext
 from infra.resume_export.document_exporter import ResumeDocumentExporterImpl
 from tests.test_cases import TestCase
 
@@ -150,6 +158,7 @@ class TestResumeDocumentExporter(TestCase):
                 title="Backend resume",
                 language=LanguageEnum.RU,
                 content=self.factory.core.resume_content(
+                    date_format=ResumeDateFormatEnum.MONTH_YEAR_NUMERIC,
                     full_name="Дмитрий Иванов",
                     role="Backend инженер",
                     summary="Строит надежные backend-системы.",
@@ -250,6 +259,7 @@ class TestResumeDocumentExporter(TestCase):
                 title="Backend resume",
                 language=LanguageEnum.RU,
                 content=self.factory.core.resume_content(
+                    date_format=ResumeDateFormatEnum.MONTH_YEAR_NUMERIC,
                     full_name="Дмитрий Иванов",
                     role="Backend инженер",
                     summary="Строит надежные backend-системы.",
@@ -293,6 +303,7 @@ class TestResumeDocumentExporter(TestCase):
                 title="Backend resume",
                 language=LanguageEnum.RU,
                 content=self.factory.core.resume_full_content(
+                    date_format=ResumeDateFormatEnum.MONTH_YEAR_NUMERIC,
                     summary="Разрабатывает надежные системы.",
                     skill_items=["Python", "PostgreSQL"],
                 ),
@@ -388,6 +399,132 @@ class TestResumeDocumentExporter(TestCase):
                     "work experience",
                 ],
             )
+
+    @pytest.mark.parametrize("theme", list(ResumeThemeEnum))
+    @pytest.mark.parametrize("export_format", list(ResumeExportFormatEnum))
+    @pytest.mark.parametrize(
+        ("language", "date_format", "expected"),
+        [
+            (LanguageEnum.EN, ResumeDateFormatEnum.MONTH_YEAR, ("Aug 2024", "Feb 2025")),
+            (LanguageEnum.RU, ResumeDateFormatEnum.MONTH_YEAR, ("авг. 2024", "февр. 2025")),
+            (LanguageEnum.EN, ResumeDateFormatEnum.MONTH_YEAR_NUMERIC, ("08.2024", "02.2025")),
+            (LanguageEnum.RU, ResumeDateFormatEnum.MONTH_YEAR_NUMERIC, ("08.2024", "02.2025")),
+            (LanguageEnum.EN, ResumeDateFormatEnum.FULL_DATE, ("08/09/2024", "02/11/2025")),
+            (LanguageEnum.RU, ResumeDateFormatEnum.FULL_DATE, ("09.08.2024", "11.02.2025")),
+            (LanguageEnum.EN, ResumeDateFormatEnum.YEAR, ("2024", "2025")),
+            (LanguageEnum.RU, ResumeDateFormatEnum.YEAR, ("2024", "2025")),
+        ],
+    )
+    def test_exports_apply_selected_dates_and_inherited_project_role(
+        self,
+        theme: ResumeThemeEnum,
+        export_format: ResumeExportFormatEnum,
+        language: LanguageEnum,
+        date_format: ResumeDateFormatEnum,
+        expected: tuple[str, str],
+    ) -> None:
+        start, end = expected
+        content = self.factory.core.resume_full_content()
+        experience = content.experience[0]
+        content = replace(
+            content,
+            settings=ResumeSettings(date_format=date_format),
+            experience=[
+                replace(
+                    experience,
+                    position="Lead engineer",
+                    projects=[replace(experience.projects[0], role="")],
+                    start_date=date(2024, 8, 9),
+                    end_date=date(2025, 2, 11),
+                    current_status=ResumeCurrentStatusEnum.NOT_CURRENT,
+                ),
+            ],
+            education=[
+                replace(
+                    content.education[0],
+                    start_date=date(2024, 8, 9),
+                    end_date=date(2025, 2, 11),
+                ),
+            ],
+            certifications=[
+                replace(
+                    content.certifications[0],
+                    issued_on=date(2024, 8, 9),
+                    expires_on=date(2025, 2, 11),
+                ),
+            ],
+        )
+        params = ResumeExportParams(
+            format=export_format,
+            theme=theme,
+            title="Resume",
+            language=language,
+            content=content,
+        )
+        assert (
+            ResumeTemplateContext.from_params(params=params).content.experience[0].projects[0].role
+            == "Lead engineer"
+        )
+        document = self._exporter().export_resume(params=params, photo_content=b"")
+        if export_format is ResumeExportFormatEnum.PDF:
+            text = self._extract_pdf_text(content=document.content)
+        else:
+            text = "\n".join(
+                paragraph.text for paragraph in Document(io.BytesIO(document.content)).paragraphs
+            )
+        assert text.count(f"{start} - {end}") == 2
+        assert f"{'Issued' if language is LanguageEnum.EN else 'Выдан'}: {start}" in text
+        assert f"{'Expires' if language is LanguageEnum.EN else 'Истекает'}: {end}" in text
+        if theme is ResumeThemeEnum.SIMPLE:
+            assert "Portfolio | Lead engineer" in text
+        else:
+            assert (
+                "Project: Portfolio" in text
+                if language is LanguageEnum.EN
+                else "Проект: Portfolio" in text
+            )
+            assert "Lead engineer | Moscow" in text
+        assert content.experience[0].projects[0].role == ""
+
+    @pytest.mark.parametrize("export_format", list(ResumeExportFormatEnum))
+    def test_exports_accept_unknown_and_start_only_periods(
+        self,
+        export_format: ResumeExportFormatEnum,
+    ) -> None:
+        content = self.factory.core.resume_full_content()
+        content = replace(
+            content,
+            experience=[
+                replace(
+                    content.experience[0],
+                    start_date=None,
+                    end_date=None,
+                    current_status=ResumeCurrentStatusEnum.NOT_SET,
+                ),
+            ],
+            education=[replace(content.education[0], start_date=date(2024, 8, 9), end_date=None)],
+            certifications=[replace(content.certifications[0], issued_on=None, expires_on=None)],
+        )
+        document = self._exporter().export_resume(
+            params=ResumeExportParams(
+                format=export_format,
+                theme=ResumeThemeEnum.SIMPLE,
+                title="Resume",
+                language=LanguageEnum.EN,
+                content=content,
+            ),
+            photo_content=b"",
+        )
+        if export_format is ResumeExportFormatEnum.PDF:
+            text = self._extract_pdf_text(content=document.content)
+        else:
+            text = "\n".join(
+                paragraph.text for paragraph in Document(io.BytesIO(document.content)).paragraphs
+            )
+        assert "Aug 2024" in text
+        assert "Present" not in text
+        assert "Issued:" not in text
+        assert "Expires:" not in text
 
     def _exporter(self) -> ResumeDocumentExporterImpl:
         return ResumeDocumentExporterImpl(

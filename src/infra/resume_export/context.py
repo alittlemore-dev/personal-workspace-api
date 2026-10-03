@@ -3,7 +3,7 @@ from datetime import date
 from typing import ClassVar, Self
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum
 from core.resumes.schemas import (
     ResumeCertificationItem,
     ResumeContent,
@@ -84,11 +84,25 @@ class ResumeTemplateContext:
         "Nov",
         "Dec",
     )
+    _MONTH_NAMES_RU: ClassVar[tuple[str, ...]] = (
+        "янв.",
+        "февр.",
+        "мар.",
+        "апр.",
+        "май",
+        "июн.",
+        "июл.",
+        "авг.",
+        "сент.",
+        "окт.",
+        "нояб.",
+        "дек.",
+    )
 
     @classmethod
     def from_params(cls, *, params: ResumeExportParams) -> Self:
         labels = cls._labels_for_language(language=params.language)
-        content = params.content
+        content = params.content.with_resolved_project_roles()
         profile = content.profile
         contacts = (
             (labels.phone, profile.phone),
@@ -116,15 +130,28 @@ class ResumeTemplateContext:
             contacts=[{"label": label, "value": value} for label, value in contacts if value],
             simple_contact_line=" | ".join(part for part in simple_contacts if part),
             experiences=[
-                cls._experience_view(item=item, language=params.language, present=labels.present)
+                cls._experience_view(
+                    item=item,
+                    language=params.language,
+                    date_format=content.settings.date_format,
+                )
                 for item in content.experience
             ],
             educations=[
-                cls._education_view(item=item, language=params.language, present=labels.present)
+                cls._education_view(
+                    item=item,
+                    language=params.language,
+                    date_format=content.settings.date_format,
+                )
                 for item in content.education
             ],
             certifications=[
-                cls._certification_view(item=item, language=params.language, labels=labels)
+                cls._certification_view(
+                    item=item,
+                    language=params.language,
+                    date_format=content.settings.date_format,
+                    labels=labels,
+                )
                 for item in content.certifications
             ],
         )
@@ -149,14 +176,14 @@ class ResumeTemplateContext:
         *,
         item: ResumeExperienceItem,
         language: LanguageEnum,
-        present: str,
+        date_format: ResumeDateFormatEnum,
     ) -> ExperienceView:
         period = cls._date_range(
             start_date=item.start_date,
             end_date=item.end_date,
             current_status=item.current_status,
             language=language,
-            present=present,
+            date_format=date_format,
         )
         return ExperienceView(
             item=item,
@@ -171,14 +198,14 @@ class ResumeTemplateContext:
         *,
         item: ResumeEducationItem,
         language: LanguageEnum,
-        present: str,
+        date_format: ResumeDateFormatEnum,
     ) -> EducationView:
         period = cls._date_range(
             start_date=item.start_date,
             end_date=item.end_date,
             current_status=ResumeCurrentStatusEnum.NOT_SET,
             language=language,
-            present=present,
+            date_format=date_format,
         )
         return EducationView(
             item=item,
@@ -193,14 +220,23 @@ class ResumeTemplateContext:
         *,
         item: ResumeCertificationItem,
         language: LanguageEnum,
+        date_format: ResumeDateFormatEnum,
         labels: ResumeLabels,
     ) -> CertificationView:
         dates = []
         if item.issued_on:
-            issued = cls._format_date(value=item.issued_on, language=language)
+            issued = cls._format_date(
+                value=item.issued_on,
+                language=language,
+                date_format=date_format,
+            )
             dates.append(f"{labels.issued}: {issued}")
         if item.expires_on:
-            expires = cls._format_date(value=item.expires_on, language=language)
+            expires = cls._format_date(
+                value=item.expires_on,
+                language=language,
+                date_format=date_format,
+            )
             dates.append(f"{labels.expires}: {expires}")
         return CertificationView(item=item, dates=" | ".join(dates))
 
@@ -256,20 +292,35 @@ class ResumeTemplateContext:
         end_date: date | None,
         current_status: ResumeCurrentStatusEnum,
         language: LanguageEnum,
-        present: str,
+        date_format: ResumeDateFormatEnum,
     ) -> str:
-        start = cls._format_date(value=start_date, language=language)
-        end = present if current_status == ResumeCurrentStatusEnum.CURRENT else ""
+        start = cls._format_date(value=start_date, language=language, date_format=date_format)
+        end = (
+            cls._labels_for_language(language=language).present
+            if current_status == ResumeCurrentStatusEnum.CURRENT
+            else ""
+        )
         if not end:
-            end = cls._format_date(value=end_date, language=language)
+            end = cls._format_date(value=end_date, language=language, date_format=date_format)
         if start and end:
             return f"{start} - {end}"
         return start or end
 
     @classmethod
-    def _format_date(cls, *, value: date | None, language: LanguageEnum) -> str:
+    def _format_date(
+        cls,
+        *,
+        value: date | None,
+        language: LanguageEnum,
+        date_format: ResumeDateFormatEnum,
+    ) -> str:
         if value is None:
             return ""
-        if language == LanguageEnum.RU:
+        if date_format is ResumeDateFormatEnum.YEAR:
+            return str(value.year)
+        if date_format is ResumeDateFormatEnum.MONTH_YEAR_NUMERIC:
             return f"{value.month:02d}.{value.year}"
-        return f"{cls._MONTH_NAMES[value.month - 1]} {value.year}"
+        if date_format is ResumeDateFormatEnum.FULL_DATE:
+            return value.strftime("%d.%m.%Y" if language is LanguageEnum.RU else "%m/%d/%Y")
+        months = cls._MONTH_NAMES_RU if language is LanguageEnum.RU else cls._MONTH_NAMES
+        return f"{months[value.month - 1]} {value.year}"

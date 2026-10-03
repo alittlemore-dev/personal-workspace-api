@@ -15,8 +15,10 @@ class ApiFactoryHelper:
         role: str = "Инженер",
         summary: str = "Короткое описание опыта.",
         experience: list[dict[str, Any]] | None = None,
+        date_format: str = "monthYear",
     ) -> dict[str, Any]:
         return {
+            "settings": {"dateFormat": date_format},
             "profile": {
                 "fullName": full_name,
                 "photoFileId": "",

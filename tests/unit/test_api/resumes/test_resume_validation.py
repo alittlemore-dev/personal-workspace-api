@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 from pypdf import PdfWriter
 
-from core.resumes.enums import ResumeExportFormatEnum
+from core.resumes.enums import ResumeDateFormatEnum, ResumeExportFormatEnum
 from core.resumes.schemas import ResumeExport
 from entrypoints.litestar.api.resumes.responses import ResumeExportResponse
 from entrypoints.litestar.api.resumes.schemas import ResumeRequestSchema
@@ -215,3 +215,132 @@ def test_pdf_export_reports_actual_page_count() -> None:
     )
 
     assert response.headers["X-Resume-Page-Count"] == "2"
+
+
+@pytest.mark.parametrize("date_format", list(ResumeDateFormatEnum))
+def test_resume_requires_explicit_date_settings(date_format: ResumeDateFormatEnum) -> None:
+    content = request_content()
+    content["settings"] = {"dateFormat": date_format.value}
+    request = ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+    assert (
+        request.to_create_schema(author_username="owner").content.settings.date_format
+        is date_format
+    )
+    assert request.model_dump(by_alias=True)["content"]["settings"] == {
+        "dateFormat": date_format.value,
+    }
+    content.pop("settings")
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+@pytest.mark.parametrize("settings", [None, {}, {"dateFormat": "unknown"}, {"dateFormat": None}])
+def test_resume_rejects_missing_or_invalid_date_format(settings: object) -> None:
+    content = request_content()
+    content["settings"] = settings
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+def test_project_role_accepts_blank_but_requires_field_and_experience_position() -> None:
+    content = request_content()
+    project = content["experience"][0]["projects"][0]
+    project["role"] = "   "
+    resume = ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+    assert resume.content.experience[0].projects[0].role == ""
+    project.pop("role")
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+    project["role"] = ""
+    content["experience"][0]["position"] = " "
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+@pytest.mark.parametrize("section", ["experience", "education", "certifications"])
+@pytest.mark.parametrize(
+    ("start", "end", "valid"),
+    [
+        (None, None, True),
+        ("2024-08-09", None, True),
+        (None, "2024-08-09", False),
+        ("2024-08-09", "2024-08-09", True),
+        ("2024-08-09", "2024-08-08", False),
+    ],
+)
+def test_resume_date_periods(section: str, start: str | None, end: str | None, valid: bool) -> None:
+    content = request_content()
+    if section == "experience":
+        item = experience_payload()
+        item.update(startDate=start, endDate=end, currentStatus="notCurrent")
+    elif section == "education":
+        item = {
+            "institution": "University",
+            "degree": "Bachelor",
+            "field": "Engineering",
+            "location": "Yerevan",
+            "description": "",
+            "startDate": start,
+            "endDate": end,
+        }
+    else:
+        item = {
+            "name": "Certificate",
+            "issuer": "Issuer",
+            "credentialUrl": "",
+            "issuedOn": start,
+            "expiresOn": end,
+        }
+    content[section] = [item]
+    if valid:
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+    else:
+        with pytest.raises(ValidationError):
+            ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+@pytest.mark.parametrize("date_format", list(ResumeDateFormatEnum))
+def test_format_settings_do_not_change_visible_text_limit(
+    date_format: ResumeDateFormatEnum,
+) -> None:
+    projects: list[dict[str, Any]] = [
+        {
+            "name": "P",
+            "role": "",
+            "teamSize": "",
+            "scale": "",
+            "description": "x" * 500,
+            "highlights": [],
+            "technologies": [],
+            "url": "",
+        }
+        for _ in range(100)
+    ]
+    projects[-1]["description"] = "x" * 384
+    experience = []
+    for index in range(0, 100, 15):
+        item = experience_payload()
+        item.update(
+            company="C",
+            position="E",
+            location="",
+            summary="",
+            highlights=[],
+            technologies=[],
+            projects=projects[index : index + 15],
+        )
+        experience.append(item)
+    content = ApiFactoryHelper.resume_content(
+        full_name="N",
+        role="R",
+        summary="",
+        experience=experience,
+    )
+    content["skills"] = []
+    content["settings"] = {"dateFormat": date_format.value}
+
+    ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+    projects[-1]["description"] += "x"
+    with pytest.raises(ValidationError, match="resume text exceeds limit"):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))

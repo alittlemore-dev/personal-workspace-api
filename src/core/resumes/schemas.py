@@ -1,11 +1,16 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from math import ceil
 from typing import Self
 
 from core.files.schemas import FileUploadParams
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
+from core.resumes.enums import (
+    ResumeCurrentStatusEnum,
+    ResumeDateFormatEnum,
+    ResumeExportFormatEnum,
+    ResumeThemeEnum,
+)
 from core.schemas import ValuedDataclass
 
 
@@ -60,6 +65,14 @@ class ResumeExperienceItem:
     technologies: list[str]
     projects: list[ResumeProjectItem]
 
+    def with_resolved_project_roles(self) -> Self:
+        return replace(
+            self,
+            projects=[
+                replace(project, role=project.role or self.position) for project in self.projects
+            ],
+        )
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ResumeEducationItem:
@@ -101,7 +114,13 @@ class ResumeAdditionalSection:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ResumeSettings:
+    date_format: ResumeDateFormatEnum
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ResumeContent:
+    settings: ResumeSettings
     profile: ResumeProfile
     summary: ResumeSummary
     skills: list[ResumeSkillGroup]
@@ -110,6 +129,12 @@ class ResumeContent:
     languages: list[ResumeLanguageItem]
     certifications: list[ResumeCertificationItem]
     additional_sections: list[ResumeAdditionalSection]
+
+    def with_resolved_project_roles(self) -> Self:
+        return replace(
+            self,
+            experience=[item.with_resolved_project_roles() for item in self.experience],
+        )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

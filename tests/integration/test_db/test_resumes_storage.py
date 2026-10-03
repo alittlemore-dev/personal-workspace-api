@@ -243,6 +243,7 @@ class TestResumesDatabaseStorage(StorageTestCase):
 
 def nullable_content_json() -> dict[str, object]:
     return {
+        "settings": {"date_format": "monthYearNumeric"},
         "profile": {
             "full_name": None,
             "role": None,

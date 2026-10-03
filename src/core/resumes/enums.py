@@ -15,3 +15,10 @@ class ResumeExportFormatEnum(StrEnum):
 class ResumeThemeEnum(StrEnum):
     SIMPLE = "simple"
     ACCENT = "accent"
+
+
+class ResumeDateFormatEnum(StrEnum):
+    MONTH_YEAR = "monthYear"
+    MONTH_YEAR_NUMERIC = "monthYearNumeric"
+    FULL_DATE = "fullDate"
+    YEAR = "year"

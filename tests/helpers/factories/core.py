@@ -59,7 +59,7 @@ from core.knowledge.people.schemas import (
 )
 from core.notifications.enums import ReminderKind
 from core.notifications.schemas import ReminderRecipient, ReminderSource
-from core.resumes.enums import ResumeCurrentStatusEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum
 from core.resumes.schemas import (
     Resume,
     ResumeAdditionalSection,
@@ -72,6 +72,7 @@ from core.resumes.schemas import (
     ResumeProfile,
     ResumeProjectItem,
     Resumes,
+    ResumeSettings,
     ResumeSkillGroup,
     ResumeSummary,
 )
@@ -527,8 +528,10 @@ class CoreFactoryHelper:
         summary: str = "Короткое описание опыта.",
         skills: list[ResumeSkillGroup] | None = None,
         experience: list[ResumeExperienceItem] | None = None,
+        date_format: ResumeDateFormatEnum = ResumeDateFormatEnum.MONTH_YEAR,
     ) -> ResumeContent:
         return ResumeContent(
+            settings=ResumeSettings(date_format=date_format),
             profile=ResumeProfile(
                 full_name=full_name,
                 photo_file_id="",
@@ -553,8 +556,13 @@ class CoreFactoryHelper:
         )
 
     @classmethod
-    def resume_empty_content(cls, summary: str = "") -> ResumeContent:
+    def resume_empty_content(
+        cls,
+        summary: str = "",
+        date_format: ResumeDateFormatEnum = ResumeDateFormatEnum.MONTH_YEAR,
+    ) -> ResumeContent:
         return ResumeContent(
+            settings=ResumeSettings(date_format=date_format),
             profile=ResumeProfile(
                 full_name="",
                 photo_file_id="",
@@ -581,8 +589,10 @@ class CoreFactoryHelper:
         cls,
         summary: str = "Builds reliable backend systems.",
         skill_items: list[str] | None = None,
+        date_format: ResumeDateFormatEnum = ResumeDateFormatEnum.MONTH_YEAR,
     ) -> ResumeContent:
         return ResumeContent(
+            settings=ResumeSettings(date_format=date_format),
             profile=ResumeProfile(
                 full_name="Dmitriy Ivanov",
                 photo_file_id="",

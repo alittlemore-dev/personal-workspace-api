@@ -3,8 +3,7 @@ from typing import Any, Self
 
 from sqlalchemy import Enum, Index, String
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, declared_attr, mapped_column
-from sqlalchemy_dev_utils.mixins.audit import AuditMixin
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column, synonym
 
 from core.i18n.enums import LanguageEnum
 from core.resumes.enums import ResumeCurrentStatusEnum
@@ -24,11 +23,18 @@ from core.resumes.schemas import (
     ResumeSummary,
 )
 from infra.postgresql.models.base import BaseModel, TableArgs
-from infra.postgresql.models.mixins.ids import HexUuidIDMixin
+from infra.postgresql.models.vault import VaultEntryModel
 
 
-class ResumeModel(HexUuidIDMixin, AuditMixin, BaseModel):
-    title: Mapped[str] = mapped_column(String(length=255), doc="Private workspace resume title")
+class ResumeModel(VaultEntryModel, BaseModel):
+    __mapper_args__ = {"polymorphic_identity": "resume", "concrete": True}
+    display_name: Mapped[str] = mapped_column(
+        "title",
+        String(length=255),
+        key="display_name",
+        doc="Private workspace resume title",
+    )
+    title: Mapped[str] = synonym("display_name")
     language: Mapped[LanguageEnum] = mapped_column(
         Enum(LanguageEnum, native_enum=True, name="language_enum"),
         doc="User-selected resume language",

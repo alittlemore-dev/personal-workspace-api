@@ -5,6 +5,11 @@ from core.files.enums import FilePurpose
 from core.files.schemas import FileRule, FileRules
 
 
+class VaultConstants:
+    recent_limit: int = 8
+    activity_period_days: int = 30
+
+
 class PathConstants:
     src_dir: Path = Path(__file__).resolve().parent.parent.parent
     root_dir: Path = src_dir.parent
@@ -196,6 +201,7 @@ class Constants:
     telegram: TelegramConstants = TelegramConstants()
     files: FilesConstants = FilesConstants()
     knowledge_files: KnowledgeFilesConstants = KnowledgeFilesConstants()
+    vault: VaultConstants = VaultConstants()
     request_logging: RequestLoggingConstants = RequestLoggingConstants()
     resume_export: ResumeExportConstants = ResumeExportConstants()
     search: SearchConstants = SearchConstants()

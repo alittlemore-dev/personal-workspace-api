@@ -11,6 +11,8 @@ class TestQueryPlanScenarios:
     def test_scenarios_cover_only_current_knowledge_and_resumes_storage_reads(self) -> None:
         assert {(scenario.storage_class, scenario.method_name) for scenario in SCENARIOS} == {
             ("ResumesDatabaseStorage", "list_resumes"),
+            ("VaultDatabaseStorage", "list_recent"),
+            ("VaultDatabaseStorage", "list_statistics"),
             ("KnowledgeItemsDatabaseStorage", "get_item"),
             ("KnowledgeItemsDatabaseStorage", "list_tags"),
             ("KnowledgeDatesDatabaseStorage", "list_date_page"),

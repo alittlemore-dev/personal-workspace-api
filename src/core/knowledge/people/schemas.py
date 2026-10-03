@@ -195,6 +195,7 @@ class PersonQuickCreateParams:
     first_name: str
     last_name: str
     author_username: str
+    birthday: PersonBirthday | None
 
     def to_details(self, *, item_id: str) -> PersonDetails:
         return PersonDetails(
@@ -205,7 +206,7 @@ class PersonQuickCreateParams:
             email="",
             phone="",
             telegram="",
-            birthday=None,
+            birthday=self.birthday,
             notifications_enabled=True,
         )
 

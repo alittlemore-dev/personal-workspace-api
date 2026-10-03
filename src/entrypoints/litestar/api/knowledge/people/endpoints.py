@@ -33,7 +33,7 @@ from entrypoints.litestar.api.knowledge.people.dependencies import (
 )
 from entrypoints.litestar.api.knowledge.people.schemas import (
     PeopleResponseSchema,
-    PersonQuickCreateRequestSchema,
+    PersonCreateRequestSchema,
     PersonRelationshipTypeResponseSchema,
     PersonRelationshipTypesResponseSchema,
     PersonResponseSchema,
@@ -78,7 +78,7 @@ class PeopleApiController(Controller):
     async def create_person(
         self,
         data: Annotated[
-            PersonQuickCreateRequestSchema,
+            PersonCreateRequestSchema,
             api_json_body(
                 title="Person quick-create request",
                 description="Required name parts for a new private person.",

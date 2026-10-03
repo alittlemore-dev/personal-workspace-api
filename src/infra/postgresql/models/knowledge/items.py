@@ -8,10 +8,12 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    case,
     func,
     literal,
 )
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy_dev_utils.mixins.audit import AuditMixin
 
 from core.knowledge.items.enums import KnowledgeItemKind
@@ -23,10 +25,16 @@ from core.knowledge.items.schemas import (
 )
 from infra.postgresql.models.base import BaseModel, TableArgs
 from infra.postgresql.models.mixins.ids import HexUuidIDMixin
+from infra.postgresql.models.vault import VaultEntryModel
 
 
-class KnowledgeItemModel(HexUuidIDMixin, AuditMixin, BaseModel):
+class KnowledgeItemModel(VaultEntryModel, BaseModel):
     __tablename__ = "knowledge__knowledge_item_model"
+    __mapper_args__ = {"polymorphic_identity": "knowledge", "concrete": True}
+
+    @classmethod
+    def vault_kind_expression(cls) -> ColumnElement[str]:
+        return case(*[(cls.kind == kind, kind.value) for kind in KnowledgeItemKind])
 
     kind: Mapped[KnowledgeItemKind] = mapped_column(
         Enum(KnowledgeItemKind, native_enum=True, name="knowledge_item_kind_enum"),
@@ -49,6 +57,12 @@ class KnowledgeItemModel(HexUuidIDMixin, AuditMixin, BaseModel):
     @classmethod
     def __table_args__(cls) -> TableArgs:
         return (
+            Index(
+                "knowledge_items_author_updated_id_idx",
+                cls.author_username,
+                cls.updated_at.desc(),
+                cls.id.desc(),
+            ),
             UniqueConstraint(
                 cls.id,
                 cls.author_username,

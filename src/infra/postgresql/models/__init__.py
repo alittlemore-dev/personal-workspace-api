@@ -27,3 +27,6 @@ from .notifications import ReminderDeliveryModel as ReminderDeliveryModel
 from .resumes import ResumeModel as ResumeModel
 from .telegram import TelegramConnectionModel as TelegramConnectionModel
 from .telegram import TelegramInvitationModel as TelegramInvitationModel
+from .vault import VaultEntryModel as VaultEntryModel
+
+BaseModel.registry.configure()

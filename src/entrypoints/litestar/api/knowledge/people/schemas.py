@@ -24,7 +24,7 @@ from entrypoints.litestar.api.knowledge.dates.schemas import (
 )
 from entrypoints.litestar.api.knowledge.files.schemas import KnowledgeFileResponseSchema
 from entrypoints.litestar.api.knowledge.items.schemas import KnowledgeTagResponseSchema
-from entrypoints.litestar.api.schemas import CamelCaseSchema
+from entrypoints.litestar.api.schemas import CamelCaseSchema, RootSchema
 from entrypoints.litestar.api.validation import (
     BlankableEmailString,
     KnowledgeDescriptionText,
@@ -225,7 +225,29 @@ class PersonQuickCreateRequestSchema(CamelCaseSchema):
             first_name=self.first_name,
             last_name=self.last_name,
             author_username=author_username,
+            birthday=None,
         )
+
+
+class PersonBirthdayCreateRequestSchema(CamelCaseSchema):
+    first_name: Annotated[RequiredShortText, Field(title="First name")]
+    last_name: Annotated[RequiredShortText, Field(title="Last name")]
+    birthday: PersonBirthdaySchema
+
+    def to_domain_schema(self, *, author_username: str) -> PersonQuickCreateParams:
+        return PersonQuickCreateParams(
+            first_name=self.first_name,
+            last_name=self.last_name,
+            author_username=author_username,
+            birthday=self.birthday.to_domain_schema(),
+        )
+
+
+class PersonCreateRequestSchema(
+    RootSchema[PersonQuickCreateRequestSchema | PersonBirthdayCreateRequestSchema],
+):
+    def to_domain_schema(self, *, author_username: str) -> PersonQuickCreateParams:
+        return self.root.to_domain_schema(author_username=author_username)
 
 
 class PersonUpdateRequestSchema(CamelCaseSchema):

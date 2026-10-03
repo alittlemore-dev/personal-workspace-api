@@ -119,8 +119,8 @@ Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
   - [x] Click on event -> Open event detail modal
 - [x] Show knowledge birthdays and memorable dates automatically alongside calendar events.
 - [ ] Add events from calendar
-  - [ ] Create person birthday entries from the calendar.
-  - [ ] Create memorable dates from the calendar.
+  - [x] Create person birthday entries from the calendar.
+  - [x] Create memorable dates from the calendar.
   - [x] One-time or recurring Events
 
 ## TODOs
@@ -136,8 +136,8 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
   - [ ] Main page
     - [x] Important info (in-dashboard CRUD – only text oneline items)
     - [x] Dates and birthdays (current and next month)
-    - [ ] Recently changed knowledge items
-    - [ ] Vault statistic
+    - [x] Recently changed knowledge items
+    - [x] Vault statistic
 - [ ] Knowledge item
   - [ ] Books
     - [ ] All books page

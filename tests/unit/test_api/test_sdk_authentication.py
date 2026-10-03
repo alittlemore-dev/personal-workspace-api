@@ -34,6 +34,15 @@ def build_sdk_auth_app(
 
 
 class TestSdkAuthentication:
+    @pytest.mark.parametrize("path", ["/api/vault/recent", "/api/vault/statistics"])
+    def test_vault_requires_authentication(self, container: AsyncContainer, path: str) -> None:
+        with build_sdk_auth_app(
+            container=container,
+            auth_client=FakeAuthenticationClient(),
+        ) as client:
+            response = client.get(path)
+        assert response.status_code == codes.UNAUTHORIZED
+
     def test_allows_anonymous_health_requests(self, container: AsyncContainer) -> None:
         auth_client = FakeAuthenticationClient()
         auth_client.set_unavailable()

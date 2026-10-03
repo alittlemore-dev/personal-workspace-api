@@ -93,11 +93,14 @@ source_sha="workspace-sha256:$({
         src/infra/postgresql/alembic/versions/0001_initial_schema.py \
         src/infra/postgresql/models/files.py \
         src/infra/postgresql/models/resumes.py \
+        src/infra/postgresql/models/vault.py \
+        src/infra/postgresql/alembic/versions/0009_add_vault_recent_knowledge_index.py \
         src/infra/postgresql/storages/knowledge/dates.py \
         src/infra/postgresql/storages/knowledge/files.py \
         src/infra/postgresql/storages/knowledge/items.py \
         src/infra/postgresql/storages/knowledge/people.py \
         src/infra/postgresql/storages/resumes.py
+    printf '%s\n' src/infra/postgresql/storages/vault.py
     printf '%s\n' \
         scripts/run_query_plans.sh \
         scripts/build_query_plan_baseline.sh \

@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,7 @@ from infra.postgresql.storages.knowledge.files import KnowledgeFilesDatabaseStor
 from infra.postgresql.storages.knowledge.items import KnowledgeItemsDatabaseStorage
 from infra.postgresql.storages.knowledge.people import PeopleDatabaseStorage
 from infra.postgresql.storages.resumes import ResumesDatabaseStorage
+from infra.postgresql.storages.vault import VaultDatabaseStorage
 from performance.query_plans.identifiers import seeded_identifier
 from performance.query_plans.models import ExpectedIndex, PlanExpectation
 
@@ -109,7 +111,58 @@ async def run_item_files(session: AsyncSession) -> None:
     )
 
 
+async def run_vault_recent(session: AsyncSession) -> None:
+    await VaultDatabaseStorage(session=session).list_recent(
+        author_username=SEED_AUTHOR_USERNAME,
+        limit=8,
+    )
+
+
+async def run_vault_statistics(session: AsyncSession) -> None:
+    now = datetime.now(tz=UTC)
+    await VaultDatabaseStorage(session=session).list_statistics(
+        author_username=SEED_AUTHOR_USERNAME,
+        from_datetime=now - timedelta(days=30),
+        to_datetime=now,
+    )
+
+
 SCENARIOS = (
+    StorageScenario(
+        name="vault_recent",
+        storage_class="VaultDatabaseStorage",
+        method_name="list_recent",
+        expectation=PlanExpectation(
+            max_execution_ms=100.0,
+            expected_indexes=(
+                ExpectedIndex(
+                    name="knowledge_items_author_updated_id_idx",
+                    relation_name="knowledge__knowledge_item_model",
+                ),
+                ExpectedIndex(
+                    name="resumes_resume_author_updated_id_idx",
+                    relation_name="resumes__resume_model",
+                ),
+            ),
+            forbidden_seq_scan_relations=(
+                "knowledge__knowledge_item_model",
+                "resumes__resume_model",
+            ),
+        ),
+        run=run_vault_recent,
+    ),
+    StorageScenario(
+        name="vault_statistics",
+        storage_class="VaultDatabaseStorage",
+        method_name="list_statistics",
+        expectation=PlanExpectation(
+            max_execution_ms=100.0,
+            expected_indexes=(),
+            forbidden_seq_scan_relations=(),
+            allow_seq_scan_relations=("knowledge__knowledge_item_model", "resumes__resume_model"),
+        ),
+        run=run_vault_statistics,
+    ),
     StorageScenario(
         name="resumes_list",
         storage_class="ResumesDatabaseStorage",

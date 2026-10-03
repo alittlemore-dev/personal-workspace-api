@@ -111,11 +111,47 @@ class TestPeopleApi(ApiTestCase):
         assert response.json()["middleName"] == ""
         self.use_case.create_person.assert_awaited_once_with(
             params=PersonQuickCreateParams(
+                birthday=None,
                 first_name="Ivan",
                 last_name="Ivanov",
                 author_username=TEST_USERNAME,
             ),
         )
+
+    def test_quick_create_accepts_birthday_without_year(self) -> None:
+        self.use_case.create_person.return_value = self.factory.core.person(now=CURRENT_DATETIME)
+        response = self.api.post_person(
+            data={
+                "firstName": "Ivan",
+                "lastName": "Ivanov",
+                "birthday": {"day": 29, "month": 2, "year": None},
+            },
+        )
+        assert response.status_code == codes.CREATED
+        params = self.use_case.create_person.await_args.kwargs["params"]
+        assert params.birthday.day == 29
+        assert params.birthday.month == 2
+        assert params.birthday.year is None
+
+    @pytest.mark.parametrize(
+        "birthday",
+        [
+            None,
+            {"day": 30, "month": 2, "year": None},
+            {"day": 1, "month": 1, "year": 9999},
+            {"day": 29, "month": 2, "year": 2025},
+        ],
+    )
+    def test_invalid_birthday_does_not_fall_back_to_name_only(self, birthday: object) -> None:
+        response = self.api.post_person(
+            data={
+                "firstName": "Ivan",
+                "lastName": "Ivanov",
+                "birthday": birthday,
+            },
+        )
+        assert response.status_code == codes.BAD_REQUEST
+        self.use_case.create_person.assert_not_awaited()
 
     @pytest.mark.parametrize(
         "payload",

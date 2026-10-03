@@ -12,6 +12,7 @@ from entrypoints.litestar.api.knowledge.router import api_router as knowledge_ro
 from entrypoints.litestar.api.resumes.endpoints import api_router as resumes_router
 from entrypoints.litestar.api.telegram.endpoints import api_router as telegram_router
 from entrypoints.litestar.api.tools.endpoints import api_router as tools_router
+from entrypoints.litestar.api.vault.endpoints import api_router as vault_router
 from entrypoints.litestar.api.wiki_links.endpoints import api_router as wiki_links_router
 
 protected_api_router = Router(
@@ -26,6 +27,7 @@ protected_api_router = Router(
         resumes_router,
         knowledge_router,
         wiki_links_router,
+        vault_router,
     ],
     tags=["protected api"],
     include_in_schema=False,

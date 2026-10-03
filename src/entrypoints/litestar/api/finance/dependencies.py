@@ -7,12 +7,10 @@ from dishka.integrations.litestar import inject
 from litestar import Request
 from litestar.datastructures import State
 from litestar.di import NamedDependency
-from litestar.params import FromPath, FromQuery
 
 from core.account_time_zone.clients import AccountTimeZoneReader
 from core.finance.enums import (
     FinanceStatisticsCurrency,
-    FinanceStatisticsPeriod,
 )
 from core.finance.exceptions import InvalidFinanceDataError
 from core.finance.schemas import (
@@ -46,6 +44,16 @@ from entrypoints.litestar.api.finance.schemas import (
     FinanceVersionRequest,
     OpeningBalanceRequest,
     UpdateFinanceCategoryRequest,
+)
+from entrypoints.litestar.api.parameters import (
+    FinanceCategoryIdPath,
+    FinanceCurrencyQuery,
+    FinanceIncludeDeletedQuery,
+    FinanceMonthPath,
+    FinancePeriodQuery,
+    FinanceTransactionIdPath,
+    FinanceVersionQuery,
+    FinanceYearPath,
 )
 
 
@@ -107,7 +115,7 @@ def provide_create_category_params(
 
 
 def provide_update_category_params(
-    category_id: FromPath[str],
+    category_id: FinanceCategoryIdPath,
     data: UpdateFinanceCategoryRequest,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> UpdateFinanceCategoryParams:
@@ -122,7 +130,7 @@ def provide_update_category_params(
 
 
 def provide_archive_category_params(
-    category_id: FromPath[str],
+    category_id: FinanceCategoryIdPath,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> SetFinanceCategoryArchivedParams:
     return SetFinanceCategoryArchivedParams(
@@ -134,7 +142,7 @@ def provide_archive_category_params(
 
 
 def provide_restore_category_params(
-    category_id: FromPath[str],
+    category_id: FinanceCategoryIdPath,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> SetFinanceCategoryArchivedParams:
     return SetFinanceCategoryArchivedParams(
@@ -146,7 +154,7 @@ def provide_restore_category_params(
 
 
 def provide_delete_category_params(
-    category_id: FromPath[str],
+    category_id: FinanceCategoryIdPath,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> DeleteFinanceCategoryParams:
     return DeleteFinanceCategoryParams(
@@ -157,7 +165,7 @@ def provide_delete_category_params(
 
 
 def provide_list_transactions_params(
-    include_deleted: FromQuery[bool],
+    include_deleted: FinanceIncludeDeletedQuery,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> ListFinanceTransactionsParams:
     return ListFinanceTransactionsParams(
@@ -181,7 +189,7 @@ def provide_create_transaction_params(
 
 
 def provide_update_transaction_params(
-    transaction_id: FromPath[str],
+    transaction_id: FinanceTransactionIdPath,
     data: FinanceTransactionUpdateRequest,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> UpdateFinanceTransactionParams:
@@ -196,8 +204,8 @@ def provide_update_transaction_params(
 
 
 def provide_delete_transaction_params(
-    transaction_id: FromPath[str],
-    version: FromQuery[int],
+    transaction_id: FinanceTransactionIdPath,
+    version: FinanceVersionQuery,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> SetFinanceTransactionDeletedParams:
     return SetFinanceTransactionDeletedParams(
@@ -211,7 +219,7 @@ def provide_delete_transaction_params(
 
 
 def provide_restore_transaction_params(
-    transaction_id: FromPath[str],
+    transaction_id: FinanceTransactionIdPath,
     data: FinanceVersionRequest,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> SetFinanceTransactionDeletedParams:
@@ -226,7 +234,7 @@ def provide_restore_transaction_params(
 
 
 def provide_transaction_revisions_params(
-    transaction_id: FromPath[str],
+    transaction_id: FinanceTransactionIdPath,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> FinanceTransactionRevisionsParams:
     return FinanceTransactionRevisionsParams(
@@ -237,8 +245,8 @@ def provide_transaction_revisions_params(
 
 
 def provide_historical_context(
-    year: FromPath[int],
-    month: FromPath[int],
+    year: FinanceYearPath,
+    month: FinanceMonthPath,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> FinanceHistoricalMonthParams:
     try:
@@ -254,7 +262,7 @@ def provide_historical_context(
 
 def provide_historical_transactions_params(
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
-    include_deleted: FromQuery[bool],
+    include_deleted: FinanceIncludeDeletedQuery,
 ) -> ListHistoricalFinanceTransactionsParams:
     return ListHistoricalFinanceTransactionsParams(
         owner_username=historical_context.owner_username,
@@ -266,7 +274,7 @@ def provide_historical_transactions_params(
 
 def provide_historical_revisions_params(
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
-    transaction_id: FromPath[str],
+    transaction_id: FinanceTransactionIdPath,
 ) -> HistoricalFinanceRevisionsParams:
     return HistoricalFinanceRevisionsParams(
         owner_username=historical_context.owner_username,
@@ -277,8 +285,8 @@ def provide_historical_revisions_params(
 
 
 def provide_statistics_params(
-    period: FromQuery[FinanceStatisticsPeriod],
-    currency: FromQuery[str],
+    period: FinancePeriodQuery,
+    currency: FinanceCurrencyQuery,
     month_context: NamedDependency[FinanceMonthParams],
 ) -> FinanceStatisticsParams:
     try:
@@ -307,7 +315,7 @@ def provide_historical_create_transaction_params(
 
 
 def provide_historical_update_transaction_params(
-    transaction_id: FromPath[str],
+    transaction_id: FinanceTransactionIdPath,
     data: FinanceTransactionUpdateRequest,
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
 ) -> UpdateFinanceTransactionParams:
@@ -322,8 +330,8 @@ def provide_historical_update_transaction_params(
 
 
 def provide_historical_delete_transaction_params(
-    transaction_id: FromPath[str],
-    version: FromQuery[int],
+    transaction_id: FinanceTransactionIdPath,
+    version: FinanceVersionQuery,
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
 ) -> SetFinanceTransactionDeletedParams:
     return SetFinanceTransactionDeletedParams(
@@ -337,7 +345,7 @@ def provide_historical_delete_transaction_params(
 
 
 def provide_historical_restore_transaction_params(
-    transaction_id: FromPath[str],
+    transaction_id: FinanceTransactionIdPath,
     data: FinanceVersionRequest,
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
 ) -> SetFinanceTransactionDeletedParams:

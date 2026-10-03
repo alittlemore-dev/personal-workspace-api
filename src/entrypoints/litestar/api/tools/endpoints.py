@@ -17,6 +17,7 @@ from entrypoints.litestar.api.tools.schemas import (
 
 class ToolsApiController(Controller):
     path = "/tools"
+    include_in_schema = False
     tags = ["tools"]
     guards = [RequireRole(RoleEnum.ADMIN)]
 

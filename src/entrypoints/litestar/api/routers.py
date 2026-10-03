@@ -30,7 +30,7 @@ protected_api_router = Router(
         vault_router,
     ],
     tags=["protected api"],
-    include_in_schema=False,
+    security=[{"bearerAuth": []}],
     guards=[RequireRole(RoleEnum.USER)],
 )
 

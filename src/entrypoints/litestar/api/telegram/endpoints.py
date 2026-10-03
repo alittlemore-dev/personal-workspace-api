@@ -50,7 +50,7 @@ from infra.config.settings import settings
 class TelegramApiController(Controller):
     path = "/telegram"
     tags = ["telegram"]
-    include_in_schema = False
+    security = [{"bearerAuth": []}]
     response_headers = {"Cache-Control": "no-store"}
     guards = [RequireRole(RoleEnum.USER), require_ready_bot]
 

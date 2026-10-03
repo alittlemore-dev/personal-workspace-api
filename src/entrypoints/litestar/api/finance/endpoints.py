@@ -61,7 +61,6 @@ from infra.config.constants import constants
 class FinanceApiController(Controller):
     path = "/finance"
     tags = ["finance"]
-    include_in_schema = False
     dependencies = {"month_context": Provide(provide_finance_context)}
     response_headers = {
         constants.knowledge_files.cache_control_header_name: (

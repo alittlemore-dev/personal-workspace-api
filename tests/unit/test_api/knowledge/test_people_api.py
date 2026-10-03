@@ -268,6 +268,5 @@ class TestPeopleApi(ApiTestCase):
         assert call.author_username == TEST_USERNAME
         assert isinstance(call.current_datetime, datetime)
 
-    def test_private_controller_is_hidden_and_uncached(self) -> None:
-        assert PeopleApiController.include_in_schema is False
+    def test_private_controller_is_uncached(self) -> None:
         assert PeopleApiController.response_headers == {"Cache-Control": "no-store"}

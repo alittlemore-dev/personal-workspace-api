@@ -30,7 +30,6 @@ from infra.post_commit_actions import PostCommitActions
 class KnowledgeDatesApiController(Controller):
     path = "/knowledge/dates"
     tags = ["knowledge dates"]
-    include_in_schema = False
     response_headers = {
         constants.knowledge_files.cache_control_header_name: (
             constants.knowledge_files.no_store_header_value

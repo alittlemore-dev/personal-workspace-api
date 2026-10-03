@@ -9,6 +9,7 @@ from litestar.params import BodyKwarg, PathParameter, QueryParameter
 
 from core.calendar.enums import CalendarWindow
 from core.files.enums import FilePurpose
+from core.finance.enums import FinanceStatisticsPeriod
 from core.i18n.enums import LanguageEnum
 from core.knowledge.dates.enums import KnowledgeDateListSort
 from core.knowledge.people.enums import PersonListSort
@@ -345,5 +346,105 @@ ResumeIdPath: TypeAlias = Annotated[
         title="Resume identifier",
         description="Resume workspace identifier.",
         examples=("00000000000000000000000000000004",),
+    ),
+]
+
+
+FinanceCategoryIdPath: TypeAlias = Annotated[
+    str,
+    api_path_parameter(
+        name="category_id",
+        title="Finance category ID",
+        description="Identifier of a category in the authenticated user's finance workspace.",
+        examples=("00000000000000000000000000000001",),
+    ),
+]
+
+FinanceTransactionIdPath: TypeAlias = Annotated[
+    str,
+    api_path_parameter(
+        name="transaction_id",
+        title="Finance transaction ID",
+        description="Identifier of a transaction in the authenticated user's finance workspace.",
+        examples=("00000000000000000000000000000001",),
+    ),
+]
+
+FinanceYearPath: TypeAlias = Annotated[
+    int,
+    api_path_parameter(
+        name="year",
+        title="Finance year",
+        description="Year of the historical finance month.",
+        examples=(2026,),
+    ),
+]
+
+FinanceMonthPath: TypeAlias = Annotated[
+    int,
+    api_path_parameter(
+        name="month",
+        title="Finance month",
+        description="Calendar month number, from 1 to 12.",
+        examples=(10,),
+    ),
+]
+
+FinanceIncludeDeletedQuery: TypeAlias = Annotated[
+    bool,
+    api_query_parameter(
+        name="include_deleted",
+        title="Include deleted transactions",
+        description="Include soft-deleted transactions in the list.",
+        examples=(
+            False,
+            True,
+        ),
+        ge=None,
+        le=None,
+        min_items=None,
+        max_items=None,
+    ),
+]
+
+FinanceVersionQuery: TypeAlias = Annotated[
+    int,
+    api_query_parameter(
+        name="version",
+        title="Transaction version",
+        description="Current transaction version used for optimistic concurrency.",
+        examples=(1,),
+        ge=None,
+        le=None,
+        min_items=None,
+        max_items=None,
+    ),
+]
+
+FinancePeriodQuery: TypeAlias = Annotated[
+    FinanceStatisticsPeriod,
+    api_query_parameter(
+        name="period",
+        title="Statistics period",
+        description="Period covered by the finance statistics.",
+        examples=(FinanceStatisticsPeriod.THIS_YEAR.value,),
+        ge=None,
+        le=None,
+        min_items=None,
+        max_items=None,
+    ),
+]
+
+FinanceCurrencyQuery: TypeAlias = Annotated[
+    str,
+    api_query_parameter(
+        name="currency",
+        title="Statistics currency",
+        description="Currency used to report finance statistics.",
+        examples=("RUB",),
+        ge=None,
+        le=None,
+        min_items=None,
+        max_items=None,
     ),
 ]

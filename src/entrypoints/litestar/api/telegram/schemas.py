@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
+from litestar.openapi.spec import Example
 from litestar.params import PathParameter
 from pydantic import Field, field_validator
 
@@ -13,7 +14,14 @@ from core.telegram.schemas import (
 )
 from entrypoints.litestar.api.schemas import CamelCaseSchema
 
-TelegramItemId = Annotated[str, PathParameter()]
+TelegramItemId = Annotated[
+    str,
+    PathParameter(
+        description="Identifier of the authenticated user's Telegram invitation or connection.",
+        examples=[Example(value="00000000000000000000000000000001")],
+        schema_extra={"examples": ["00000000000000000000000000000001"]},
+    ),
+]
 
 
 class TelegramLabelRequest(CamelCaseSchema):

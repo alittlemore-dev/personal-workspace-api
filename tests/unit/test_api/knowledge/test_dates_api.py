@@ -146,8 +146,7 @@ class TestKnowledgeDatesApi(ApiTestCase):
         duplicate = self.api.put_knowledge_date(date_id=1, data=payload)
         self.asserts.status(response=duplicate, expected_status=codes.BAD_REQUEST)
 
-    def test_private_controller_is_hidden_and_uncached(self) -> None:
-        assert KnowledgeDatesApiController.include_in_schema is False
+    def test_private_controller_is_uncached(self) -> None:
         assert KnowledgeDatesApiController.response_headers == {
             "Cache-Control": "no-store",
         }

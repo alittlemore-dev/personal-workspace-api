@@ -68,6 +68,5 @@ class TestCalendarApi(ApiTestCase):
         self.asserts.status(response=response, expected_status=codes.BAD_REQUEST)
         self.use_case.get_calendar.assert_not_called()
 
-    def test_private_calendar_handlers_are_uncached_and_hidden_from_openapi(self) -> None:
+    def test_private_calendar_handlers_are_uncached(self) -> None:
         assert CalendarApiController.get_calendar.cache is False
-        assert CalendarApiController.include_in_schema is False

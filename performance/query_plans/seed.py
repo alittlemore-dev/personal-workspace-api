@@ -85,7 +85,8 @@ async def seed_profile(*, connection: AsyncConnection, profile: QueryPlanProfile
                 'Benchmark resume ' || value::text,
                 'EN'::language_enum,
                 :author_username,
-                '{"profile":{"full_name":"Query Plan","role":"Engineer","location":"",'
+                '{"settings":{"date_format":"monthYear"},'
+                '"profile":{"full_name":"Query Plan","role":"Engineer","location":"",'
                 '"email":"","phone":"","website_url":"","linkedin_url":"",'
                 '"github_url":"","telegram":""},"summary":{"text":"seed"},"skills":[],'
                 '"experience":[],"education":[],"languages":[],"certifications":[],'

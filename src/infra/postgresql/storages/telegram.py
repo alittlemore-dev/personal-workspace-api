@@ -268,7 +268,7 @@ class TelegramDatabaseStorage(TelegramStorage):
         if state == TelegramConnectionState.ACTIVE:
             values["connected_at"] = now
         try:
-            model = await self.session.scalar(
+            model: TelegramConnectionModel | None = await self.session.scalar(
                 update(TelegramConnectionModel)
                 .where(
                     TelegramConnectionModel.id == connection_id,
@@ -283,7 +283,7 @@ class TelegramDatabaseStorage(TelegramStorage):
         return model.to_domain_schema()
 
     async def set_connection_label(self, *, connection_id: str, label: str) -> TelegramConnection:
-        model = await self.session.scalar(
+        model: TelegramConnectionModel | None = await self.session.scalar(
             update(TelegramConnectionModel)
             .where(
                 TelegramConnectionModel.id == connection_id,
@@ -301,7 +301,7 @@ class TelegramDatabaseStorage(TelegramStorage):
         connection_id: str,
         settings: TelegramConnectionSettings,
     ) -> TelegramConnection:
-        model = await self.session.scalar(
+        model: TelegramConnectionModel | None = await self.session.scalar(
             update(TelegramConnectionModel)
             .where(TelegramConnectionModel.id == connection_id)
             .values(

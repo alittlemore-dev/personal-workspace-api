@@ -730,7 +730,10 @@ class FinanceDatabaseStorage(FinanceStorage):
         )
         if not include_deleted:
             query = query.where(FinanceTransactionModel.deleted_at.is_(None))
-        return [tuple(row) for row in (await self.session.execute(query)).all()]
+        return [
+            (transaction, category, rate_set, rate)
+            for transaction, category, rate_set, rate in (await self.session.execute(query)).all()
+        ]
 
     def _transaction_view(
         self,

@@ -324,6 +324,6 @@ class KnowledgeItemsDatabaseStorage(KnowledgeItemsStorage):
             )
         )
         tags_by_item_id: dict[str, list[KnowledgeTag]] = {}
-        for item_id, model in (await self.session.execute(query)).tuples():
+        for item_id, model in await self.session.execute(query):
             tags_by_item_id.setdefault(item_id, []).append(model.to_domain_schema())
         return tags_by_item_id

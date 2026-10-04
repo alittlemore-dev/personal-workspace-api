@@ -45,7 +45,7 @@ class KnowledgeFilesDatabaseStorage(KnowledgeFilesStorage):
         )
         return [
             link.to_domain_schema(metadata=metadata)
-            for link, metadata in (await self.session.execute(query)).tuples()
+            for link, metadata in (await self.session.execute(query))
         ]
 
     async def list_files_for_items(
@@ -73,7 +73,7 @@ class KnowledgeFilesDatabaseStorage(KnowledgeFilesStorage):
         )
         return [
             link.to_domain_schema(metadata=metadata)
-            for link, metadata in (await self.session.execute(query)).tuples()
+            for link, metadata in (await self.session.execute(query))
         ]
 
     async def get_file(self, *, file_id: str, author_username: str) -> KnowledgeFile:
@@ -86,7 +86,7 @@ class KnowledgeFilesDatabaseStorage(KnowledgeFilesStorage):
                 KnowledgeItemFileModel.author_username == author_username,
             )
         )
-        row = (await self.session.execute(query)).tuples().one_or_none()
+        row = (await self.session.execute(query)).one_or_none()
         if row is None:
             raise KnowledgeFileNotFoundError
         link, metadata = row

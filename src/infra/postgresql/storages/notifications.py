@@ -82,21 +82,26 @@ class ReminderDatabaseStorage(ReminderStorage):
                 .execution_options(populate_existing=True)
             )
             rows = (await self.session.execute(birthday_query)).all()
-            return [
-                ReminderSource(
-                    owner_username=owner_username,
-                    item_id=item.id,
-                    kind=kind,
-                    title=item.display_name,
-                    day=details.birthday_day,
-                    month=details.birthday_month,
-                    year=details.birthday_year,
-                    description="",
-                    related_people=(),
-                    notifications_enabled=details.notifications_enabled,
+            sources: list[ReminderSource] = []
+            for item, details in rows:
+                if details.birthday_day is None or details.birthday_month is None:
+                    message = "Birthday query returned a date without a day or month"
+                    raise ValueError(message)
+                sources.append(
+                    ReminderSource(
+                        owner_username=owner_username,
+                        item_id=item.id,
+                        kind=kind,
+                        title=item.display_name,
+                        day=details.birthday_day,
+                        month=details.birthday_month,
+                        year=details.birthday_year,
+                        description="",
+                        related_people=(),
+                        notifications_enabled=details.notifications_enabled,
+                    ),
                 )
-                for item, details in rows
-            ]
+            return sources
         date_query = (
             select(KnowledgeItemModel, KnowledgeDateDetailsModel)
             .join(

@@ -56,7 +56,7 @@ class VaultDatabaseStorage(VaultStorage):
                 display_name=row[3],
                 updated_at=row[4],
             )
-            for row in (await self.session.execute(query)).tuples()
+            for row in (await self.session.execute(query))
         ]
 
     async def list_statistics(
@@ -102,5 +102,5 @@ class VaultDatabaseStorage(VaultStorage):
                 created_last_30_days_count=row[3],
                 created_or_updated_last_30_days_count=row[4],
             )
-            for row in (await self.session.execute(query)).tuples()
+            for row in (await self.session.execute(query))
         ]

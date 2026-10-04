@@ -240,9 +240,7 @@ class PeopleDatabaseStorage(PeopleStorage):
             relationship_model.to_domain_schema(
                 relationship_type=relationship_type_model.to_domain_schema(),
             )
-            for relationship_model, relationship_type_model in (
-                await self.session.execute(query)
-            ).tuples()
+            for relationship_model, relationship_type_model in (await self.session.execute(query))
         ]
 
     async def get_relationships_by_ids(
@@ -272,9 +270,7 @@ class PeopleDatabaseStorage(PeopleStorage):
             relationship_model.to_domain_schema(
                 relationship_type=relationship_type_model.to_domain_schema(),
             )
-            for relationship_model, relationship_type_model in (
-                await self.session.execute(query)
-            ).tuples()
+            for relationship_model, relationship_type_model in (await self.session.execute(query))
         ]
 
     async def list_related_person_ids(
@@ -294,7 +290,7 @@ class PeopleDatabaseStorage(PeopleStorage):
             ),
         )
         related_ids: set[str] = set()
-        for source_person_id, target_person_id in (await self.session.execute(query)).tuples():
+        for source_person_id, target_person_id in await self.session.execute(query):
             related_ids.add(
                 target_person_id if source_person_id == person_id else source_person_id,
             )

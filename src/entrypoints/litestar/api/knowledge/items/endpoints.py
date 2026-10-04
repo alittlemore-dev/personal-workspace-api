@@ -41,10 +41,14 @@ class KnowledgeTagsApiController(Controller):
 
     @get(
         "",
-        description="List or search current author's knowledge tags.",
+        description=(
+            "List or search current author's knowledge tags.\n\nPersonal API "
+            "token permissions: workspace.knowledge.read."
+        ),
         name="knowledge-tags-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_list_tags_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def list_tags(
         self,
@@ -59,9 +63,13 @@ class KnowledgeTagsApiController(Controller):
 
     @post(
         "",
-        description="Create an author-scoped knowledge tag.",
+        description=(
+            "Create an author-scoped knowledge tag.\n\nPersonal API token "
+            "permissions: workspace.knowledge.create."
+        ),
         name="knowledge-tags-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
+        opt={"pat_permissions": ("workspace.knowledge.create",)},
     )
     async def create_tag(
         self,
@@ -84,10 +92,14 @@ class KnowledgeTagsApiController(Controller):
 
     @put(
         "/{tag_id:str}",
-        description="Rename an author-scoped knowledge tag.",
+        description=(
+            "Rename an author-scoped knowledge tag.\n\nPersonal API token "
+            "permissions: workspace.knowledge.update."
+        ),
         name="knowledge-tags-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_tag_params)},
+        opt={"pat_permissions": ("workspace.knowledge.update",)},
     )
     async def update_tag(
         self,
@@ -102,10 +114,14 @@ class KnowledgeTagsApiController(Controller):
 
     @delete(
         "/{tag_id:str}",
-        description="Delete an unused author-scoped knowledge tag.",
+        description=(
+            "Delete an unused author-scoped knowledge tag.\n\nPersonal API token "
+            "permissions: workspace.knowledge.delete."
+        ),
         name="knowledge-tags-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_tag_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",)},
     )
     async def delete_tag(
         self,

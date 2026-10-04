@@ -22,9 +22,7 @@ class TestOpenApiMetadata:
         assert "/api/calendar" in paths
         assert "/api/telegram" in paths
         assert any(path.startswith("/api/knowledge/") for path in paths)
-        assert not any(
-            path.startswith(("/api/tools", "/api/internal", "/api/healthcheck")) for path in paths
-        )
+        assert not any(path.startswith(("/api/internal", "/api/healthcheck")) for path in paths)
         assert "/api/telegram/webhook" not in paths
         for _, _, operation in self._iter_operations(schema=schema):
             assert operation["security"] == [{"bearerAuth": []}]
@@ -43,7 +41,7 @@ class TestOpenApiMetadata:
             assert "/api/resumes" in response.json()["paths"]
             assert (
                 response.json()["components"]["securitySchemes"]["bearerAuth"]["bearerFormat"]
-                == "PASETO"
+                == "PASETO or personal API token"
             )
             assert client.get("/api/resumes").status_code == 401
         assert authentication_client.tokens == ()

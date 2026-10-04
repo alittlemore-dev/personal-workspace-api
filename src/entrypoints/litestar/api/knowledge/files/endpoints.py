@@ -52,13 +52,17 @@ class KnowledgeFilesApiController(Controller):
 
     @put(
         "/people/{person_id:str}/photo",
-        description="Replace a private person photo.",
+        description=(
+            "Replace a private person photo.\n\nPersonal API token permissions: "
+            "workspace.knowledge.update."
+        ),
         name="knowledge-person-photo-replace-api-handler",
         status_code=status_codes.HTTP_200_OK,
         request_max_body_size=constants.knowledge_files.photo_request_max_body_size_bytes,
         dependencies={
             "params": Provide(provide_replace_person_photo_params),
         },
+        opt={"pat_permissions": ("workspace.knowledge.update",)},
     )
     async def replace_person_photo(
         self,
@@ -90,10 +94,14 @@ class KnowledgeFilesApiController(Controller):
 
     @delete(
         "/people/{person_id:str}/photo",
-        description="Delete a private person photo.",
+        description=(
+            "Delete a private person photo.\n\nPersonal API token permissions: "
+            "workspace.knowledge.delete."
+        ),
         name="knowledge-person-photo-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_person_photo_params)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",)},
     )
     async def delete_person_photo(
         self,
@@ -113,13 +121,17 @@ class KnowledgeFilesApiController(Controller):
 
     @post(
         "/items/{item_id:str}/attachments",
-        description="Upload a private knowledge item attachment.",
+        description=(
+            "Upload a private knowledge item attachment.\n\nPersonal API token "
+            "permissions: workspace.knowledge.create."
+        ),
         name="knowledge-attachment-upload-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
         request_max_body_size=constants.knowledge_files.attachment_request_max_body_size_bytes,
         dependencies={
             "params": Provide(provide_upload_attachment_params),
         },
+        opt={"pat_permissions": ("workspace.knowledge.create",)},
     )
     async def upload_attachment(
         self,
@@ -142,13 +154,18 @@ class KnowledgeFilesApiController(Controller):
 
     @post(
         "/items/{item_id:str}/editor-images",
-        description="Upload a normalized private image for the knowledge Markdown editor.",
+        description=(
+            "Upload a normalized private image for the knowledge Markdown "
+            "editor.\n\nPersonal API token permissions: "
+            "workspace.knowledge.create."
+        ),
         name="knowledge-editor-image-upload-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
         request_max_body_size=constants.knowledge_files.photo_request_max_body_size_bytes,
         dependencies={
             "params": Provide(provide_upload_editor_image_params),
         },
+        opt={"pat_permissions": ("workspace.knowledge.create",)},
     )
     async def upload_editor_image(
         self,
@@ -171,10 +188,14 @@ class KnowledgeFilesApiController(Controller):
 
     @put(
         "/items/{item_id:str}/attachments/{file_id:str}",
-        description="Rename a private knowledge item attachment.",
+        description=(
+            "Rename a private knowledge item attachment.\n\nPersonal API token "
+            "permissions: workspace.knowledge.update."
+        ),
         name="knowledge-attachment-rename-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_rename_attachment_params)},
+        opt={"pat_permissions": ("workspace.knowledge.update",)},
     )
     async def rename_attachment(
         self,
@@ -189,10 +210,14 @@ class KnowledgeFilesApiController(Controller):
 
     @delete(
         "/items/{item_id:str}/attachments/{file_id:str}",
-        description="Delete a private knowledge item attachment.",
+        description=(
+            "Delete a private knowledge item attachment.\n\nPersonal API token "
+            "permissions: workspace.knowledge.delete."
+        ),
         name="knowledge-attachment-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_attachment_params)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",)},
     )
     async def delete_attachment(
         self,
@@ -212,10 +237,14 @@ class KnowledgeFilesApiController(Controller):
 
     @get(
         "/files/{file_id:str}/content",
-        description="Stream private knowledge file content after an author check.",
+        description=(
+            "Stream private knowledge file content after an author check.\n\n"
+            "Personal API token permissions: workspace.knowledge.read."
+        ),
         name="knowledge-file-content-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_file_content_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def get_file_content(
         self,

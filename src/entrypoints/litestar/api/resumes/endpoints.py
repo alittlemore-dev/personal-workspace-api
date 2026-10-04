@@ -42,10 +42,13 @@ class ResumesApiController(Controller):
 
     @get(
         "",
-        description="Get the resume list.",
+        description=(
+            "Get the resume list.\n\nPersonal API token permissions: workspace.resumes.read."
+        ),
         name="resumes-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"filters": Provide(provide_resume_filters, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.resumes.read",)},
     )
     async def list_resumes(
         self,
@@ -57,9 +60,12 @@ class ResumesApiController(Controller):
 
     @post(
         "",
-        description="Create a resume.",
+        description=(
+            "Create a resume.\n\nPersonal API token permissions: workspace.resumes.create."
+        ),
         name="resumes-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
+        opt={"pat_permissions": ("workspace.resumes.create",)},
     )
     async def create_resume(
         self,
@@ -105,10 +111,13 @@ class ResumesApiController(Controller):
 
     @get(
         "/{resume_id:str}",
-        description="Get resume details.",
+        description=(
+            "Get resume details.\n\nPersonal API token permissions: workspace.resumes.read."
+        ),
         name="resumes-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_resume_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.resumes.read",)},
     )
     async def get_resume(
         self,
@@ -122,11 +131,15 @@ class ResumesApiController(Controller):
 
     @post(
         "/{resume_id:str}/photo",
-        description="Upload a private resume photo.",
+        description=(
+            "Upload a private resume photo.\n\nPersonal API token permissions: "
+            "workspace.resumes.update."
+        ),
         name="resumes-photo-upload-api-handler",
         status_code=status_codes.HTTP_200_OK,
         request_max_body_size=1_048_576,
         dependencies={"params": Provide(provide_upload_photo_params)},
+        opt={"pat_permissions": ("workspace.resumes.update",)},
     )
     async def upload_photo(
         self,
@@ -149,9 +162,13 @@ class ResumesApiController(Controller):
 
     @get(
         "/{resume_id:str}/photo",
-        description="Read a private resume photo.",
+        description=(
+            "Read a private resume photo.\n\nPersonal API token permissions: "
+            "workspace.resumes.read."
+        ),
         name="resumes-photo-read-api-handler",
         dependencies={"params": Provide(provide_get_photo_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.resumes.read",)},
     )
     async def get_photo(
         self,
@@ -169,10 +186,13 @@ class ResumesApiController(Controller):
 
     @put(
         "/{resume_id:str}",
-        description="Update a resume.",
+        description=(
+            "Update a resume.\n\nPersonal API token permissions: workspace.resumes.update."
+        ),
         name="resumes-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_resume_params)},
+        opt={"pat_permissions": ("workspace.resumes.update",)},
     )
     async def update_resume(
         self,
@@ -186,10 +206,11 @@ class ResumesApiController(Controller):
 
     @post(
         "/{resume_id:str}/export",
-        description="Export a resume.",
+        description=("Export a resume.\n\nPersonal API token permissions: workspace.resumes.read."),
         name="resumes-export-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_export_resume_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.resumes.read",)},
     )
     async def export_resume(
         self,
@@ -207,10 +228,13 @@ class ResumesApiController(Controller):
 
     @delete(
         "/{resume_id:str}",
-        description="Delete a resume.",
+        description=(
+            "Delete a resume.\n\nPersonal API token permissions: workspace.resumes.delete."
+        ),
         name="resumes-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_resume_params)},
+        opt={"pat_permissions": ("workspace.resumes.delete",)},
     )
     async def delete_resume(
         self,

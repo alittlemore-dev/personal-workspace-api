@@ -23,10 +23,14 @@ class ToolsApiController(Controller):
 
     @get(
         "/cache",
-        description="Get response cache configuration, domain metrics, and last manual warm.",
+        description=(
+            "Get response cache configuration, domain metrics, and last manual "
+            "warm.\n\nPersonal API token permissions: workspace.tools.read."
+        ),
         name="tools-cache-status-api-handler",
         status_code=status_codes.HTTP_200_OK,
         cache=False,
+        opt={"pat_permissions": ("workspace.tools.read",)},
     )
     async def get_cache_status(
         self,
@@ -39,10 +43,14 @@ class ToolsApiController(Controller):
 
     @post(
         "/cache/clear",
-        description="Clear response cache domains without enqueueing a warm.",
+        description=(
+            "Clear response cache domains without enqueueing a warm.\n\nPersonal "
+            "API token permissions: workspace.tools.manage."
+        ),
         name="tools-cache-clear-api-handler",
         status_code=status_codes.HTTP_200_OK,
         cache=False,
+        opt={"pat_permissions": ("workspace.tools.manage",)},
     )
     async def clear_cache(
         self,
@@ -55,10 +63,14 @@ class ToolsApiController(Controller):
 
     @post(
         "/cache/warm",
-        description="Enqueue a manual response cache warm operation.",
+        description=(
+            "Enqueue a manual response cache warm operation.\n\nPersonal API "
+            "token permissions: workspace.tools.manage."
+        ),
         name="tools-cache-warm-api-handler",
         status_code=status_codes.HTTP_202_ACCEPTED,
         cache=False,
+        opt={"pat_permissions": ("workspace.tools.manage",)},
     )
     async def warm_cache(
         self,
@@ -73,10 +85,14 @@ class ToolsApiController(Controller):
 
     @get(
         "/cache/warm/{operation_id:str}",
-        description="Get a manual response cache warm operation for polling.",
+        description=(
+            "Get a manual response cache warm operation for polling.\n\nPersonal "
+            "API token permissions: workspace.tools.read."
+        ),
         name="tools-cache-warm-operation-api-handler",
         status_code=status_codes.HTTP_200_OK,
         cache=False,
+        opt={"pat_permissions": ("workspace.tools.read",)},
     )
     async def get_cache_warm_operation(
         self,

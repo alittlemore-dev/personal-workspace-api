@@ -38,12 +38,16 @@ class KnowledgeDatesApiController(Controller):
 
     @get(
         "",
-        description="List private memorable dates owned by the current author.",
+        description=(
+            "List private memorable dates owned by the current author.\n\n"
+            "Personal API token permissions: workspace.knowledge.read."
+        ),
         name="knowledge-dates-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={
             "filters": Provide(provide_knowledge_date_filters, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def list_dates(
         self,
@@ -56,10 +60,14 @@ class KnowledgeDatesApiController(Controller):
 
     @post(
         "",
-        description="Quick-create a private memorable date.",
+        description=(
+            "Quick-create a private memorable date.\n\nPersonal API token "
+            "permissions: workspace.knowledge.create."
+        ),
         name="knowledge-dates-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={"params": Provide(provide_create_date_params)},
+        opt={"pat_permissions": ("workspace.knowledge.create",)},
     )
     async def create_date(
         self,
@@ -74,10 +82,14 @@ class KnowledgeDatesApiController(Controller):
 
     @get(
         "/{date_id:str}",
-        description="Get one private memorable date owned by the current author.",
+        description=(
+            "Get one private memorable date owned by the current author.\n\n"
+            "Personal API token permissions: workspace.knowledge.read."
+        ),
         name="knowledge-dates-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_date_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def get_date(
         self,
@@ -92,10 +104,14 @@ class KnowledgeDatesApiController(Controller):
 
     @put(
         "/{date_id:str}",
-        description="Replace editable private memorable date data.",
+        description=(
+            "Replace editable private memorable date data.\n\nPersonal API token "
+            "permissions: workspace.knowledge.update."
+        ),
         name="knowledge-dates-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_date_params)},
+        opt={"pat_permissions": ("workspace.knowledge.update",)},
     )
     async def update_date(
         self,
@@ -110,10 +126,14 @@ class KnowledgeDatesApiController(Controller):
 
     @delete(
         "/{date_id:str}",
-        description="Permanently delete a private memorable date.",
+        description=(
+            "Permanently delete a private memorable date.\n\nPersonal API token "
+            "permissions: workspace.knowledge.delete."
+        ),
         name="knowledge-dates-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_date_params)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",)},
     )
     async def delete_date(
         self,

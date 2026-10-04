@@ -47,6 +47,8 @@ class EventsApiController(Controller):
         dependencies={
             "account_time_zone": Provide(provide_event_time_zone),
         },
+        opt={"pat_permissions": ("workspace.events.read",)},
+        description=("Personal API token permissions: workspace.events.read."),
     )
     async def list_events(
         self,
@@ -66,6 +68,8 @@ class EventsApiController(Controller):
             "params": Provide(provide_create_event_params, sync_to_thread=False),
             "account_time_zone": Provide(provide_event_time_zone),
         },
+        opt={"pat_permissions": ("workspace.events.create",)},
+        description=("Personal API token permissions: workspace.events.create."),
     )
     async def create_event(
         self,
@@ -87,6 +91,8 @@ class EventsApiController(Controller):
             "params": Provide(provide_get_event_params, sync_to_thread=False),
             "account_time_zone": Provide(provide_event_time_zone),
         },
+        opt={"pat_permissions": ("workspace.events.read",)},
+        description=("Personal API token permissions: workspace.events.read."),
     )
     async def get_event(
         self,
@@ -108,6 +114,8 @@ class EventsApiController(Controller):
             "params": Provide(provide_update_event_params, sync_to_thread=False),
             "account_time_zone": Provide(provide_event_time_zone),
         },
+        opt={"pat_permissions": ("workspace.events.update",)},
+        description=("Personal API token permissions: workspace.events.update."),
     )
     async def update_event(
         self,
@@ -128,6 +136,8 @@ class EventsApiController(Controller):
         dependencies={
             "params": Provide(provide_delete_event_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.events.delete",)},
+        description=("Personal API token permissions: workspace.events.delete."),
     )
     async def delete_event(
         self,

@@ -61,6 +61,8 @@ class TelegramApiController(Controller):
         dependencies={
             "params": Provide(provide_get_settings_params),
         },
+        opt={"pat_permissions": ("workspace.telegram.read",)},
+        description=("Personal API token permissions: workspace.telegram.read."),
     )
     async def get_settings(
         self,
@@ -89,6 +91,8 @@ class TelegramApiController(Controller):
         name="telegram-issue-invitation",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={"params": Provide(provide_create_invitation_params)},
+        opt={"pat_permissions": ("workspace.telegram.create",)},
+        description=("Personal API token permissions: workspace.telegram.create."),
     )
     async def create_invitation(
         self,
@@ -105,6 +109,8 @@ class TelegramApiController(Controller):
         name="telegram-cancel-invitation",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_cancel_invitation_params)},
+        opt={"pat_permissions": ("workspace.telegram.delete",)},
+        description=("Personal API token permissions: workspace.telegram.delete."),
     )
     async def cancel_invitation(
         self,
@@ -120,6 +126,8 @@ class TelegramApiController(Controller):
         name="telegram-approve-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_approve_connection_params)},
+        opt={"pat_permissions": ("workspace.telegram.update",)},
+        description=("Personal API token permissions: workspace.telegram.update."),
     )
     async def approve_connection(
         self,
@@ -137,6 +145,8 @@ class TelegramApiController(Controller):
         name="telegram-revoke-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_revoke_connection_params)},
+        opt={"pat_permissions": ("workspace.telegram.update",)},
+        description=("Personal API token permissions: workspace.telegram.update."),
     )
     async def revoke_connection(
         self,
@@ -154,6 +164,8 @@ class TelegramApiController(Controller):
         name="telegram-block-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_block_connection_params)},
+        opt={"pat_permissions": ("workspace.telegram.update",)},
+        description=("Personal API token permissions: workspace.telegram.update."),
     )
     async def block_connection(
         self,
@@ -171,6 +183,8 @@ class TelegramApiController(Controller):
         name="telegram-unblock-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_unblock_connection_params)},
+        opt={"pat_permissions": ("workspace.telegram.update",)},
+        description=("Personal API token permissions: workspace.telegram.update."),
     )
     async def unblock_connection(
         self,
@@ -189,6 +203,8 @@ class TelegramApiController(Controller):
         dependencies={
             "params": Provide(provide_rename_connection_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.telegram.update",)},
+        description=("Personal API token permissions: workspace.telegram.update."),
     )
     async def rename_connection(
         self,
@@ -207,6 +223,8 @@ class TelegramApiController(Controller):
         dependencies={
             "params": Provide(provide_update_connection_settings_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.telegram.update",)},
+        description=("Personal API token permissions: workspace.telegram.update."),
     )
     async def update_connection_settings(
         self,
@@ -225,7 +243,11 @@ class TelegramWebhookController(Controller):
     include_in_schema = False
     opt = {"auth_public": True}
 
-    @post("/webhook", name="telegram-webhook", status_code=200)
+    @post(
+        "/webhook",
+        name="telegram-webhook",
+        status_code=200,
+    )
     async def receive_update(self, request: Request) -> dict[str, bool]:
         expected = settings.telegram.webhook_secret.get_secret_value()
         supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
@@ -249,7 +271,10 @@ class TelegramRuntimeController(Controller):
     guards = [require_telegram_service]
     response_headers = {"Cache-Control": "no-store"}
 
-    @get("/status", name="internal-telegram-runtime-status")
+    @get(
+        "/status",
+        name="internal-telegram-runtime-status",
+    )
     async def get_status(self, request: Request) -> TelegramRuntimeStatusResponse:
         return TelegramRuntimeStatusResponse(status=await get_runtime_status(request))
 

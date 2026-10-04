@@ -54,10 +54,14 @@ class PeopleApiController(Controller):
 
     @get(
         "",
-        description="List private people owned by the current author.",
+        description=(
+            "List private people owned by the current author.\n\nPersonal API "
+            "token permissions: workspace.knowledge.read."
+        ),
         name="knowledge-people-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"filters": Provide(provide_person_filters, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def list_people(
         self,
@@ -70,9 +74,13 @@ class PeopleApiController(Controller):
 
     @post(
         "",
-        description="Quick-create a private person.",
+        description=(
+            "Quick-create a private person.\n\nPersonal API token permissions: "
+            "workspace.knowledge.create."
+        ),
         name="knowledge-people-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
+        opt={"pat_permissions": ("workspace.knowledge.create",)},
     )
     async def create_person(
         self,
@@ -95,10 +103,14 @@ class PeopleApiController(Controller):
 
     @get(
         "/{person_id:str}",
-        description="Get one private person owned by the current author.",
+        description=(
+            "Get one private person owned by the current author.\n\nPersonal API "
+            "token permissions: workspace.knowledge.read."
+        ),
         name="knowledge-people-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_person_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def get_person(
         self,
@@ -113,10 +125,15 @@ class PeopleApiController(Controller):
 
     @put(
         "/{person_id:str}",
-        description="Replace editable private person data and apply relationship commands.",
+        description=(
+            "Replace editable private person data and apply relationship "
+            "commands.\n\nPersonal API token permissions: "
+            "workspace.knowledge.update."
+        ),
         name="knowledge-people-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_person_params)},
+        opt={"pat_permissions": ("workspace.knowledge.update",)},
     )
     async def update_person(
         self,
@@ -131,10 +148,14 @@ class PeopleApiController(Controller):
 
     @delete(
         "/{person_id:str}",
-        description="Permanently delete a private person.",
+        description=(
+            "Permanently delete a private person.\n\nPersonal API token "
+            "permissions: workspace.knowledge.delete."
+        ),
         name="knowledge-people-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_person_params)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",)},
     )
     async def delete_person(
         self,
@@ -154,9 +175,13 @@ class PeopleApiController(Controller):
 
     @get(
         "/relationship-types",
-        description="List author-scoped person relationship types.",
+        description=(
+            "List author-scoped person relationship types.\n\nPersonal API token "
+            "permissions: workspace.knowledge.read."
+        ),
         name="knowledge-relationship-types-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
+        opt={"pat_permissions": ("workspace.knowledge.read",)},
     )
     async def list_relationship_types(
         self,
@@ -171,12 +196,16 @@ class PeopleApiController(Controller):
 
     @post(
         "/relationship-types",
-        description="Create an author-scoped person relationship type.",
+        description=(
+            "Create an author-scoped person relationship type.\n\nPersonal API "
+            "token permissions: workspace.knowledge.create."
+        ),
         name="knowledge-relationship-types-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={
             "params": Provide(provide_create_relationship_type_params),
         },
+        opt={"pat_permissions": ("workspace.knowledge.create",)},
     )
     async def create_relationship_type(
         self,
@@ -191,12 +220,16 @@ class PeopleApiController(Controller):
 
     @put(
         "/relationship-types/{relationship_type_id:str}",
-        description="Update an author-scoped person relationship type.",
+        description=(
+            "Update an author-scoped person relationship type.\n\nPersonal API "
+            "token permissions: workspace.knowledge.update."
+        ),
         name="knowledge-relationship-types-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={
             "params": Provide(provide_update_relationship_type_params),
         },
+        opt={"pat_permissions": ("workspace.knowledge.update",)},
     )
     async def update_relationship_type(
         self,
@@ -211,12 +244,16 @@ class PeopleApiController(Controller):
 
     @delete(
         "/relationship-types/{relationship_type_id:str}",
-        description="Delete an unused author-scoped relationship type.",
+        description=(
+            "Delete an unused author-scoped relationship type.\n\nPersonal API "
+            "token permissions: workspace.knowledge.delete."
+        ),
         name="knowledge-relationship-types-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={
             "params": Provide(provide_delete_relationship_type_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.knowledge.delete",)},
     )
     async def delete_relationship_type(
         self,

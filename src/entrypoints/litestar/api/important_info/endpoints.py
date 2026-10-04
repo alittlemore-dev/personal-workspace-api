@@ -38,7 +38,12 @@ class ImportantInfoApiController(Controller):
         ),
     }
 
-    @get("", status_code=status_codes.HTTP_200_OK)
+    @get(
+        "",
+        status_code=status_codes.HTTP_200_OK,
+        opt={"pat_permissions": ("workspace.important_info.read",)},
+        description=("Personal API token permissions: workspace.important_info.read."),
+    )
     async def list_items(
         self,
         request: Request[Principal, AuthContext, State],
@@ -54,6 +59,8 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_create_item_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.important_info.create",)},
+        description=("Personal API token permissions: workspace.important_info.create."),
     )
     async def create_item(
         self,
@@ -72,6 +79,8 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_set_order_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.important_info.update",)},
+        description=("Personal API token permissions: workspace.important_info.update."),
     )
     async def set_order(
         self,
@@ -90,6 +99,8 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_update_item_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.important_info.update",)},
+        description=("Personal API token permissions: workspace.important_info.update."),
     )
     async def update_item(
         self,
@@ -108,6 +119,8 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_delete_item_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.important_info.delete",)},
+        description=("Personal API token permissions: workspace.important_info.delete."),
     )
     async def delete_item(
         self,

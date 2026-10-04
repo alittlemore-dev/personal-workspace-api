@@ -32,13 +32,15 @@ class CalendarApiController(Controller):
     @get(
         "",
         description=(
-            "Get the current author's memorable dates and birthdays for the selected calendar "
-            "window."
+            "Get the current author's memorable dates and birthdays for the "
+            "selected calendar window.\n\nPersonal API token permissions: "
+            "workspace.calendar.read."
         ),
         name="calendar-api-handler",
         status_code=status_codes.HTTP_200_OK,
         cache=False,
         dependencies={"params": Provide(provide_get_calendar_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.calendar.read",)},
     )
     async def get_calendar(
         self,
@@ -58,6 +60,8 @@ class CalendarApiController(Controller):
         dependencies={
             "params": Provide(provide_get_occurrences_params, sync_to_thread=False),
         },
+        opt={"pat_permissions": ("workspace.calendar.read",)},
+        description=("Personal API token permissions: workspace.calendar.read."),
     )
     async def get_occurrences(
         self,

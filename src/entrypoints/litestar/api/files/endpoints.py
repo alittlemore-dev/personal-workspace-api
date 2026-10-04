@@ -28,9 +28,12 @@ class FilesApiController(Controller):
 
     @post(
         "",
-        description="Upload a managed file.",
+        description=(
+            "Upload a managed file.\n\nPersonal API token permissions: workspace.files.create."
+        ),
         name="files-upload-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
+        opt={"pat_permissions": ("workspace.files.create",)},
     )
     async def upload_file(
         self,
@@ -69,8 +72,11 @@ class FilesApiController(Controller):
 
     @get(
         "",
-        description="List managed files.",
+        description=(
+            "List managed files.\n\nPersonal API token permissions: workspace.files.read."
+        ),
         name="files-list-api-handler",
+        opt={"pat_permissions": ("workspace.files.read",)},
     )
     async def list_files(
         self,
@@ -83,8 +89,11 @@ class FilesApiController(Controller):
 
     @get(
         "/{file_id:str}",
-        description="Get managed file metadata.",
+        description=(
+            "Get managed file metadata.\n\nPersonal API token permissions: workspace.files.read."
+        ),
         name="files-detail-api-handler",
+        opt={"pat_permissions": ("workspace.files.read",)},
     )
     async def get_file(
         self,
@@ -97,8 +106,12 @@ class FilesApiController(Controller):
 
     @put(
         "/{file_id:str}",
-        description="Update managed file metadata.",
+        description=(
+            "Update managed file metadata.\n\nPersonal API token permissions: "
+            "workspace.files.update."
+        ),
         name="files-update-api-handler",
+        opt={"pat_permissions": ("workspace.files.update",)},
     )
     async def update_file(
         self,
@@ -124,9 +137,12 @@ class FilesApiController(Controller):
 
     @delete(
         "/{file_id:str}",
-        description="Delete a managed file.",
+        description=(
+            "Delete a managed file.\n\nPersonal API token permissions: workspace.files.delete."
+        ),
         name="files-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
+        opt={"pat_permissions": ("workspace.files.delete",)},
     )
     async def delete_file(
         self,

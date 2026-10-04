@@ -24,7 +24,7 @@ def test_init_sentry_uses_the_configured_dsn() -> None:
         initializers.init_sentry()
 
     assert init.call_args.kwargs["dsn"] == "https://public@sentry.test/1"
-    assert init.call_args.kwargs["send_default_pii"] is True
+    assert init.call_args.kwargs["send_default_pii"] is False
     assert len(init.call_args.kwargs["integrations"]) == 1
 
 

@@ -25,7 +25,11 @@ class VaultApiController(Controller):
         ),
     }
 
-    @get("/recent")
+    @get(
+        "/recent",
+        opt={"pat_permissions": ("workspace.vault.read",)},
+        description=("Personal API token permissions: workspace.vault.read."),
+    )
     async def recent(
         self,
         request: Request[Principal, AuthContext, State],
@@ -38,6 +42,8 @@ class VaultApiController(Controller):
     @get(
         "/statistics",
         dependencies={"params": Provide(provide_statistics_params, sync_to_thread=False)},
+        opt={"pat_permissions": ("workspace.vault.read",)},
+        description=("Personal API token permissions: workspace.vault.read."),
     )
     async def statistics(
         self,

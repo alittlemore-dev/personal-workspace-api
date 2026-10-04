@@ -6,10 +6,10 @@ import pytest
 from pydantic import ValidationError
 from pypdf import PdfWriter
 
-from core.resumes.enums import ResumeDateFormatEnum, ResumeExportFormatEnum
+from core.resumes.enums import ResumeDateFormatEnum, ResumeExportFormatEnum, ResumeSectionEnum
 from core.resumes.schemas import ResumeExport
 from entrypoints.litestar.api.resumes.responses import ResumeExportResponse
-from entrypoints.litestar.api.resumes.schemas import ResumeRequestSchema
+from entrypoints.litestar.api.resumes.schemas import ResumeExportRequestSchema, ResumeRequestSchema
 from tests.helpers.factories.api import ApiFactoryHelper
 from tests.unit.test_api.resumes.test_resumes import experience_payload
 
@@ -220,7 +220,11 @@ def test_pdf_export_reports_actual_page_count() -> None:
 @pytest.mark.parametrize("date_format", list(ResumeDateFormatEnum))
 def test_resume_requires_explicit_date_settings(date_format: ResumeDateFormatEnum) -> None:
     content = request_content()
-    content["settings"] = {"dateFormat": date_format.value}
+    content["settings"] = {
+        "dateFormat": date_format.value,
+        "sectionOrder": [],
+        "hiddenSections": [],
+    }
     request = ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
     assert (
         request.to_create_schema(author_username="owner").content.settings.date_format
@@ -228,6 +232,8 @@ def test_resume_requires_explicit_date_settings(date_format: ResumeDateFormatEnu
     )
     assert request.model_dump(by_alias=True)["content"]["settings"] == {
         "dateFormat": date_format.value,
+        "sectionOrder": [],
+        "hiddenSections": [],
     }
     content.pop("settings")
     with pytest.raises(ValidationError):
@@ -239,6 +245,67 @@ def test_resume_rejects_missing_or_invalid_date_format(settings: object) -> None
     content = request_content()
     content["settings"] = settings
     with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("sectionOrder", ["summary"]),
+        ("sectionOrder", ["summary"] * 7),
+        ("sectionOrder", [section.value for section in ResumeSectionEnum] + ["summary"]),
+        ("sectionOrder", ["unknown"]),
+        ("sectionOrder", None),
+        ("hiddenSections", ["summary", "summary"]),
+        ("hiddenSections", ["profile"]),
+        ("hiddenSections", None),
+    ],
+)
+def test_resume_rejects_invalid_section_settings(field: str, value: object) -> None:
+    content = request_content()
+    content["settings"][field] = value
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+@pytest.mark.parametrize("field", ["sectionOrder", "hiddenSections"])
+def test_resume_requires_explicit_section_settings(field: str) -> None:
+    content = request_content()
+    content["settings"].pop(field)
+    with pytest.raises(ValidationError):
+        ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
+
+
+def test_section_settings_are_preserved_in_create_update_and_export() -> None:
+    order = list(reversed(ResumeSectionEnum))
+    hidden = [ResumeSectionEnum.EDUCATION, ResumeSectionEnum.LANGUAGES]
+    content = ApiFactoryHelper.resume_content(
+        section_order=[section.value for section in order],
+        hidden_sections=[section.value for section in hidden],
+    )
+    request = ResumeExportRequestSchema.model_validate(
+        {
+            **ApiFactoryHelper.resume_request(content=content),
+            "format": "pdf",
+            "theme": "accent",
+        },
+    )
+    for settings in (
+        request.to_create_schema(author_username="owner").content.settings,
+        request.to_update_schema().content.settings,
+        request.to_export_schema().content.settings,
+    ):
+        assert settings.section_order == order
+        assert settings.hidden_sections == hidden
+    assert request.model_dump(by_alias=True)["content"]["settings"] == content["settings"]
+
+
+def test_hidden_sections_keep_authored_content_validation() -> None:
+    content = request_content()
+    content["settings"]["hiddenSections"] = ["experience"]
+    content["experience"][0]["projects"][0]["description"] = ""
+    content["experience"][0]["projects"][0]["highlights"] = []
+    with pytest.raises(ValidationError, match="project requires"):
         ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
 
 
@@ -337,7 +404,11 @@ def test_format_settings_do_not_change_visible_text_limit(
         experience=experience,
     )
     content["skills"] = []
-    content["settings"] = {"dateFormat": date_format.value}
+    content["settings"] = {
+        "dateFormat": date_format.value,
+        "sectionOrder": [],
+        "hiddenSections": [],
+    }
 
     ResumeRequestSchema.model_validate(ApiFactoryHelper.resume_request(content=content))
 

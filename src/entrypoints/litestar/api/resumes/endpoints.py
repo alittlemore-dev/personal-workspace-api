@@ -79,7 +79,11 @@ class ResumesApiController(Controller):
                         "title": "Backend Engineer",
                         "language": "en",
                         "content": {
-                            "settings": {"dateFormat": "monthYear"},
+                            "settings": {
+                                "dateFormat": "monthYear",
+                                "sectionOrder": [],
+                                "hiddenSections": [],
+                            },
                             "profile": {
                                 "fullName": "Dmitriy Lunev",
                                 "headline": "Backend Engineer",

@@ -59,7 +59,7 @@ from core.knowledge.people.schemas import (
 )
 from core.notifications.enums import ReminderKind
 from core.notifications.schemas import ReminderRecipient, ReminderSource
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum, ResumeSectionEnum
 from core.resumes.schemas import (
     Resume,
     ResumeAdditionalSection,
@@ -529,9 +529,15 @@ class CoreFactoryHelper:
         skills: list[ResumeSkillGroup] | None = None,
         experience: list[ResumeExperienceItem] | None = None,
         date_format: ResumeDateFormatEnum = ResumeDateFormatEnum.MONTH_YEAR,
+        section_order: list[ResumeSectionEnum] | None = None,
+        hidden_sections: list[ResumeSectionEnum] | None = None,
     ) -> ResumeContent:
         return ResumeContent(
-            settings=ResumeSettings(date_format=date_format),
+            settings=ResumeSettings(
+                date_format=date_format,
+                section_order=list(section_order) if section_order is not None else [],
+                hidden_sections=list(hidden_sections) if hidden_sections is not None else [],
+            ),
             profile=ResumeProfile(
                 full_name=full_name,
                 photo_file_id="",
@@ -560,9 +566,15 @@ class CoreFactoryHelper:
         cls,
         summary: str = "",
         date_format: ResumeDateFormatEnum = ResumeDateFormatEnum.MONTH_YEAR,
+        section_order: list[ResumeSectionEnum] | None = None,
+        hidden_sections: list[ResumeSectionEnum] | None = None,
     ) -> ResumeContent:
         return ResumeContent(
-            settings=ResumeSettings(date_format=date_format),
+            settings=ResumeSettings(
+                date_format=date_format,
+                section_order=list(section_order) if section_order is not None else [],
+                hidden_sections=list(hidden_sections) if hidden_sections is not None else [],
+            ),
             profile=ResumeProfile(
                 full_name="",
                 photo_file_id="",
@@ -590,9 +602,15 @@ class CoreFactoryHelper:
         summary: str = "Builds reliable backend systems.",
         skill_items: list[str] | None = None,
         date_format: ResumeDateFormatEnum = ResumeDateFormatEnum.MONTH_YEAR,
+        section_order: list[ResumeSectionEnum] | None = None,
+        hidden_sections: list[ResumeSectionEnum] | None = None,
     ) -> ResumeContent:
         return ResumeContent(
-            settings=ResumeSettings(date_format=date_format),
+            settings=ResumeSettings(
+                date_format=date_format,
+                section_order=list(section_order) if section_order is not None else [],
+                hidden_sections=list(hidden_sections) if hidden_sections is not None else [],
+            ),
             profile=ResumeProfile(
                 full_name="Dmitriy Ivanov",
                 photo_file_id="",

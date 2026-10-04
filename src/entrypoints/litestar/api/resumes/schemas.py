@@ -9,6 +9,7 @@ from core.resumes.enums import (
     ResumeCurrentStatusEnum,
     ResumeDateFormatEnum,
     ResumeExportFormatEnum,
+    ResumeSectionEnum,
     ResumeThemeEnum,
 )
 from core.resumes.schemas import (
@@ -38,6 +39,7 @@ from entrypoints.litestar.api.resumes.validators import (
     validate_experience_content,
     validate_project_content,
     validate_resume_phone,
+    validate_resume_sections,
     validate_resume_totals,
     validate_unique_skill_items,
 )
@@ -415,13 +417,25 @@ class ResumeAdditionalSectionSchema(CamelCaseSchema):
 
 class ResumeSettingsSchema(CamelCaseSchema):
     date_format: Annotated[ResumeDateFormatEnum, Field(title="Date format")]
+    section_order: Annotated[list[ResumeSectionEnum], Field(title="Section order")]
+    hidden_sections: Annotated[list[ResumeSectionEnum], Field(title="Hidden sections")]
+
+    validate_sections = model_validator(mode="after")(validate_resume_sections)
 
     def to_domain_schema(self) -> ResumeSettings:
-        return ResumeSettings(date_format=self.date_format)
+        return ResumeSettings(
+            date_format=self.date_format,
+            section_order=list(self.section_order),
+            hidden_sections=list(self.hidden_sections),
+        )
 
     @classmethod
     def from_domain_schema(cls, *, schema: ResumeSettings) -> Self:
-        return cls(date_format=schema.date_format)
+        return cls(
+            date_format=schema.date_format,
+            section_order=list(schema.section_order),
+            hidden_sections=list(schema.hidden_sections),
+        )
 
 
 class ResumeContentSchema(CamelCaseSchema):

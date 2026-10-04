@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, synonym
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum, ResumeSectionEnum
 from core.resumes.schemas import (
     Resume,
     ResumeAdditionalSection,
@@ -100,7 +100,11 @@ class ResumeModel(VaultEntryModel, BaseModel):
     @classmethod
     def _content_to_json(cls, *, content: ResumeContent) -> dict[str, Any]:
         return {
-            "settings": {"date_format": content.settings.date_format.value},
+            "settings": {
+                "date_format": content.settings.date_format.value,
+                "section_order": [section.value for section in content.settings.section_order],
+                "hidden_sections": [section.value for section in content.settings.hidden_sections],
+            },
             "profile": cls._profile_to_json(profile=content.profile),
             "summary": {
                 "text": content.summary.text,
@@ -224,6 +228,12 @@ class ResumeModel(VaultEntryModel, BaseModel):
         return ResumeContent(
             settings=ResumeSettings(
                 date_format=ResumeDateFormatEnum(data["settings"]["date_format"]),
+                section_order=[
+                    ResumeSectionEnum(section) for section in data["settings"]["section_order"]
+                ],
+                hidden_sections=[
+                    ResumeSectionEnum(section) for section in data["settings"]["hidden_sections"]
+                ],
             ),
             profile=cls._profile_from_json(data=data["profile"]),
             summary=ResumeSummary(

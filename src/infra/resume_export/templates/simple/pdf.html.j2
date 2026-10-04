@@ -10,19 +10,20 @@
   {% if content.profile.role %}<p class="role">{{ content.profile.role }}</p>{% endif %}
   {% if simple_contact_line %}<p class="contacts">{{ simple_contact_line }}</p>{% endif %}
 
-  {% if content.summary.text %}
+  {% for section_key in sections %}
+  {% if section_key == 'summary' and content.summary.text %}
   <p class="section">{{ labels.summary }}</p>
   <p>{{ content.summary.text | linebreaks }}</p>
   {% endif %}
 
-  {% if content.skills %}
+  {% if section_key == 'skills' and content.skills %}
   <p class="section">{{ labels.skills }}</p>
   {% for group in content.skills %}
   <p>{{ group.category }}: {{ group.items | join(", ") }}</p>
   {% endfor %}
   {% endif %}
 
-  {% if experiences %}
+  {% if section_key == 'experience' and experiences %}
   <p class="section">{{ labels.experience }}</p>
   {% for experience in experiences %}
   <p class="item-title">{{ experience.item.position }} | {{ experience.item.company }}</p>
@@ -43,7 +44,7 @@
   {% endfor %}
   {% endif %}
 
-  {% if educations %}
+  {% if section_key == 'education' and educations %}
   <p class="section">{{ labels.education }}</p>
   {% for education in educations %}
   <p class="item-title">{{ education.item.institution }}{% if education.details %} | {{ education.details }}{% endif %}</p>
@@ -52,7 +53,7 @@
   {% endfor %}
   {% endif %}
 
-  {% if certifications %}
+  {% if section_key == 'certifications' and certifications %}
   <p class="section">{{ labels.certifications }}</p>
   {% for certification in certifications %}
   <p class="item-title">{{ certification.item.name }} | {{ certification.item.issuer }}</p>
@@ -61,18 +62,21 @@
   {% endfor %}
   {% endif %}
 
-  {% if content.languages %}
+  {% if section_key == 'languages' and content.languages %}
   <p class="section">{{ labels.languages }}</p>
   {% for language_item in content.languages %}<p>{{ language_item.name }} | {{ language_item.proficiency }}</p>{% endfor %}
   {% endif %}
 
-  {% for section in content.additional_sections %}
+  {% if section_key == 'additionalSections' %}
+  {% for section in additional_sections %}
   <p class="section">{{ section.title }}</p>
   {% for item in section.items %}
   <p class="item-title">{{ item.title }}</p>
   {% if item.description %}<p>{{ item.description | linebreaks }}</p>{% endif %}
   {% if item.url %}<p>{{ item.url }}</p>{% endif %}
   {% endfor %}
+  {% endfor %}
+  {% endif %}
   {% endfor %}
 </body>
 </html>

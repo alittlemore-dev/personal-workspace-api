@@ -3,8 +3,14 @@ from datetime import date
 from typing import ClassVar, Self
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum
+from core.resumes.enums import (
+    ResumeCurrentStatusEnum,
+    ResumeDateFormatEnum,
+    ResumeSectionEnum,
+    ResumeThemeEnum,
+)
 from core.resumes.schemas import (
+    ResumeAdditionalSection,
     ResumeCertificationItem,
     ResumeContent,
     ResumeEducationItem,
@@ -69,6 +75,30 @@ class ResumeTemplateContext:
     experiences: list[ExperienceView]
     educations: list[EducationView]
     certifications: list[CertificationView]
+    sections: list[ResumeSectionEnum]
+    education_sections: list[ResumeAdditionalSection]
+    additional_sections: list[ResumeAdditionalSection]
+
+    _SECTION_ORDERS: ClassVar[dict[ResumeThemeEnum, tuple[ResumeSectionEnum, ...]]] = {
+        ResumeThemeEnum.SIMPLE: (
+            ResumeSectionEnum.SUMMARY,
+            ResumeSectionEnum.SKILLS,
+            ResumeSectionEnum.EXPERIENCE,
+            ResumeSectionEnum.EDUCATION,
+            ResumeSectionEnum.CERTIFICATIONS,
+            ResumeSectionEnum.LANGUAGES,
+            ResumeSectionEnum.ADDITIONAL_SECTIONS,
+        ),
+        ResumeThemeEnum.ACCENT: (
+            ResumeSectionEnum.SUMMARY,
+            ResumeSectionEnum.SKILLS,
+            ResumeSectionEnum.EDUCATION,
+            ResumeSectionEnum.LANGUAGES,
+            ResumeSectionEnum.EXPERIENCE,
+            ResumeSectionEnum.CERTIFICATIONS,
+            ResumeSectionEnum.ADDITIONAL_SECTIONS,
+        ),
+    }
 
     _MONTH_NAMES: ClassVar[tuple[str, ...]] = (
         "Jan",
@@ -121,6 +151,14 @@ class ResumeTemplateContext:
             profile.github_url,
             profile.telegram,
         )
+        uses_education_fallback = params.theme is ResumeThemeEnum.ACCENT and not content.education
+        education_sections = [
+            section
+            for section in content.additional_sections
+            if uses_education_fallback
+            and section.title == labels.education
+            and ResumeSectionEnum.ADDITIONAL_SECTIONS not in content.settings.hidden_sections
+        ]
         return cls(
             title=params.title,
             display_name=profile.full_name or params.title,
@@ -129,6 +167,17 @@ class ResumeTemplateContext:
             content=content,
             contacts=[{"label": label, "value": value} for label, value in contacts if value],
             simple_contact_line=" | ".join(part for part in simple_contacts if part),
+            sections=[
+                section
+                for section in content.settings.section_order or cls._SECTION_ORDERS[params.theme]
+                if section not in content.settings.hidden_sections
+            ],
+            education_sections=education_sections,
+            additional_sections=[
+                section
+                for section in content.additional_sections
+                if not uses_education_fallback or section.title != labels.education
+            ],
             experiences=[
                 cls._experience_view(
                     item=item,
@@ -168,6 +217,9 @@ class ResumeTemplateContext:
             "experiences": self.experiences,
             "educations": self.educations,
             "certifications": self.certifications,
+            "sections": self.sections,
+            "education_sections": self.education_sections,
+            "additional_sections": self.additional_sections,
         }
 
     @classmethod

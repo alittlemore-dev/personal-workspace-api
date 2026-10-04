@@ -9,6 +9,7 @@ from core.resumes.enums import (
     ResumeCurrentStatusEnum,
     ResumeDateFormatEnum,
     ResumeExportFormatEnum,
+    ResumeSectionEnum,
     ResumeThemeEnum,
 )
 from core.schemas import ValuedDataclass
@@ -116,6 +117,21 @@ class ResumeAdditionalSection:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ResumeSettings:
     date_format: ResumeDateFormatEnum
+    section_order: list[ResumeSectionEnum]
+    hidden_sections: list[ResumeSectionEnum]
+
+    def __post_init__(self) -> None:
+        if self.section_order and (
+            len(self.section_order) != len(ResumeSectionEnum)
+            or set(self.section_order) != set(ResumeSectionEnum)
+        ):
+            message = "section order must contain every resume section exactly once"
+            raise ValueError(message)
+        if len(self.hidden_sections) != len(set(self.hidden_sections)) or not set(
+            self.hidden_sections,
+        ).issubset(ResumeSectionEnum):
+            message = "hidden sections must be a unique subset of resume sections"
+            raise ValueError(message)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

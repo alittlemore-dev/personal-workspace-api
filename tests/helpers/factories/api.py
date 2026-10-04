@@ -16,9 +16,15 @@ class ApiFactoryHelper:
         summary: str = "Короткое описание опыта.",
         experience: list[dict[str, Any]] | None = None,
         date_format: str = "monthYear",
+        section_order: list[str] | None = None,
+        hidden_sections: list[str] | None = None,
     ) -> dict[str, Any]:
         return {
-            "settings": {"dateFormat": date_format},
+            "settings": {
+                "dateFormat": date_format,
+                "sectionOrder": list(section_order) if section_order is not None else [],
+                "hiddenSections": list(hidden_sections) if hidden_sections is not None else [],
+            },
             "profile": {
                 "fullName": full_name,
                 "photoFileId": "",

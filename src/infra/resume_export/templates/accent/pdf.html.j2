@@ -27,17 +27,18 @@
   </table>
   {% endif %}
 
-  {% if content.summary.text %}
+  {% for section_key in sections %}
+  {% if section_key == 'summary' and content.summary.text %}
   <p class="section">{{ labels.summary }}</p>
   <p>{{ content.summary.text | linebreaks }}</p>
   {% endif %}
 
-  {% if content.skills %}
+  {% if section_key == 'skills' and content.skills %}
   <p class="section">{{ labels.skills }}</p>
   {% for group in content.skills %}<p>{{ group.category }}: {{ group.items | join(", ") }}</p>{% endfor %}
   {% endif %}
 
-  {% if educations %}
+  {% if section_key == 'education' and educations %}
   <p class="section">{{ labels.education }}</p>
   {% for education in educations %}
   <p class="education-name">{{ education.item.institution }}</p>
@@ -47,8 +48,8 @@
   {% endfor %}
   {% endif %}
 
-  {% if not educations %}
-  {% for section in content.additional_sections if section.title == labels.education %}
+  {% if section_key == 'education' %}
+  {% for section in education_sections %}
   <p class="section">{{ section.title }}</p>
   {% for item in section.items %}
   <p class="additional-title">{{ item.title }}</p>
@@ -58,11 +59,11 @@
   {% endfor %}
   {% endif %}
 
-  {% if content.languages %}
+  {% if section_key == 'languages' and content.languages %}
   <p class="muted">{{ labels.languages }}: {% for language_item in content.languages %}{{ language_item.name }} — {{ language_item.proficiency }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
   {% endif %}
 
-  {% if experiences %}
+  {% if section_key == 'experience' and experiences %}
   <p class="section">{{ labels.experience }}</p>
   {% for experience in experiences %}
   <table class="company">
@@ -85,7 +86,7 @@
   {% endfor %}
   {% endif %}
 
-  {% if certifications %}
+  {% if section_key == 'certifications' and certifications %}
   <p class="section">{{ labels.certifications }}</p>
   {% for certification in certifications %}
   <p class="certification-name">{{ certification.item.name }} | {{ certification.item.issuer }}</p>
@@ -94,13 +95,16 @@
   {% endfor %}
   {% endif %}
 
-  {% for section in content.additional_sections if section.title != labels.education or educations %}
+  {% if section_key == 'additionalSections' %}
+  {% for section in additional_sections %}
   <p class="section">{{ section.title }}</p>
   {% for item in section.items %}
   <p class="additional-title">{{ item.title }}</p>
   {% if item.description %}<p>{{ item.description | linebreaks }}</p>{% endif %}
   {% if item.url %}<p class="link">{{ item.url }}</p>{% endif %}
   {% endfor %}
+  {% endfor %}
+  {% endif %}
   {% endfor %}
 </body>
 </html>

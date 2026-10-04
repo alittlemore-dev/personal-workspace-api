@@ -37,11 +37,19 @@ class TestResumeJsonCompatibility(TestCase):
             experience=[replace(experience, projects=[replace(experience.projects[0], role="")])],
         )
         model = ResumeModel.from_domain_schema(resume=self.factory.core.resume(content=content))
-        assert model.content["settings"] == {"date_format": date_format.value}
+        assert model.content["settings"] == {
+            "date_format": date_format.value,
+            "section_order": [],
+            "hidden_sections": [],
+        }
         assert model.content["experience"][0]["projects"][0]["role"] == ""
         loaded = model.to_domain_schema().content
         assert loaded == content
-        assert loaded.settings == ResumeSettings(date_format=date_format)
+        assert loaded.settings == ResumeSettings(
+            date_format=date_format,
+            section_order=[],
+            hidden_sections=[],
+        )
         assert (
             loaded.with_resolved_project_roles().experience[0].projects[0].role
             == experience.position
@@ -60,4 +68,11 @@ class TestResumeJsonCompatibility(TestCase):
         model = ResumeModel.from_domain_schema(resume=self.factory.core.resume())
         model.content.pop("settings")
         with pytest.raises(KeyError, match="settings"):
+            model.to_domain_schema()
+
+    @pytest.mark.parametrize("key", ["section_order", "hidden_sections"])
+    def test_missing_section_settings_require_migration(self, key: str) -> None:
+        model = ResumeModel.from_domain_schema(resume=self.factory.core.resume())
+        model.content["settings"].pop(key)
+        with pytest.raises(KeyError, match=key):
             model.to_domain_schema()

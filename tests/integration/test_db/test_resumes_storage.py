@@ -4,7 +4,7 @@ import pytest
 import pytest_asyncio
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum
+from core.resumes.enums import ResumeCurrentStatusEnum, ResumeSectionEnum
 from core.resumes.exceptions import ResumeNotFoundError
 from core.resumes.schemas import (
     ResumeCreateParams,
@@ -21,7 +21,11 @@ class TestResumesDatabaseStorage(StorageTestCase):
         self.storage = ResumesDatabaseStorage(session=self.db_session)
 
     async def test_create_and_get_resume_roundtrips_full_content_jsonb(self) -> None:
-        content = self.factory.core.resume_full_content(summary="Builds reliable backend systems.")
+        content = self.factory.core.resume_full_content(
+            summary="Builds reliable backend systems.",
+            section_order=list(reversed(ResumeSectionEnum)),
+            hidden_sections=[ResumeSectionEnum.EDUCATION, ResumeSectionEnum.LANGUAGES],
+        )
 
         created = await self.storage.create_resume(
             params=ResumeCreateParams(
@@ -43,6 +47,10 @@ class TestResumesDatabaseStorage(StorageTestCase):
         assert loaded.updated_at.tzinfo == UTC
         assert created_row is not None
         assert created_row.language is LanguageEnum.EN
+        assert created_row.content["settings"]["section_order"] == [
+            section.value for section in reversed(ResumeSectionEnum)
+        ]
+        assert created_row.content["settings"]["hidden_sections"] == ["education", "languages"]
         assert created_row.content["experience"][0]["current_status"] == "current"
         assert created_row.content["experience"][0]["company"] == "Company"
         assert "is_current" not in created_row.content["experience"][0]
@@ -98,7 +106,11 @@ class TestResumesDatabaseStorage(StorageTestCase):
                 author_username="admin",
             ),
         )
-        replacement = self.factory.core.resume_empty_content(summary="Новое описание.")
+        replacement = self.factory.core.resume_empty_content(
+            summary="Новое описание.",
+            section_order=list(ResumeSectionEnum),
+            hidden_sections=[ResumeSectionEnum.SKILLS],
+        )
         updated_at = created.updated_at + timedelta(minutes=5)
 
         updated = await self.storage.update_resume(
@@ -243,7 +255,11 @@ class TestResumesDatabaseStorage(StorageTestCase):
 
 def nullable_content_json() -> dict[str, object]:
     return {
-        "settings": {"date_format": "monthYearNumeric"},
+        "settings": {
+            "date_format": "monthYearNumeric",
+            "section_order": [],
+            "hidden_sections": [],
+        },
         "profile": {
             "full_name": None,
             "role": None,

@@ -17,10 +17,16 @@ if TYPE_CHECKING:
         ResumeEducationItemSchema,
         ResumeExperienceItemSchema,
         ResumeProjectItemSchema,
+        ResumeSettingsSchema,
         ResumeSkillGroupSchema,
     )
 
 ResumeOptionalShortText = Annotated[ShortText, AfterValidator(str.strip)]
+
+
+def validate_resume_sections(value: ResumeSettingsSchema) -> ResumeSettingsSchema:
+    value.to_domain_schema()
+    return value
 
 
 def require_unique(values: Iterable[str], *, label: str) -> None:

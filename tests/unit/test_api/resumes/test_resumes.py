@@ -8,7 +8,12 @@ import pytest_asyncio
 from httpx import codes
 
 from core.i18n.enums import LanguageEnum
-from core.resumes.enums import ResumeCurrentStatusEnum, ResumeExportFormatEnum, ResumeThemeEnum
+from core.resumes.enums import (
+    ResumeCurrentStatusEnum,
+    ResumeExportFormatEnum,
+    ResumeSectionEnum,
+    ResumeThemeEnum,
+)
 from core.resumes.exceptions import ResumeNotFoundError
 from core.resumes.schemas import (
     DeleteResumeParams,
@@ -59,7 +64,14 @@ class TestResumesApi(ApiTestCase):
         self.use_case = await self.container.get_resumes_use_case()
 
     def test_list_maps_pagination_and_current_author(self) -> None:
-        resume = self.factory.core.resume(resume_id=1, title="Backend resume")
+        resume = self.factory.core.resume(
+            resume_id=1,
+            title="Backend resume",
+            content=self.factory.core.resume_content(
+                section_order=list(reversed(ResumeSectionEnum)),
+                hidden_sections=[ResumeSectionEnum.SKILLS],
+            ),
+        )
         self.use_case.list_resumes.return_value = self.factory.core.resumes(
             values=[resume],
             total_count=1,
@@ -70,6 +82,11 @@ class TestResumesApi(ApiTestCase):
 
         self.asserts.status(response=response, expected_status=codes.OK)
         assert response.json()["resumes"][0]["id"] == self.factory.core.hex_id(1)
+        assert response.json()["resumes"][0]["content"]["settings"] == {
+            "dateFormat": "monthYear",
+            "sectionOrder": [section.value for section in reversed(ResumeSectionEnum)],
+            "hiddenSections": ["skills"],
+        }
         self.use_case.list_resumes.assert_awaited_once_with(
             filters=ResumeFilters(
                 page=2,

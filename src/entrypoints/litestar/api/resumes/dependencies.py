@@ -112,7 +112,11 @@ async def provide_update_resume_params(
                     "title": "Backend Engineer",
                     "language": "en",
                     "content": {
-                        "settings": {"dateFormat": "monthYear"},
+                        "settings": {
+                            "dateFormat": "monthYear",
+                            "sectionOrder": [],
+                            "hiddenSections": [],
+                        },
                         "profile": {
                             "fullName": "Dmitriy Lunev",
                             "headline": "Backend Engineer",
@@ -159,7 +163,11 @@ def provide_export_resume_params(
                     "format": "docx",
                     "theme": "simple",
                     "content": {
-                        "settings": {"dateFormat": "monthYear"},
+                        "settings": {
+                            "dateFormat": "monthYear",
+                            "sectionOrder": [],
+                            "hiddenSections": [],
+                        },
                         "profile": {
                             "fullName": "Dmitriy Lunev",
                             "headline": "Backend Engineer",

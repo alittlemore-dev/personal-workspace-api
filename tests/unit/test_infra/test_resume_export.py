@@ -14,6 +14,7 @@ from core.resumes.enums import (
     ResumeCurrentStatusEnum,
     ResumeDateFormatEnum,
     ResumeExportFormatEnum,
+    ResumeSectionEnum,
     ResumeThemeEnum,
 )
 from core.resumes.schemas import (
@@ -428,7 +429,7 @@ class TestResumeDocumentExporter(TestCase):
         experience = content.experience[0]
         content = replace(
             content,
-            settings=ResumeSettings(date_format=date_format),
+            settings=ResumeSettings(date_format=date_format, section_order=[], hidden_sections=[]),
             experience=[
                 replace(
                     experience,
@@ -525,6 +526,167 @@ class TestResumeDocumentExporter(TestCase):
         assert "Present" not in text
         assert "Issued:" not in text
         assert "Expires:" not in text
+
+    @pytest.mark.parametrize("theme", list(ResumeThemeEnum))
+    @pytest.mark.parametrize("export_format", list(ResumeExportFormatEnum))
+    def test_exports_follow_custom_section_order(
+        self,
+        theme: ResumeThemeEnum,
+        export_format: ResumeExportFormatEnum,
+    ) -> None:
+        order = list(reversed(ResumeSectionEnum))
+        content = self.factory.core.resume_full_content(
+            summary="SummaryMarker",
+            skill_items=["SkillMarker"],
+            section_order=order,
+        )
+        # Repeated section labels in authored titles must not affect semantic ordering.
+        content = replace(
+            content,
+            additional_sections=[replace(content.additional_sections[0], title="Skills")],
+        )
+        text = self._export_text(
+            params=ResumeExportParams(
+                format=export_format,
+                theme=theme,
+                title="Resume",
+                language=LanguageEnum.EN,
+                content=content,
+            ),
+        )
+        markers = {
+            ResumeSectionEnum.SUMMARY: "SummaryMarker",
+            ResumeSectionEnum.SKILLS: "SkillMarker",
+            ResumeSectionEnum.EXPERIENCE: "Company",
+            ResumeSectionEnum.EDUCATION: "University",
+            ResumeSectionEnum.LANGUAGES: "English",
+            ResumeSectionEnum.CERTIFICATIONS: "Certificate",
+            ResumeSectionEnum.ADDITIONAL_SECTIONS: "Article",
+        }
+        self._assert_text_order(
+            text=text,
+            expected_parts=["Dmitriy Ivanov", *[markers[section] for section in order]],
+        )
+
+    @pytest.mark.parametrize("theme", list(ResumeThemeEnum))
+    @pytest.mark.parametrize("export_format", list(ResumeExportFormatEnum))
+    @pytest.mark.parametrize("section", list(ResumeSectionEnum))
+    def test_exports_hide_complete_sections_without_mutating_content(
+        self,
+        theme: ResumeThemeEnum,
+        export_format: ResumeExportFormatEnum,
+        section: ResumeSectionEnum,
+    ) -> None:
+        content = self.factory.core.resume_full_content(
+            summary="SummaryMarker",
+            skill_items=["SkillMarker"],
+            hidden_sections=[section],
+        )
+        text = self._export_text(
+            params=ResumeExportParams(
+                format=export_format,
+                theme=theme,
+                title="Resume",
+                language=LanguageEnum.EN,
+                content=content,
+            ),
+        )
+        markers = {
+            ResumeSectionEnum.SUMMARY: ["Professional Summary", "SummaryMarker"],
+            ResumeSectionEnum.SKILLS: ["Skills", "SkillMarker"],
+            ResumeSectionEnum.EXPERIENCE: ["Work Experience", "Company", "Portfolio"],
+            ResumeSectionEnum.EDUCATION: ["Education", "University", "Bachelor"],
+            ResumeSectionEnum.LANGUAGES: ["English", "C1"],
+            ResumeSectionEnum.CERTIFICATIONS: ["Certifications", "Certificate", "Provider"],
+            ResumeSectionEnum.ADDITIONAL_SECTIONS: ["Publications", "Article", "write-up"],
+        }
+        assert "Dmitriy Ivanov" in text
+        assert "dmitriy@example.com" in text
+        for marker in markers[section]:
+            assert marker not in text
+        for visible in ResumeSectionEnum:
+            if visible is not section:
+                assert markers[visible][-1] in text
+        assert content.summary.text == "SummaryMarker"
+        assert content.skills[0].items == ["SkillMarker"]
+        assert content.experience[0].projects[0].name == "Portfolio"
+        assert content.education[0].institution == "University"
+        assert content.languages[0].name == "English"
+        assert content.certifications[0].name == "Certificate"
+        assert content.additional_sections[0].title == "Publications"
+
+    @pytest.mark.parametrize("export_format", list(ResumeExportFormatEnum))
+    def test_accent_empty_order_retains_education_and_inline_languages_before_experience(
+        self,
+        export_format: ResumeExportFormatEnum,
+    ) -> None:
+        text = self._export_text(
+            params=ResumeExportParams(
+                format=export_format,
+                theme=ResumeThemeEnum.ACCENT,
+                title="Resume",
+                language=LanguageEnum.EN,
+                content=self.factory.core.resume_full_content(
+                    summary="SummaryMarker",
+                    skill_items=["SkillMarker"],
+                ),
+            ),
+        )
+        self._assert_text_order(
+            text=text,
+            expected_parts=[
+                "SummaryMarker",
+                "SkillMarker",
+                "University",
+                "English",
+                "Company",
+                "Certificate",
+                "Article",
+            ],
+        )
+        assert "Languages: English" in text
+
+    @pytest.mark.parametrize("export_format", list(ResumeExportFormatEnum))
+    @pytest.mark.parametrize(
+        "hidden",
+        [[], [ResumeSectionEnum.EDUCATION], [ResumeSectionEnum.ADDITIONAL_SECTIONS]],
+    )
+    def test_accent_imported_education_uses_education_position_and_both_visibility_settings(
+        self,
+        export_format: ResumeExportFormatEnum,
+        hidden: list[ResumeSectionEnum],
+    ) -> None:
+        order = list(reversed(ResumeSectionEnum))
+        content = self.factory.core.resume_full_content(section_order=order, hidden_sections=hidden)
+        content = replace(
+            content,
+            education=[],
+            additional_sections=[
+                replace(content.additional_sections[0], title="Education"),
+            ],
+        )
+        text = self._export_text(
+            params=ResumeExportParams(
+                format=export_format,
+                theme=ResumeThemeEnum.ACCENT,
+                title="Resume",
+                language=LanguageEnum.EN,
+                content=content,
+            ),
+        )
+        if hidden:
+            assert "Article" not in text
+            assert "Education" not in text
+        else:
+            self._assert_text_order(text=text, expected_parts=["English", "Article", "Company"])
+            assert text.count("Article") == 1
+
+    def _export_text(self, *, params: ResumeExportParams) -> str:
+        document = self._exporter().export_resume(params=params, photo_content=b"")
+        if params.format is ResumeExportFormatEnum.PDF:
+            return self._extract_pdf_text(content=document.content)
+        with ZipFile(io.BytesIO(document.content)) as archive:
+            return self._extract_word_text(document_xml=archive.read("word/document.xml").decode())
 
     def _exporter(self) -> ResumeDocumentExporterImpl:
         return ResumeDocumentExporterImpl(

@@ -435,6 +435,34 @@ FinancePeriodQuery: TypeAlias = Annotated[
     ),
 ]
 
+FinanceStatisticsYearQuery: TypeAlias = Annotated[
+    int | None,
+    api_query_parameter(
+        name="year",
+        title="Statistics year",
+        description="Selected calendar year for the monthly report; supply with month.",
+        examples=(2026,),
+        ge=1,
+        le=9999,
+        min_items=None,
+        max_items=None,
+    ),
+]
+
+FinanceStatisticsMonthQuery: TypeAlias = Annotated[
+    int | None,
+    api_query_parameter(
+        name="month",
+        title="Statistics month",
+        description="Selected calendar month for the monthly report; supply with year.",
+        examples=(10,),
+        ge=1,
+        le=12,
+        min_items=None,
+        max_items=None,
+    ),
+]
+
 FinanceCurrencyQuery: TypeAlias = Annotated[
     str,
     api_query_parameter(

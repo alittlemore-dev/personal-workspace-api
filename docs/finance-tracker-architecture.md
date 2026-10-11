@@ -593,9 +593,14 @@ full editing and Telegram confirmation semantics.
 
 `GET /api/finance/statistics?period=...&currency=...` accepts `today`, `thisWeek`, `thisMonth`,
 `thisYear`, `last7Days`, `last30Days`, and `last365Days`; currency is `month`, AMD, RUB, USD, or EUR. Responses contain a `reports` collection.
-The `month` mode (also the frontend default) groups records by their stored month currency, with
-independent totals, trends, pies, and comparisons for each currency; mixed currencies are never
-summed. A concrete selected currency produces one converted report. Select options display
+For `thisMonth`, optional paired `year` and `month` query parameters select a stored month.
+Incomplete, invalid, future, and non-monthly calendar selections are rejected; a missing owned
+snapshot returns 404. With no selection the current tracker-local month is used.
+The default `month` currency mode produces one monthly report in that selected snapshot’s currency,
+including the previous month converted through saved operation rates solely for comparison.
+For broader periods, `month` mode retains separate groups by stored month currency, with independent
+totals, trends, pies, and comparisons; mixed currencies are never summed. A concrete selected
+currency produces one converted report. Select options display
 `֏`, `₽`, `$`, and `€`, plus a localized month-currency option.
 Calendar periods include all recorded transactions within the entire period, including future-dated
 entries. Rolling periods include today and the preceding N−1 local dates. Weeks start on Monday.
@@ -610,12 +615,21 @@ shown. Permanently deleted categories appear as an uncategorized group. Soft-del
 are excluded. Zero timeline buckets remain visible; the first stored month marks history coverage.
 A zero previous total has no percentage change.
 
-Statistics provides summary, income, and expense tabs. The current-month summary also contains
+Statistics provides summary, income, and expense tabs. The selected-month summary also contains
 opening/closing balance charts, budget tables, and planned/actual category charts. In a selected
 currency, all of these use the same reporting currency. Transaction facts retain each operation's
 saved rates; opening balances and plans use the newest stored rate effective on or before the
-report date, and its effective date is displayed. Reads never fetch new rates or mutate stored
-month values. An unavailable required conversion produces an explicit rate error. In `month` mode,
-the budget is included only in the current month's own currency group. Categoryless amounts remain included in both analytics and monthly fact charts.
+report date (bounded by the selected month’s final date for historical reports), and its effective
+date is displayed. Reads never fetch new rates or mutate stored month values. An unavailable required conversion produces an explicit rate error. In `month` mode,
+the monthly budget uses the selected snapshot’s own currency. Categoryless amounts remain included
+in both analytics and monthly fact charts.
 Filters are URL-backed and are not persisted in account settings. Charts use feature-owned SVG
 with localized text tables, existing theme colors, and no new chart dependency or inline styles.
+
+Personal Workspace exposes one Financial Tracker page at `/personal-workspace/finance`: overview,
+operations, and the summary/income/expense analytics tabs share the selected month. Tabs and
+statistics filters are query parameters; changing tabs preserves overview drafts. Monthly analytics
+use the same previous/current/next controls as overview and operations. Other analytics periods
+retain their existing windows and hide the monthly controls. Legacy `/finance/statistics` bookmarks
+redirect to the corresponding analytics tab and preserve filters. The single sidebar entry belongs
+to Working Area; the admin panel keeps its existing page organization.

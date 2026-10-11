@@ -147,9 +147,11 @@ class TestFinanceApi(ApiTestCase):
         "currency",
         [FinanceStatisticsCurrency.USD, FinanceStatisticsCurrency.MONTH],
     )
+    @pytest.mark.parametrize("selected", [None, date(2026, 8, 1)])
     def test_statistics_maps_nested_decimal_and_period_response(
         self,
         currency: FinanceStatisticsCurrency,
+        selected: date | None,
     ) -> None:
         month = self.factory.core.finance_month()
         now = TEST_CURRENT_DATETIME
@@ -158,6 +160,7 @@ class TestFinanceApi(ApiTestCase):
             now=now,
             period=FinanceStatisticsPeriod.THIS_MONTH,
             currency=currency,
+            period_start=selected,
         )
         window, previous = FinanceStatisticsWindow.for_period(params.period, now, month.time_zone)
         self.use_case.statistics.return_value = FinanceStatisticsService().compose_result(
@@ -176,7 +179,11 @@ class TestFinanceApi(ApiTestCase):
         )
         response = self.api.client.get(
             "/api/finance/statistics",
-            params={"period": "thisMonth", "currency": currency},
+            params={
+                "period": "thisMonth",
+                "currency": currency,
+                **({"year": selected.year, "month": selected.month} if selected else {}),
+            },
         )
         self.asserts.status(response=response, expected_status=codes.OK)
         assert response.json()["currency"] == currency
@@ -192,6 +199,24 @@ class TestFinanceApi(ApiTestCase):
             params={"period": "arbitrary", "currency": "USD"},
         )
         self.asserts.status(response=invalid, expected_status=codes.BAD_REQUEST)
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            {"year": 2026},
+            {"month": 8},
+            {"year": 2026, "month": 13},
+            {"year": 0, "month": 8},
+            {"period": "thisYear", "year": 2026, "month": 8},
+        ],
+    )
+    def test_statistics_rejects_invalid_calendar_selection(
+        self,
+        query: dict[str, int | str],
+    ) -> None:
+        response = self.api.client.get("/api/finance/statistics", params=query)
+        self.asserts.status(response=response, expected_status=codes.BAD_REQUEST)
+        self.use_case.statistics.assert_not_awaited()
 
     def test_historical_transaction_writes_preserve_owner_period_and_version(self) -> None:
         transaction = self.factory.core.finance_transaction()

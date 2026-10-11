@@ -526,17 +526,27 @@ class FinanceUseCase:
 
     async def statistics(self, params: FinanceStatisticsParams) -> FinanceStatisticsResult:
         month = await self.storage.get_month(owner_username=params.owner_username, now=params.now)
+        params.check_period(month)
+        if params.period_start is not None and params.period_start != month.period_start:
+            month = await self.storage.get_month_for_period(
+                owner_username=params.owner_username,
+                period_start=params.period_start,
+            )
         window, previous_window = FinanceStatisticsWindow.for_period(
             params.period,
             params.now,
             month.time_zone,
+            params.period_start,
         )
         budget_rate = None
         if params.period == FinanceStatisticsPeriod.THIS_MONTH and month.needs_budget_rate(
             params.currency,
         ):
             stored_rate = await self.storage.latest_rate_before_date(
-                on_date=params.now.astimezone(month.time_zone).date(),
+                on_date=min(
+                    params.now.astimezone(month.time_zone).date(),
+                    window.end.date() - timedelta(days=1),
+                ),
             )
             if stored_rate is None:
                 raise FinanceRateUnavailableError
@@ -545,9 +555,14 @@ class FinanceUseCase:
             owner_username=params.owner_username,
             start=previous_window.start,
             end=window.end,
-            currency=None
-            if params.currency == FinanceStatisticsCurrency.MONTH
-            else FinanceCurrency(params.currency),
+            currency=(
+                month.currency
+                if params.currency == FinanceStatisticsCurrency.MONTH
+                and params.period == FinanceStatisticsPeriod.THIS_MONTH
+                else None
+                if params.currency == FinanceStatisticsCurrency.MONTH
+                else FinanceCurrency(params.currency)
+            ),
         )
         return self.statistics_service.compose_result(
             FinanceStatisticsComposition(

@@ -889,6 +889,15 @@ class HistoricalFinanceRevisionsParams(FinanceHistoricalMonthParams):
 class FinanceStatisticsParams(FinanceMonthParams):
     period: FinanceStatisticsPeriod
     currency: FinanceStatisticsCurrency
+    period_start: date | None = None
+
+    def check_period(self, month: FinanceMonth) -> None:
+        if self.period_start is not None and (
+            self.period != FinanceStatisticsPeriod.THIS_MONTH
+            or self.period_start.day != 1
+            or self.period_start > month.period_start
+        ):
+            raise InvalidFinanceDataError
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -903,6 +912,7 @@ class FinanceStatisticsWindow:
         period: FinanceStatisticsPeriod,
         now: datetime,
         time_zone: ZoneInfo,
+        period_start: date | None = None,
     ) -> tuple[FinanceStatisticsWindow, FinanceStatisticsWindow]:
         today = now.astimezone(time_zone).date()
         granularity = FinanceStatisticsGranularity.DAY
@@ -916,7 +926,7 @@ class FinanceStatisticsWindow:
             end = start + timedelta(days=7)
             previous_start = start - timedelta(days=7)
         elif period == FinanceStatisticsPeriod.THIS_MONTH:
-            start = today.replace(day=1)
+            start = period_start if period_start is not None else today.replace(day=1)
             end = next_month(start)
             previous_start = (start - timedelta(days=1)).replace(day=1)
         elif period == FinanceStatisticsPeriod.THIS_YEAR:

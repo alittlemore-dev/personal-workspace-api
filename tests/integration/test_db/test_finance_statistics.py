@@ -421,7 +421,7 @@ class TestFinanceStatisticsStorage(StorageTestCase):
                 transaction_id=late.id,
             )
 
-    async def test_all_budget_values_convert_and_native_statistics_keep_currencies_separate(
+    async def test_all_budget_values_convert_and_native_statistics_keep_currencies_separate(  # noqa: PLR0915
         self,
     ) -> None:
         await self.factory.db.seed_finance_templates(self.db_session)
@@ -513,6 +513,65 @@ class TestFinanceStatisticsStorage(StorageTestCase):
             FinanceCurrency.USD: Amount(10),
             FinanceCurrency.RUB: Amount(80),
         }
+        monthly = await use_case.statistics(
+            FinanceStatisticsParams(
+                owner_username="currency-owner",
+                now=february,
+                period=FinanceStatisticsPeriod.THIS_MONTH,
+                currency=FinanceStatisticsCurrency.MONTH,
+            ),
+        )
+        assert len(monthly.reports) == 1
+        assert monthly.reports[0].currency == FinanceCurrency.RUB
+        assert monthly.reports[0].income.actual == 80
+        assert monthly.reports[0].income.previous == 800
+        historic = await use_case.statistics(
+            FinanceStatisticsParams(
+                owner_username="currency-owner",
+                now=february,
+                period=FinanceStatisticsPeriod.THIS_MONTH,
+                currency=FinanceStatisticsCurrency.MONTH,
+                period_start=date(2026, 1, 1),
+            ),
+        )
+        assert len(historic.reports) == 1
+        assert historic.reports[0].currency == FinanceCurrency.USD
+        assert historic.reports[0].income.actual == 10
+        assert historic.reports[0].monthly is not None
+        assert historic.reports[0].monthly.opening_balance == 100
+        assert historic.reports[0].window.start.date() == date(2026, 1, 1)
+        assert historic.reports[0].window.end.date() == date(2026, 2, 1)
+        converted_historic = await use_case.statistics(
+            FinanceStatisticsParams(
+                owner_username="currency-owner",
+                now=february,
+                period=FinanceStatisticsPeriod.THIS_MONTH,
+                currency=FinanceStatisticsCurrency.AMD,
+                period_start=date(2026, 1, 1),
+            ),
+        )
+        assert converted_historic.reports[0].budget_rate_effective_on == january.date()
+        assert converted_historic.reports[0].income.actual == 4000
+        with pytest.raises(FinanceNotFoundError):
+            await use_case.statistics(
+                FinanceStatisticsParams(
+                    owner_username="currency-owner",
+                    now=february,
+                    period=FinanceStatisticsPeriod.THIS_MONTH,
+                    currency=FinanceStatisticsCurrency.MONTH,
+                    period_start=date(2025, 12, 1),
+                ),
+            )
+        with pytest.raises(InvalidFinanceDataError):
+            await use_case.statistics(
+                FinanceStatisticsParams(
+                    owner_username="currency-owner",
+                    now=february,
+                    period=FinanceStatisticsPeriod.THIS_MONTH,
+                    currency=FinanceStatisticsCurrency.MONTH,
+                    period_start=date(2026, 3, 1),
+                ),
+            )
         selected = await use_case.statistics(
             FinanceStatisticsParams(
                 owner_username="currency-owner",

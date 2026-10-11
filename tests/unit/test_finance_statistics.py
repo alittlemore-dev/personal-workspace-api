@@ -1,13 +1,23 @@
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from core.finance.enums import FinanceCurrency, FinanceKind, FinanceStatisticsPeriod
-from core.finance.exceptions import FinanceConflictError
-from core.finance.schemas import Amount, FinanceStatisticsFact, FinanceStatisticsWindow
+from core.finance.enums import (
+    FinanceCurrency,
+    FinanceKind,
+    FinanceStatisticsCurrency,
+    FinanceStatisticsPeriod,
+)
+from core.finance.exceptions import FinanceConflictError, InvalidFinanceDataError
+from core.finance.schemas import (
+    Amount,
+    FinanceStatisticsFact,
+    FinanceStatisticsParams,
+    FinanceStatisticsWindow,
+)
 from core.finance.services import FinanceStatisticsService
 from tests.helpers.factories.core import CoreFactoryHelper
 
@@ -162,3 +172,51 @@ def test_late_edit_permission_uses_creation_month_in_tracker_time_zone(
     else:
         with pytest.raises(FinanceConflictError):
             transaction.check_writable(month, now)
+
+
+@pytest.mark.parametrize(
+    ("selected", "previous_start", "end"),
+    [
+        (date(2026, 1, 1), date(2025, 12, 1), date(2026, 2, 1)),
+        (date(2024, 2, 1), date(2024, 1, 1), date(2024, 3, 1)),
+    ],
+)
+def test_selected_month_uses_its_calendar_boundaries(
+    selected: date,
+    previous_start: date,
+    end: date,
+):
+    current, previous = FinanceStatisticsWindow.for_period(
+        FinanceStatisticsPeriod.THIS_MONTH,
+        datetime(2026, 10, 2, tzinfo=UTC),
+        ZoneInfo("Asia/Yerevan"),
+        selected,
+    )
+    assert current.start.date() == selected
+    assert current.end.date() == end
+    assert current.start.utcoffset() == timedelta(hours=4)
+    assert previous.start.date() == previous_start
+    assert previous.end == current.start
+
+
+@pytest.mark.parametrize(
+    ("selected", "period"),
+    [
+        (date(2026, 10, 1), FinanceStatisticsPeriod.THIS_MONTH),
+        (date(2026, 8, 2), FinanceStatisticsPeriod.THIS_MONTH),
+        (date(2026, 8, 1), FinanceStatisticsPeriod.THIS_YEAR),
+    ],
+)
+def test_selected_month_rejects_future_noncanonical_and_nonmonthly_dates(
+    selected: date,
+    period: FinanceStatisticsPeriod,
+):
+    params = FinanceStatisticsParams(
+        owner_username="owner",
+        now=datetime(2026, 9, 15, tzinfo=UTC),
+        currency=FinanceStatisticsCurrency.MONTH,
+        period=period,
+        period_start=selected,
+    )
+    with pytest.raises(InvalidFinanceDataError):
+        params.check_period(CoreFactoryHelper.finance_month(period_start=date(2026, 9, 1)))

@@ -11,6 +11,7 @@ from litestar.di import NamedDependency
 from core.account_time_zone.clients import AccountTimeZoneReader
 from core.finance.enums import (
     FinanceStatisticsCurrency,
+    FinanceStatisticsPeriod,
 )
 from core.finance.exceptions import InvalidFinanceDataError
 from core.finance.schemas import (
@@ -51,6 +52,8 @@ from entrypoints.litestar.api.parameters import (
     FinanceIncludeDeletedQuery,
     FinanceMonthPath,
     FinancePeriodQuery,
+    FinanceStatisticsMonthQuery,
+    FinanceStatisticsYearQuery,
     FinanceTransactionIdPath,
     FinanceVersionQuery,
     FinanceYearPath,
@@ -288,9 +291,16 @@ def provide_statistics_params(
     period: FinancePeriodQuery,
     currency: FinanceCurrencyQuery,
     month_context: NamedDependency[FinanceMonthParams],
+    year: FinanceStatisticsYearQuery = None,
+    month: FinanceStatisticsMonthQuery = None,
 ) -> FinanceStatisticsParams:
+    if (year is None) != (month is None) or (
+        year is not None and period != FinanceStatisticsPeriod.THIS_MONTH
+    ):
+        raise InvalidFinanceDataError
     try:
         selected = FinanceStatisticsCurrency(currency)
+        period_start = date(year, month, 1) if year is not None and month is not None else None
     except ValueError as error:
         raise InvalidFinanceDataError from error
     return FinanceStatisticsParams(
@@ -298,6 +308,7 @@ def provide_statistics_params(
         now=month_context.now,
         period=period,
         currency=selected,
+        period_start=period_start,
     )
 
 

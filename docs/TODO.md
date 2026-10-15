@@ -7,10 +7,6 @@ remain active work unless a later product decision supersedes them.
 
 ## Public system health
 
-- [ ] Build a public system-status page with an extended healthcheck showing overall availability
-  and the state of each service and component, including Telegram bot connectivity. Report which
-  components are working, connecting, or unavailable without exposing credentials or private data.
-
 ## Telegram Bot
 
 Architecture: [Telegram Bot Architecture](telegram-bot-architecture.md).
@@ -145,7 +141,6 @@ Each knowledge item has its own subfolder in the Knowledge section of the worksp
     - [ ] Books to buy page
     - [ ] Books by categories page
     - [ ] Books to reread page
-  - [ ] Companies
   - [x] Dates
     - [ ] Related dates
       - [ ] Nth day of the year. Example: Programmer's Day — 256th day of the year

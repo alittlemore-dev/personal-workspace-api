@@ -76,8 +76,23 @@ def create_stores() -> dict[str, Store]:
 
 def create_openapi_config() -> OpenAPIConfig:
     return OpenAPIConfig(
-        title="docs",
-        version="0.1.0",
+        title="Personal Workspace API",
+        description=(
+            "Private workspace for knowledge, people, memorable dates, events, resumes, "
+            "finance, and Telegram notifications. Send a PASETO access token or personal "
+            "API token as Authorization: Bearer <credential>. Personal tokens need the "
+            "permission listed on each operation and retain account role checks. "
+            "Knowledge, resumes, events, and finance data belong to the authenticated account.\n\n"
+            "Paginated lists require page (one-based) and pageSize (1–100), with no implicit "
+            "defaults. Other lists are documented as unpaginated. JSON uses camelCase; the "
+            "shared error envelope uses snake_case. Validation errors return HTTP 400 with "
+            "one field error or nested_errors. Messages explain failures but are not stable "
+            "identifiers. PUT requires the complete body unless stated otherwise.\n\n"
+            "Uploads use multipart/form-data with binary file parts. Downloads return raw "
+            "bytes with the documented MIME type. Resume export supports PDF and DOCX. "
+            "Private attachments use application/octet-stream; normalized images use image/webp."
+        ),
+        version="1.0.0",
         openapi_router=Router(
             "/api/docs",
             route_handlers=[],

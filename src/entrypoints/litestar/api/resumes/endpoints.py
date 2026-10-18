@@ -27,7 +27,11 @@ from entrypoints.litestar.api.resumes.dependencies import (
     provide_update_resume_params,
     provide_upload_photo_params,
 )
-from entrypoints.litestar.api.resumes.responses import ResumeExportResponse
+from entrypoints.litestar.api.resumes.responses import (
+    RESUME_EXPORT_OPENAPI_RESPONSE,
+    RESUME_PHOTO_OPENAPI_RESPONSE,
+    ResumeExportResponse,
+)
 from entrypoints.litestar.api.resumes.schemas import (
     ResumePhotoUploadRequestSchema,
     ResumeRequestSchema,
@@ -49,6 +53,7 @@ class ResumesApiController(Controller):
         status_code=status_codes.HTTP_200_OK,
         dependencies={"filters": Provide(provide_resume_filters, sync_to_thread=False)},
         opt={"pat_permissions": ("workspace.resumes.read",)},
+        summary="List resumes",
     )
     async def list_resumes(
         self,
@@ -65,7 +70,8 @@ class ResumesApiController(Controller):
         ),
         name="resumes-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
-        opt={"pat_permissions": ("workspace.resumes.create",)},
+        opt={"pat_permissions": ("workspace.resumes.create",), "error_statuses": (400,)},
+        summary="Create resume",
     )
     async def create_resume(
         self,
@@ -86,12 +92,15 @@ class ResumesApiController(Controller):
                             },
                             "profile": {
                                 "fullName": "Dmitriy Lunev",
-                                "headline": "Backend Engineer",
+                                "role": "Backend Engineer",
+                                "photoFileId": "",
                                 "location": "Moscow",
                                 "email": "example@mail.ru",
                                 "phone": "",
                                 "telegram": "@alm_dmitriy_dev",
-                                "website": "https://example.com",
+                                "websiteUrl": "https://alex.example.com",
+                                "linkedinUrl": "https://www.linkedin.com/in/alex-morgan",
+                                "githubUrl": "https://github.com/alex-morgan",
                             },
                             "summary": {"text": "Builds reliable backend systems."},
                             "skills": [],
@@ -121,7 +130,8 @@ class ResumesApiController(Controller):
         name="resumes-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_resume_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.resumes.read",)},
+        opt={"pat_permissions": ("workspace.resumes.read",), "error_statuses": (404,)},
+        summary="Get resume",
     )
     async def get_resume(
         self,
@@ -143,7 +153,12 @@ class ResumesApiController(Controller):
         status_code=status_codes.HTTP_200_OK,
         request_max_body_size=1_048_576,
         dependencies={"params": Provide(provide_upload_photo_params)},
-        opt={"pat_permissions": ("workspace.resumes.update",)},
+        opt={
+            "pat_permissions": ("workspace.resumes.update",),
+            "error_statuses": (400, 404, 413),
+            "upload_media_types": ("image/jpeg",),
+        },
+        summary="Upload photo",
     )
     async def upload_photo(
         self,
@@ -152,7 +167,10 @@ class ResumesApiController(Controller):
             ResumePhotoUploadRequestSchema,
             api_multipart_body(
                 title="Resume photo upload",
-                description="JPEG resume photo.",
+                description=(
+                    "JPEG resume photo up to 256 KiB, with maximum dimensions 800 × 800 "
+                    "pixels. Send the bytes in the file part."
+                ),
                 examples=({"file": "photo.jpg"},),
             ),
         ],
@@ -167,12 +185,19 @@ class ResumesApiController(Controller):
     @get(
         "/{resume_id:str}/photo",
         description=(
-            "Read a private resume photo.\n\nPersonal API token permissions: "
+            "Read a private resume photo. Returns HTTP 400 if the resume has no photo, "
+            "or 404 when the resume does not exist in this account.\n\n"
+            "Personal API token permissions: "
             "workspace.resumes.read."
         ),
         name="resumes-photo-read-api-handler",
         dependencies={"params": Provide(provide_get_photo_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.resumes.read",)},
+        opt={
+            "pat_permissions": ("workspace.resumes.read",),
+            "binary_response": RESUME_PHOTO_OPENAPI_RESPONSE,
+            "error_statuses": (400, 404),
+        },
+        summary="Get photo",
     )
     async def get_photo(
         self,
@@ -196,7 +221,8 @@ class ResumesApiController(Controller):
         name="resumes-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_resume_params)},
-        opt={"pat_permissions": ("workspace.resumes.update",)},
+        opt={"pat_permissions": ("workspace.resumes.update",), "error_statuses": (400, 404)},
+        summary="Update resume",
     )
     async def update_resume(
         self,
@@ -212,9 +238,15 @@ class ResumesApiController(Controller):
         "/{resume_id:str}/export",
         description=("Export a resume.\n\nPersonal API token permissions: workspace.resumes.read."),
         name="resumes-export-api-handler",
+        media_type="application/pdf",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_export_resume_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.resumes.read",)},
+        opt={
+            "pat_permissions": ("workspace.resumes.read",),
+            "binary_response": RESUME_EXPORT_OPENAPI_RESPONSE,
+            "error_statuses": (400, 404),
+        },
+        summary="Export resume",
     )
     async def export_resume(
         self,
@@ -238,7 +270,8 @@ class ResumesApiController(Controller):
         name="resumes-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_resume_params)},
-        opt={"pat_permissions": ("workspace.resumes.delete",)},
+        opt={"pat_permissions": ("workspace.resumes.delete",), "error_statuses": (400, 404)},
+        summary="Delete resume",
     )
     async def delete_resume(
         self,

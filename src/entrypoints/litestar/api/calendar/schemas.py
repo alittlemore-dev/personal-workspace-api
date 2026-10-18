@@ -22,9 +22,38 @@ from entrypoints.litestar.api.schemas import CamelCaseSchema
 
 
 class CalendarAnnualDateResponseSchema(CamelCaseSchema):
-    day: Annotated[int, Field(title="Day", ge=1, le=31)]
-    month: Annotated[int, Field(title="Month", ge=1, le=12)]
-    year: Annotated[int | None, Field(title="Optional first year", ge=1, le=9999)]
+    day: Annotated[
+        int,
+        Field(
+            title="Day",
+            ge=1,
+            le=31,
+            description=(
+                "Day of the month, from 1 to 31; must form a valid date with month and year."
+            ),
+            examples=[18],
+        ),
+    ]
+    month: Annotated[
+        int,
+        Field(
+            title="Month",
+            ge=1,
+            le=12,
+            description="Calendar month, from 1 to 12.",
+            examples=[10],
+        ),
+    ]
+    year: Annotated[
+        int | None,
+        Field(
+            title="Optional first year",
+            ge=1,
+            le=9999,
+            description="Original year; null when the year is unknown.",
+            examples=[1992],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(
@@ -36,8 +65,22 @@ class CalendarAnnualDateResponseSchema(CamelCaseSchema):
 
 
 class CalendarRelatedPersonResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    display_name: Annotated[str, Field(title="Display name")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    display_name: Annotated[
+        str,
+        Field(
+            title="Display name",
+            description="Human-readable display name.",
+            examples=["Alex Morgan"],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(
@@ -49,13 +92,57 @@ class CalendarRelatedPersonResponseSchema(CamelCaseSchema):
 
 
 class CalendarEntryResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    kind: Annotated[CalendarEntryKind, Field(title="Entry kind")]
-    display_name: Annotated[str, Field(title="Display name")]
-    annual_date: Annotated[CalendarAnnualDateResponseSchema, Field(title="Annual date")]
-    period: Annotated[CalendarEntryPeriod, Field(title="Calendar period")]
-    occurrence_year: Annotated[int, Field(title="Occurrence year")]
-    related_people: Annotated[list[CalendarRelatedPersonResponseSchema], Field(title="People")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    kind: Annotated[
+        CalendarEntryKind,
+        Field(
+            title="Entry kind",
+            description="Kind; allowed values are listed in the referenced enumeration.",
+            examples=["birthday"],
+        ),
+    ]
+    display_name: Annotated[
+        str,
+        Field(
+            title="Display name",
+            description="Human-readable display name.",
+            examples=["Alex Morgan"],
+        ),
+    ]
+    annual_date: Annotated[
+        CalendarAnnualDateResponseSchema,
+        Field(
+            title="Annual date",
+            description=("Annual date; see the nested schema for its fields."),
+        ),
+    ]
+    period: Annotated[
+        CalendarEntryPeriod,
+        Field(
+            title="Calendar period",
+            description="Period; allowed values are listed in the referenced enumeration.",
+            examples=["currentMonth"],
+        ),
+    ]
+    occurrence_year: Annotated[
+        int,
+        Field(
+            title="Occurrence year",
+            description="Year of this occurrence of the annual date.",
+            examples=[2026],
+        ),
+    ]
+    related_people: Annotated[
+        list[CalendarRelatedPersonResponseSchema],
+        Field(title="People", description="Related people returned by this operation."),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: CalendarEntry) -> CalendarEntryResponseSchema:
@@ -76,8 +163,24 @@ class CalendarEntryResponseSchema(CamelCaseSchema):
 
 
 class CalendarSummaryResponseSchema(CamelCaseSchema):
-    memorable_date_count: Annotated[int, Field(title="Memorable date count", ge=0)]
-    birthday_count: Annotated[int, Field(title="Birthday count", ge=0)]
+    memorable_date_count: Annotated[
+        int,
+        Field(
+            title="Memorable date count",
+            ge=0,
+            description="Number of memorable dates in this calendar window.",
+            examples=[4],
+        ),
+    ]
+    birthday_count: Annotated[
+        int,
+        Field(
+            title="Birthday count",
+            ge=0,
+            description="Number of birthdays in this calendar window.",
+            examples=[2],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: CalendarSummary) -> CalendarSummaryResponseSchema:
@@ -88,10 +191,34 @@ class CalendarSummaryResponseSchema(CamelCaseSchema):
 
 
 class CalendarResponseSchema(CamelCaseSchema):
-    reference_date: Annotated[date, Field(title="Browser-local reference date")]
-    window: Annotated[CalendarWindow, Field(title="Calendar window")]
-    summary: Annotated[CalendarSummaryResponseSchema, Field(title="Calendar summary")]
-    entries: Annotated[list[CalendarEntryResponseSchema], Field(title="Entries")]
+    reference_date: Annotated[
+        date,
+        Field(
+            title="Browser-local reference date",
+            description="Browser-local reference date for the calendar window.",
+            examples=["2026-10-18"],
+        ),
+    ]
+    window: Annotated[
+        CalendarWindow,
+        Field(
+            title="Calendar window",
+            description="Window; allowed values are listed in the referenced enumeration.",
+            examples=["month"],
+        ),
+    ]
+    summary: Annotated[
+        CalendarSummaryResponseSchema,
+        Field(
+            title="Calendar summary",
+            description="Counts of birthdays and memorable dates in this window.",
+            examples=[{"memorableDateCount": 4, "birthdayCount": 2}],
+        ),
+    ]
+    entries: Annotated[
+        list[CalendarEntryResponseSchema],
+        Field(title="Entries", description="Entries returned by this operation."),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: Calendar) -> CalendarResponseSchema:
@@ -109,15 +236,36 @@ class CalendarResponseSchema(CamelCaseSchema):
 
 
 class CalendarOccurrenceResponseSchema(CamelCaseSchema):
-    id: str
-    source_id: str
-    kind: str
-    display_name: str
-    all_day: bool
-    start: str
-    end: str
-    annual_date: CalendarAnnualDateResponseSchema | None
-    related_people: list[CalendarRelatedPersonResponseSchema]
+    id: str = Field(
+        description="Opaque resource identifier; use the value returned by this API.",
+        examples=["4e92d4de561f4bc7a3eed227868952db"],
+    )
+    source_id: str = Field(
+        description="Identifier of the source event, person, or memorable date.",
+        examples=["4e92d4de561f4bc7a3eed227868952db"],
+    )
+    kind: str = Field(
+        description="Occurrence source kind: event, birthday, or memorableDate.",
+        examples=["event"],
+    )
+    display_name: str = Field(description="Human-readable display name.", examples=["Alex Morgan"])
+    all_day: bool = Field(
+        description=(
+            "True for calendar-date intervals; false for timestamps with explicit UTC offsets."
+        ),
+        examples=[False],
+    )
+    start: str = Field(description="Inclusive interval start.", examples=["2026-10-18T09:00:00Z"])
+    end: str = Field(
+        description="Exclusive interval end; must follow start.",
+        examples=["2026-10-18T10:00:00Z"],
+    )
+    annual_date: CalendarAnnualDateResponseSchema | None = Field(
+        description="Annual date; see the nested schema for its fields.",
+    )
+    related_people: list[CalendarRelatedPersonResponseSchema] = Field(
+        description="Related people returned by this operation.",
+    )
 
     @classmethod
     def from_domain_schema(cls, *, schema: CalendarOccurrence) -> CalendarOccurrenceResponseSchema:
@@ -142,11 +290,21 @@ class CalendarOccurrenceResponseSchema(CamelCaseSchema):
 
 
 class UnplacedAnnualEntryResponseSchema(CamelCaseSchema):
-    source_id: str
-    kind: CalendarEntryKind
-    display_name: str
-    annual_date: CalendarAnnualDateResponseSchema
-    related_people: list[CalendarRelatedPersonResponseSchema]
+    source_id: str = Field(
+        description="Identifier of the source event, person, or memorable date.",
+        examples=["4e92d4de561f4bc7a3eed227868952db"],
+    )
+    kind: CalendarEntryKind = Field(
+        description="Kind; allowed values are listed in the referenced enumeration.",
+        examples=["birthday"],
+    )
+    display_name: str = Field(description="Human-readable display name.", examples=["Alex Morgan"])
+    annual_date: CalendarAnnualDateResponseSchema = Field(
+        description="Annual date; see the nested schema for its fields.",
+    )
+    related_people: list[CalendarRelatedPersonResponseSchema] = Field(
+        description="Related people returned by this operation.",
+    )
 
     @classmethod
     def from_domain_schema(
@@ -169,8 +327,12 @@ class UnplacedAnnualEntryResponseSchema(CamelCaseSchema):
 
 
 class CalendarOccurrencesResponseSchema(CamelCaseSchema):
-    entries: list[CalendarOccurrenceResponseSchema]
-    unplaced_annual_entries: list[UnplacedAnnualEntryResponseSchema]
+    entries: list[CalendarOccurrenceResponseSchema] = Field(
+        description="Entries returned by this operation.",
+    )
+    unplaced_annual_entries: list[UnplacedAnnualEntryResponseSchema] = Field(
+        description="Unplaced annual entries returned by this operation.",
+    )
 
     @classmethod
     def from_domain_schema(

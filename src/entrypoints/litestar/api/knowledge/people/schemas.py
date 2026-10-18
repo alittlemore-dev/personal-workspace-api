@@ -35,9 +35,38 @@ from entrypoints.litestar.api.validation import (
 
 
 class PersonBirthdaySchema(CamelCaseSchema):
-    day: Annotated[int, Field(title="Day", ge=1, le=31)]
-    month: Annotated[int, Field(title="Month", ge=1, le=12)]
-    year: Annotated[int | None, Field(title="Optional year", ge=1, le=9999)]
+    day: Annotated[
+        int,
+        Field(
+            title="Day",
+            ge=1,
+            le=31,
+            description=(
+                "Day of the month, from 1 to 31; must form a valid date with month and year."
+            ),
+            examples=[18],
+        ),
+    ]
+    month: Annotated[
+        int,
+        Field(
+            title="Month",
+            ge=1,
+            le=12,
+            description="Calendar month, from 1 to 12.",
+            examples=[10],
+        ),
+    ]
+    year: Annotated[
+        int | None,
+        Field(
+            title="Optional year",
+            ge=1,
+            le=9999,
+            description="Original year; null when the year is unknown.",
+            examples=[1992],
+        ),
+    ]
 
     @model_validator(mode="after")
     def validate_date(self) -> Self:  # noqa: N804
@@ -57,12 +86,56 @@ class PersonBirthdaySchema(CamelCaseSchema):
 
 
 class PersonRelationshipTypeResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    is_symmetric: Annotated[bool, Field(title="Symmetric")]
-    forward_name: Annotated[str, Field(title="Forward label")]
-    reverse_name: Annotated[str, Field(title="Reverse label")]
-    created_at: Annotated[str, Field(title="Created at")]
-    updated_at: Annotated[str, Field(title="Updated at")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    is_symmetric: Annotated[
+        bool,
+        Field(
+            title="Symmetric",
+            description="Whether both directions use the same relationship label.",
+            examples=[False],
+        ),
+    ]
+    forward_name: Annotated[
+        str,
+        Field(
+            title="Forward label",
+            description="Relationship label from the source person to the related person.",
+            examples=["Mentor"],
+        ),
+    ]
+    reverse_name: Annotated[
+        str,
+        Field(
+            title="Reverse label",
+            description=(
+                "Label in the reverse direction; may be empty for symmetric relationships."
+            ),
+            examples=["Mentee"],
+        ),
+    ]
+    created_at: Annotated[
+        str,
+        Field(
+            title="Created at",
+            description="Creation timestamp in ISO 8601 format.",
+            examples=["2026-10-18T09:00:00Z"],
+        ),
+    ]
+    updated_at: Annotated[
+        str,
+        Field(
+            title="Updated at",
+            description="Last modification timestamp in ISO 8601 format.",
+            examples=["2026-10-18T10:30:00Z"],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: PersonRelationshipType) -> Self:
@@ -82,7 +155,10 @@ class PersonRelationshipTypeResponseSchema(CamelCaseSchema):
 class PersonRelationshipTypesResponseSchema(CamelCaseSchema):
     relationship_types: Annotated[
         list[PersonRelationshipTypeResponseSchema],
-        Field(title="Relationship types"),
+        Field(
+            title="Relationship types",
+            description=("Relationship types returned by this operation."),
+        ),
     ]
 
     @classmethod
@@ -99,9 +175,32 @@ class PersonRelationshipTypesResponseSchema(CamelCaseSchema):
 
 
 class PersonRelationshipTypeRequestSchema(CamelCaseSchema):
-    is_symmetric: Annotated[bool, Field(title="Symmetric")]
-    forward_name: Annotated[RequiredShortText, Field(title="Forward label")]
-    reverse_name: Annotated[ShortText, Field(title="Reverse label")]
+    is_symmetric: Annotated[
+        bool,
+        Field(
+            title="Symmetric",
+            description="Whether both directions use the same relationship label.",
+            examples=[False],
+        ),
+    ]
+    forward_name: Annotated[
+        RequiredShortText,
+        Field(
+            title="Forward label",
+            description="Relationship label from the source person to the related person.",
+            examples=["Mentor"],
+        ),
+    ]
+    reverse_name: Annotated[
+        ShortText,
+        Field(
+            title="Reverse label",
+            description=(
+                "Label in the reverse direction; may be empty for symmetric relationships."
+            ),
+            examples=["Mentee"],
+        ),
+    ]
 
     @model_validator(mode="after")
     def validate_names(self) -> Self:  # noqa: N804
@@ -138,10 +237,42 @@ class PersonRelationshipTypeRequestSchema(CamelCaseSchema):
 
 
 class PersonRelationshipCreateSchema(CamelCaseSchema):
-    related_person_id: Annotated[str, Field(title="Related person identifier")]
-    relationship_type_id: Annotated[str, Field(title="Relationship type identifier")]
-    direction: Annotated[PersonRelationshipDirection, Field(title="Direction")]
-    note: Annotated[KnowledgeRelationshipNoteText, Field(title="Note")]
+    related_person_id: Annotated[
+        str,
+        Field(
+            title="Related person identifier",
+            description=(
+                "Related person id; use the identifier returned by the corresponding API."
+            ),
+            examples=["1bb209e394954b71bd78b52d572dd835"],
+        ),
+    ]
+    relationship_type_id: Annotated[
+        str,
+        Field(
+            title="Relationship type identifier",
+            description=(
+                "Relationship type id; use the identifier returned by the corresponding API."
+            ),
+            examples=["1bb209e394954b71bd78b52d572dd835"],
+        ),
+    ]
+    direction: Annotated[
+        PersonRelationshipDirection,
+        Field(
+            title="Direction",
+            description="Direction; allowed values are listed in the referenced enumeration.",
+            examples=["forward"],
+        ),
+    ]
+    note: Annotated[
+        KnowledgeRelationshipNoteText,
+        Field(
+            title="Note",
+            description="Private note about this relationship.",
+            examples=["Worked together on the payments platform."],
+        ),
+    ]
 
     def to_domain_schema(self) -> PersonRelationshipCreateParams:
         return PersonRelationshipCreateParams(
@@ -153,11 +284,50 @@ class PersonRelationshipCreateSchema(CamelCaseSchema):
 
 
 class PersonRelationshipUpdateSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Relationship identifier")]
-    related_person_id: Annotated[str, Field(title="Related person identifier")]
-    relationship_type_id: Annotated[str, Field(title="Relationship type identifier")]
-    direction: Annotated[PersonRelationshipDirection, Field(title="Direction")]
-    note: Annotated[KnowledgeRelationshipNoteText, Field(title="Note")]
+    id: Annotated[
+        str,
+        Field(
+            title="Relationship identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    related_person_id: Annotated[
+        str,
+        Field(
+            title="Related person identifier",
+            description=(
+                "Related person id; use the identifier returned by the corresponding API."
+            ),
+            examples=["1bb209e394954b71bd78b52d572dd835"],
+        ),
+    ]
+    relationship_type_id: Annotated[
+        str,
+        Field(
+            title="Relationship type identifier",
+            description=(
+                "Relationship type id; use the identifier returned by the corresponding API."
+            ),
+            examples=["1bb209e394954b71bd78b52d572dd835"],
+        ),
+    ]
+    direction: Annotated[
+        PersonRelationshipDirection,
+        Field(
+            title="Direction",
+            description="Direction; allowed values are listed in the referenced enumeration.",
+            examples=["forward"],
+        ),
+    ]
+    note: Annotated[
+        KnowledgeRelationshipNoteText,
+        Field(
+            title="Note",
+            description="Private note about this relationship.",
+            examples=["Worked together on the payments platform."],
+        ),
+    ]
 
     def to_domain_schema(self) -> PersonRelationshipUpdateParams:
         return PersonRelationshipUpdateParams(
@@ -170,9 +340,22 @@ class PersonRelationshipUpdateSchema(CamelCaseSchema):
 
 
 class PersonRelationshipChangesSchema(CamelCaseSchema):
-    create: Annotated[list[PersonRelationshipCreateSchema], Field(title="Create")]
-    update: Annotated[list[PersonRelationshipUpdateSchema], Field(title="Update")]
-    delete_ids: Annotated[list[str], Field(title="Delete identifiers")]
+    create: Annotated[
+        list[PersonRelationshipCreateSchema],
+        Field(title="Create", description="Create included in this request."),
+    ]
+    update: Annotated[
+        list[PersonRelationshipUpdateSchema],
+        Field(title="Update", description="Update included in this request."),
+    ]
+    delete_ids: Annotated[
+        list[str],
+        Field(
+            title="Delete identifiers",
+            description="Identifiers of existing relationships to delete.",
+            examples=[["1bb209e394954b71bd78b52d572dd835"]],
+        ),
+    ]
 
     def to_domain_schema(self) -> PersonRelationshipChanges:
         return PersonRelationshipChanges(
@@ -183,18 +366,79 @@ class PersonRelationshipChangesSchema(CamelCaseSchema):
 
 
 class PersonRelationshipResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    related_person_id: Annotated[str, Field(title="Related person identifier")]
-    related_person_display_name: Annotated[str, Field(title="Related person display name")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    related_person_id: Annotated[
+        str,
+        Field(
+            title="Related person identifier",
+            description=(
+                "Related person id; use the identifier returned by the corresponding API."
+            ),
+            examples=["1bb209e394954b71bd78b52d572dd835"],
+        ),
+    ]
+    related_person_display_name: Annotated[
+        str,
+        Field(
+            title="Related person display name",
+            description="Display name of the related person.",
+            examples=["Sam Rivera"],
+        ),
+    ]
     relationship_type: Annotated[
         PersonRelationshipTypeResponseSchema,
-        Field(title="Relationship type"),
+        Field(
+            title="Relationship type",
+            description="Relationship type; see the nested schema for its fields.",
+        ),
     ]
-    direction: Annotated[PersonRelationshipDirection, Field(title="Direction")]
-    label: Annotated[str, Field(title="Projected label")]
-    note: Annotated[str, Field(title="Note")]
-    created_at: Annotated[str, Field(title="Created at")]
-    updated_at: Annotated[str, Field(title="Updated at")]
+    direction: Annotated[
+        PersonRelationshipDirection,
+        Field(
+            title="Direction",
+            description="Direction; allowed values are listed in the referenced enumeration.",
+            examples=["forward"],
+        ),
+    ]
+    label: Annotated[
+        str,
+        Field(
+            title="Projected label",
+            description="Relationship label projected for this direction.",
+            examples=["Mentor"],
+        ),
+    ]
+    note: Annotated[
+        str,
+        Field(
+            title="Note",
+            description="Private note about this relationship.",
+            examples=["Worked together on the payments platform."],
+        ),
+    ]
+    created_at: Annotated[
+        str,
+        Field(
+            title="Created at",
+            description="Creation timestamp in ISO 8601 format.",
+            examples=["2026-10-18T09:00:00Z"],
+        ),
+    ]
+    updated_at: Annotated[
+        str,
+        Field(
+            title="Updated at",
+            description="Last modification timestamp in ISO 8601 format.",
+            examples=["2026-10-18T10:30:00Z"],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: PersonRelationshipView) -> Self:
@@ -217,8 +461,14 @@ class PersonRelationshipResponseSchema(CamelCaseSchema):
 
 
 class PersonQuickCreateRequestSchema(CamelCaseSchema):
-    first_name: Annotated[RequiredShortText, Field(title="First name")]
-    last_name: Annotated[RequiredShortText, Field(title="Last name")]
+    first_name: Annotated[
+        RequiredShortText,
+        Field(title="First name", description="Given name.", examples=["Alex"]),
+    ]
+    last_name: Annotated[
+        RequiredShortText,
+        Field(title="Last name", description="Family name.", examples=["Morgan"]),
+    ]
 
     def to_domain_schema(self, *, author_username: str) -> PersonQuickCreateParams:
         return PersonQuickCreateParams(
@@ -230,9 +480,17 @@ class PersonQuickCreateRequestSchema(CamelCaseSchema):
 
 
 class PersonBirthdayCreateRequestSchema(CamelCaseSchema):
-    first_name: Annotated[RequiredShortText, Field(title="First name")]
-    last_name: Annotated[RequiredShortText, Field(title="Last name")]
-    birthday: PersonBirthdaySchema
+    first_name: Annotated[
+        RequiredShortText,
+        Field(title="First name", description="Given name.", examples=["Alex"]),
+    ]
+    last_name: Annotated[
+        RequiredShortText,
+        Field(title="Last name", description="Family name.", examples=["Morgan"]),
+    ]
+    birthday: PersonBirthdaySchema = Field(
+        description="Birthday; see the nested schema for its fields.",
+    )
 
     def to_domain_schema(self, *, author_username: str) -> PersonQuickCreateParams:
         return PersonQuickCreateParams(
@@ -251,19 +509,77 @@ class PersonCreateRequestSchema(
 
 
 class PersonUpdateRequestSchema(CamelCaseSchema):
-    last_name: Annotated[RequiredShortText, Field(title="Last name")]
-    first_name: Annotated[RequiredShortText, Field(title="First name")]
-    middle_name: Annotated[ShortText, Field(title="Middle name")]
-    email: Annotated[BlankableEmailString, Field(title="Email")]
-    phone: Annotated[str, Field(title="Phone", max_length=64)]
-    telegram: Annotated[ShortText, Field(title="Telegram")]
-    birthday: Annotated[PersonBirthdaySchema | None, Field(title="Birthday")]
-    notifications_enabled: bool
-    description: Annotated[KnowledgeDescriptionText, Field(title="Markdown description")]
-    tag_ids: Annotated[list[str], Field(title="Tag identifiers")]
+    last_name: Annotated[
+        RequiredShortText,
+        Field(title="Last name", description="Family name.", examples=["Morgan"]),
+    ]
+    first_name: Annotated[
+        RequiredShortText,
+        Field(title="First name", description="Given name.", examples=["Alex"]),
+    ]
+    middle_name: Annotated[
+        ShortText,
+        Field(
+            title="Middle name",
+            description="Middle name; an empty string means it is not provided.",
+            examples=["Taylor"],
+        ),
+    ]
+    email: Annotated[
+        BlankableEmailString,
+        Field(
+            title="Email",
+            description="Contact email; an empty string means it is not provided.",
+            examples=["alex.morgan@example.com"],
+        ),
+    ]
+    phone: Annotated[
+        str,
+        Field(
+            title="Phone",
+            max_length=64,
+            description="Contact phone number; an empty string means it is not provided.",
+            examples=["+12025550123"],
+        ),
+    ]
+    telegram: Annotated[
+        ShortText,
+        Field(
+            title="Telegram",
+            description="Telegram username; an empty string means it is not provided.",
+            examples=["@alex_morgan"],
+        ),
+    ]
+    birthday: Annotated[
+        PersonBirthdaySchema | None,
+        Field(title="Birthday", description="Birthday; see the nested schema for its fields."),
+    ]
+    notifications_enabled: bool = Field(
+        description="Whether notifications are enabled for this person or annual date.",
+        examples=[True],
+    )
+    description: Annotated[
+        KnowledgeDescriptionText,
+        Field(
+            title="Markdown description",
+            description="Human-readable description.",
+            examples=["Designed APIs and reduced request latency by 30%."],
+        ),
+    ]
+    tag_ids: Annotated[
+        list[str],
+        Field(
+            title="Tag identifiers",
+            description="Tag identifiers owned by the authenticated user.",
+            examples=[["cabe3a7dd502458aa35e3d95d0953eaf"]],
+        ),
+    ]
     relationship_changes: Annotated[
         PersonRelationshipChangesSchema,
-        Field(title="Relationship changes"),
+        Field(
+            title="Relationship changes",
+            description="Relationship changes; see the nested schema for its fields.",
+        ),
     ]
 
     def to_domain_schema(self) -> PersonUpdateParams:
@@ -283,16 +599,74 @@ class PersonUpdateRequestSchema(CamelCaseSchema):
 
 
 class PersonSummaryResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    display_name: Annotated[str, Field(title="Display name")]
-    email: Annotated[str, Field(title="Email")]
-    phone: Annotated[str, Field(title="Phone")]
-    telegram: Annotated[str, Field(title="Telegram")]
-    birthday: Annotated[PersonBirthdaySchema | None, Field(title="Birthday")]
-    tags: Annotated[list[KnowledgeTagResponseSchema], Field(title="Tags")]
-    photo: Annotated[KnowledgeFileResponseSchema | None, Field(title="Photo")]
-    created_at: Annotated[str, Field(title="Created at")]
-    updated_at: Annotated[str, Field(title="Updated at")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    display_name: Annotated[
+        str,
+        Field(
+            title="Display name",
+            description="Human-readable display name.",
+            examples=["Alex Morgan"],
+        ),
+    ]
+    email: Annotated[
+        str,
+        Field(
+            title="Email",
+            description="Contact email; an empty string means it is not provided.",
+            examples=["alex.morgan@example.com"],
+        ),
+    ]
+    phone: Annotated[
+        str,
+        Field(
+            title="Phone",
+            description="Contact phone number; an empty string means it is not provided.",
+            examples=["+12025550123"],
+        ),
+    ]
+    telegram: Annotated[
+        str,
+        Field(
+            title="Telegram",
+            description="Telegram username; an empty string means it is not provided.",
+            examples=["@alex_morgan"],
+        ),
+    ]
+    birthday: Annotated[
+        PersonBirthdaySchema | None,
+        Field(title="Birthday", description="Birthday; see the nested schema for its fields."),
+    ]
+    tags: Annotated[
+        list[KnowledgeTagResponseSchema],
+        Field(title="Tags", description="Tags returned by this operation."),
+    ]
+    photo: Annotated[
+        KnowledgeFileResponseSchema | None,
+        Field(title="Photo", description="Photo; see the nested schema for its fields."),
+    ]
+    created_at: Annotated[
+        str,
+        Field(
+            title="Created at",
+            description="Creation timestamp in ISO 8601 format.",
+            examples=["2026-10-18T09:00:00Z"],
+        ),
+    ]
+    updated_at: Annotated[
+        str,
+        Field(
+            title="Updated at",
+            description="Last modification timestamp in ISO 8601 format.",
+            examples=["2026-10-18T10:30:00Z"],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: PersonSummary) -> Self:
@@ -324,9 +698,29 @@ class PersonSummaryResponseSchema(CamelCaseSchema):
 
 
 class PeopleResponseSchema(CamelCaseSchema):
-    total_count: Annotated[int, Field(title="Total count")]
-    total_pages: Annotated[int, Field(title="Total pages")]
-    people: Annotated[list[PersonSummaryResponseSchema], Field(title="People")]
+    total_count: Annotated[
+        int,
+        Field(
+            title="Total count",
+            description="Total number of matching records before pagination.",
+            examples=[42],
+        ),
+    ]
+    total_pages: Annotated[
+        int,
+        Field(
+            title="Total pages",
+            description=(
+                "Number of pages for the requested pageSize; zero when there are no "
+                "matching records."
+            ),
+            examples=[3],
+        ),
+    ]
+    people: Annotated[
+        list[PersonSummaryResponseSchema],
+        Field(title="People", description="People returned by this operation."),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: PeoplePage) -> Self:
@@ -344,30 +738,117 @@ class PeopleResponseSchema(CamelCaseSchema):
 
 
 class PersonResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    display_name: Annotated[str, Field(title="Display name")]
-    last_name: Annotated[str, Field(title="Last name")]
-    first_name: Annotated[str, Field(title="First name")]
-    middle_name: Annotated[str, Field(title="Middle name")]
-    email: Annotated[str, Field(title="Email")]
-    phone: Annotated[str, Field(title="Phone")]
-    telegram: Annotated[str, Field(title="Telegram")]
-    birthday: Annotated[PersonBirthdaySchema | None, Field(title="Birthday")]
-    notifications_enabled: bool
-    description: Annotated[str, Field(title="Markdown description")]
-    tags: Annotated[list[KnowledgeTagResponseSchema], Field(title="Tags")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    display_name: Annotated[
+        str,
+        Field(
+            title="Display name",
+            description="Human-readable display name.",
+            examples=["Alex Morgan"],
+        ),
+    ]
+    last_name: Annotated[
+        str,
+        Field(title="Last name", description="Family name.", examples=["Morgan"]),
+    ]
+    first_name: Annotated[
+        str,
+        Field(title="First name", description="Given name.", examples=["Alex"]),
+    ]
+    middle_name: Annotated[
+        str,
+        Field(
+            title="Middle name",
+            description="Middle name; an empty string means it is not provided.",
+            examples=["Taylor"],
+        ),
+    ]
+    email: Annotated[
+        str,
+        Field(
+            title="Email",
+            description="Contact email; an empty string means it is not provided.",
+            examples=["alex.morgan@example.com"],
+        ),
+    ]
+    phone: Annotated[
+        str,
+        Field(
+            title="Phone",
+            description="Contact phone number; an empty string means it is not provided.",
+            examples=["+12025550123"],
+        ),
+    ]
+    telegram: Annotated[
+        str,
+        Field(
+            title="Telegram",
+            description="Telegram username; an empty string means it is not provided.",
+            examples=["@alex_morgan"],
+        ),
+    ]
+    birthday: Annotated[
+        PersonBirthdaySchema | None,
+        Field(title="Birthday", description="Birthday; see the nested schema for its fields."),
+    ]
+    notifications_enabled: bool = Field(
+        description="Whether notifications are enabled for this person or annual date.",
+        examples=[True],
+    )
+    description: Annotated[
+        str,
+        Field(
+            title="Markdown description",
+            description="Human-readable description.",
+            examples=["Designed APIs and reduced request latency by 30%."],
+        ),
+    ]
+    tags: Annotated[
+        list[KnowledgeTagResponseSchema],
+        Field(title="Tags", description="Tags returned by this operation."),
+    ]
     relationships: Annotated[
         list[PersonRelationshipResponseSchema],
-        Field(title="Relationships"),
+        Field(title="Relationships", description="Relationships returned by this operation."),
     ]
     related_dates: Annotated[
         list[KnowledgeDateReferenceResponseSchema],
-        Field(title="Related memorable dates"),
+        Field(
+            title="Related memorable dates",
+            description=("Related dates returned by this operation."),
+        ),
     ]
-    photo: Annotated[KnowledgeFileResponseSchema | None, Field(title="Photo")]
-    attachments: Annotated[list[KnowledgeFileResponseSchema], Field(title="Attachments")]
-    created_at: Annotated[str, Field(title="Created at")]
-    updated_at: Annotated[str, Field(title="Updated at")]
+    photo: Annotated[
+        KnowledgeFileResponseSchema | None,
+        Field(title="Photo", description="Photo; see the nested schema for its fields."),
+    ]
+    attachments: Annotated[
+        list[KnowledgeFileResponseSchema],
+        Field(title="Attachments", description="Attachments returned by this operation."),
+    ]
+    created_at: Annotated[
+        str,
+        Field(
+            title="Created at",
+            description="Creation timestamp in ISO 8601 format.",
+            examples=["2026-10-18T09:00:00Z"],
+        ),
+    ]
+    updated_at: Annotated[
+        str,
+        Field(
+            title="Updated at",
+            description="Last modification timestamp in ISO 8601 format.",
+            examples=["2026-10-18T10:30:00Z"],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: Person) -> Self:

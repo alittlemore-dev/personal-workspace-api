@@ -20,6 +20,7 @@ class WikiLinksApiController(Controller):
         name="wiki-links-targets-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         opt={"pat_permissions": ("workspace.wiki_links.read",)},
+        summary="List wiki link targets",
     )
     async def list_wiki_link_targets(
         self,

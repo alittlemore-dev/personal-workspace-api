@@ -15,17 +15,92 @@ from infra.config.constants import constants
 
 
 class KnowledgeFileResponseSchema(CamelCaseSchema):
-    id: Annotated[str, Field(title="Identifier")]
-    item_id: Annotated[str, Field(title="Knowledge item identifier")]
-    kind: Annotated[KnowledgeFileKind, Field(title="File kind")]
-    processing: Annotated[KnowledgeFileProcessing, Field(title="File processing provenance")]
-    mime_type: Annotated[str, Field(title="MIME type")]
-    size_bytes: Annotated[int, Field(title="Size in bytes")]
-    name: Annotated[str, Field(title="Display name")]
-    original_name: Annotated[str, Field(title="Original name")]
-    content_path: Annotated[str, Field(title="Protected content path")]
-    created_at: Annotated[str, Field(title="Created at")]
-    updated_at: Annotated[str, Field(title="Updated at")]
+    id: Annotated[
+        str,
+        Field(
+            title="Identifier",
+            description="Opaque resource identifier; use the value returned by this API.",
+            examples=["4e92d4de561f4bc7a3eed227868952db"],
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            title="Knowledge item identifier",
+            description="Item id; use the identifier returned by the corresponding API.",
+            examples=["1bb209e394954b71bd78b52d572dd835"],
+        ),
+    ]
+    kind: Annotated[
+        KnowledgeFileKind,
+        Field(
+            title="File kind",
+            description="Kind; allowed values are listed in the referenced enumeration.",
+            examples=["attachment"],
+        ),
+    ]
+    processing: Annotated[
+        KnowledgeFileProcessing,
+        Field(
+            title="File processing provenance",
+            description="Processing; allowed values are listed in the referenced enumeration.",
+            examples=["raw"],
+        ),
+    ]
+    mime_type: Annotated[
+        str,
+        Field(
+            title="MIME type",
+            description=(
+                "Stored file MIME type. Content downloads may use "
+                "application/octet-stream for safe attachment delivery."
+            ),
+            examples=["application/pdf"],
+        ),
+    ]
+    size_bytes: Annotated[
+        int,
+        Field(title="Size in bytes", description="Stored file size in bytes.", examples=[184320]),
+    ]
+    name: Annotated[
+        str,
+        Field(title="Display name", description="Human-readable name.", examples=["Project notes"]),
+    ]
+    original_name: Annotated[
+        str,
+        Field(
+            title="Original name",
+            description="Original filename supplied by the uploader.",
+            examples=["project-notes.pdf"],
+        ),
+    ]
+    content_path: Annotated[
+        str,
+        Field(
+            title="Protected content path",
+            description=(
+                "Protected content URL path; requires bearer authentication and "
+                "access to this file."
+            ),
+            examples=["/api/knowledge/files/4e92d4de561f4bc7a3eed227868952db/content"],
+        ),
+    ]
+    created_at: Annotated[
+        str,
+        Field(
+            title="Created at",
+            description="Creation timestamp in ISO 8601 format.",
+            examples=["2026-10-18T09:00:00Z"],
+        ),
+    ]
+    updated_at: Annotated[
+        str,
+        Field(
+            title="Updated at",
+            description="Last modification timestamp in ISO 8601 format.",
+            examples=["2026-10-18T10:30:00Z"],
+        ),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: KnowledgeFile) -> Self:
@@ -50,7 +125,15 @@ class KnowledgeFileResponseSchema(CamelCaseSchema):
 class KnowledgeUploadRequestSchema(CamelCaseSchema):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    file: Annotated[UploadFile, Field(title="Uploaded file")]
+    file: Annotated[
+        UploadFile,
+        Field(
+            title="Uploaded file",
+            description=(
+                "Binary file part in multipart/form-data; select a local file, not a JSON filename."
+            ),
+        ),
+    ]
 
     @model_validator(mode="after")
     def validate_file_metadata(self) -> Self:  # noqa: N804
@@ -90,7 +173,10 @@ class KnowledgeUploadRequestSchema(CamelCaseSchema):
 
 
 class KnowledgeAttachmentUploadRequestSchema(KnowledgeUploadRequestSchema):
-    name: Annotated[RequiredShortText, Field(title="Display name")]
+    name: Annotated[
+        RequiredShortText,
+        Field(title="Display name", description="Human-readable name.", examples=["Project notes"]),
+    ]
 
     async def to_domain_schema(
         self,
@@ -156,7 +242,10 @@ class KnowledgeEditorImageUploadRequestSchema(KnowledgeUploadRequestSchema):
 
 
 class KnowledgeFileUpdateRequestSchema(CamelCaseSchema):
-    name: Annotated[RequiredShortText, Field(title="Display name")]
+    name: Annotated[
+        RequiredShortText,
+        Field(title="Display name", description="Human-readable name.", examples=["Project notes"]),
+    ]
 
     def to_domain_schema(self) -> KnowledgeFileUpdateParams:
         return KnowledgeFileUpdateParams(name=self.name)

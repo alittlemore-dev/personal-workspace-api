@@ -13,10 +13,11 @@ from core.finance.enums import FinanceStatisticsPeriod
 from core.i18n.enums import LanguageEnum
 from core.knowledge.dates.enums import KnowledgeDateListSort
 from core.knowledge.people.enums import PersonListSort
+from entrypoints.litestar.openapi_examples import JSONExample
 
 
 def build_examples(*values: object) -> list[Example]:
-    return [Example(value=value) for value in values]
+    return [JSONExample(value=value) for value in values]
 
 
 def api_query_parameter(  # noqa: PLR0913
@@ -94,7 +95,11 @@ PageQuery: TypeAlias = Annotated[
     api_query_parameter(
         name="page",
         title="Page",
-        description="One-based page number.",
+        description=(
+            "Required one-based page number (minimum 1). No implicit default is "
+            "applied. Supply together with pageSize; missing or invalid values "
+            "return HTTP 400."
+        ),
         examples=(1,),
         ge=1,
         le=None,
@@ -107,7 +112,12 @@ PageSizeQuery: TypeAlias = Annotated[
     api_query_parameter(
         name="pageSize",
         title="Page size",
-        description="Number of items to return per page.",
+        description=(
+            "Required page size from 1 to 100 inclusive. No implicit default is "
+            "applied. Supply together with page; missing or invalid values "
+            "return HTTP 400. totalCount and totalPages describe all matching "
+            "records."
+        ),
         examples=(20,),
         ge=1,
         le=100,

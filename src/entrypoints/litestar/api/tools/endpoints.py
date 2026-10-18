@@ -31,6 +31,7 @@ class ToolsApiController(Controller):
         status_code=status_codes.HTTP_200_OK,
         cache=False,
         opt={"pat_permissions": ("workspace.tools.read",)},
+        summary="Get cache status",
     )
     async def get_cache_status(
         self,
@@ -51,6 +52,7 @@ class ToolsApiController(Controller):
         status_code=status_codes.HTTP_200_OK,
         cache=False,
         opt={"pat_permissions": ("workspace.tools.manage",)},
+        summary="Clear cache",
     )
     async def clear_cache(
         self,
@@ -71,6 +73,7 @@ class ToolsApiController(Controller):
         status_code=status_codes.HTTP_202_ACCEPTED,
         cache=False,
         opt={"pat_permissions": ("workspace.tools.manage",)},
+        summary="Warm cache",
     )
     async def warm_cache(
         self,
@@ -92,7 +95,8 @@ class ToolsApiController(Controller):
         name="tools-cache-warm-operation-api-handler",
         status_code=status_codes.HTTP_200_OK,
         cache=False,
-        opt={"pat_permissions": ("workspace.tools.read",)},
+        opt={"pat_permissions": ("workspace.tools.read",), "error_statuses": (404,)},
+        summary="Get cache warm operation",
     )
     async def get_cache_warm_operation(
         self,

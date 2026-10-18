@@ -47,7 +47,8 @@ class KnowledgeDatesApiController(Controller):
         dependencies={
             "filters": Provide(provide_knowledge_date_filters, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.knowledge.read",)},
+        opt={"pat_permissions": ("workspace.knowledge.read",), "error_statuses": (404,)},
+        summary="List dates",
     )
     async def list_dates(
         self,
@@ -67,7 +68,8 @@ class KnowledgeDatesApiController(Controller):
         name="knowledge-dates-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={"params": Provide(provide_create_date_params)},
-        opt={"pat_permissions": ("workspace.knowledge.create",)},
+        opt={"pat_permissions": ("workspace.knowledge.create",), "error_statuses": (400,)},
+        summary="Create date",
     )
     async def create_date(
         self,
@@ -89,7 +91,8 @@ class KnowledgeDatesApiController(Controller):
         name="knowledge-dates-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_date_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.knowledge.read",)},
+        opt={"pat_permissions": ("workspace.knowledge.read",), "error_statuses": (404,)},
+        summary="Get date",
     )
     async def get_date(
         self,
@@ -111,7 +114,8 @@ class KnowledgeDatesApiController(Controller):
         name="knowledge-dates-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_date_params)},
-        opt={"pat_permissions": ("workspace.knowledge.update",)},
+        opt={"pat_permissions": ("workspace.knowledge.update",), "error_statuses": (400, 404)},
+        summary="Update date",
     )
     async def update_date(
         self,
@@ -133,7 +137,8 @@ class KnowledgeDatesApiController(Controller):
         name="knowledge-dates-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_date_params)},
-        opt={"pat_permissions": ("workspace.knowledge.delete",)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",), "error_statuses": (400, 404)},
+        summary="Delete date",
     )
     async def delete_date(
         self,

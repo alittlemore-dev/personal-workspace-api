@@ -103,6 +103,7 @@ async def provide_update_date_params(
                     "description": "",
                     "tagIds": [],
                     "personIds": [],
+                    "notificationsEnabled": True,
                 },
             ),
         ),

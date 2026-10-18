@@ -12,8 +12,16 @@ from entrypoints.litestar.api.validation import RequiredShortText
 
 
 class EventRecurrenceSchema(CamelCaseSchema):
-    frequency: EventFrequency
-    until_date: date | None
+    frequency: EventFrequency = Field(
+        description="Frequency; allowed values are listed in the referenced enumeration.",
+        examples=["none"],
+    )
+    until_date: date | None = Field(
+        description=(
+            "Last included recurrence date; null for an unbounded recurrence or no recurrence."
+        ),
+        examples=[None],
+    )
 
     def to_domain_schema(self) -> EventRecurrence:
         return EventRecurrence(frequency=self.frequency, until_date=self.until_date)
@@ -24,12 +32,29 @@ class EventRecurrenceSchema(CamelCaseSchema):
 
 
 class EventRequestSchema(CamelCaseSchema):
-    title: RequiredShortText
-    description: Annotated[str, Field(max_length=2000)] = ""
-    all_day: bool
-    start: str
-    end: str
-    recurrence: EventRecurrenceSchema
+    title: RequiredShortText = Field(description="Event title.", examples=["Project planning"])
+    description: Annotated[
+        str,
+        Field(
+            max_length=2000,
+            description="Optional event details, up to 2000 characters.",
+            examples=["Monthly planning session."],
+        ),
+    ] = ""
+    all_day: bool = Field(
+        description=(
+            "True for calendar-date intervals; false for timestamps with explicit UTC offsets."
+        ),
+        examples=[False],
+    )
+    start: str = Field(description="Inclusive interval start.", examples=["2026-10-18T09:00:00Z"])
+    end: str = Field(
+        description="Exclusive interval end; must follow start.",
+        examples=["2026-10-18T10:00:00Z"],
+    )
+    recurrence: EventRecurrenceSchema = Field(
+        description="Recurrence; see the nested schema for its fields.",
+    )
 
     @model_validator(mode="after")
     def validate_event(self) -> Self:  # noqa: N804
@@ -56,13 +81,29 @@ class EventRequestSchema(CamelCaseSchema):
 
 
 class EventResponseSchema(CamelCaseSchema):
-    id: str
-    title: str
-    description: str
-    all_day: bool
-    start: str
-    end: str
-    recurrence: EventRecurrenceSchema
+    id: str = Field(
+        description="Opaque resource identifier; use the value returned by this API.",
+        examples=["4e92d4de561f4bc7a3eed227868952db"],
+    )
+    title: str = Field(description="Event title.", examples=["Project planning"])
+    description: str = Field(
+        description="Optional event details, up to 2000 characters.",
+        examples=["Monthly planning session."],
+    )
+    all_day: bool = Field(
+        description=(
+            "True for calendar-date intervals; false for timestamps with explicit UTC offsets."
+        ),
+        examples=[False],
+    )
+    start: str = Field(description="Inclusive interval start.", examples=["2026-10-18T09:00:00Z"])
+    end: str = Field(
+        description="Exclusive interval end; must follow start.",
+        examples=["2026-10-18T10:00:00Z"],
+    )
+    recurrence: EventRecurrenceSchema = Field(
+        description="Recurrence; see the nested schema for its fields.",
+    )
 
     @classmethod
     def from_domain_schema(
@@ -84,7 +125,7 @@ class EventResponseSchema(CamelCaseSchema):
 
 
 class EventsResponseSchema(CamelCaseSchema):
-    events: list[EventResponseSchema]
+    events: list[EventResponseSchema] = Field(description="Events returned by this operation.")
 
     @classmethod
     def from_domain_schema(

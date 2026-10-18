@@ -49,6 +49,7 @@ class KnowledgeTagsApiController(Controller):
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_list_tags_params, sync_to_thread=False)},
         opt={"pat_permissions": ("workspace.knowledge.read",)},
+        summary="List tags",
     )
     async def list_tags(
         self,
@@ -69,7 +70,8 @@ class KnowledgeTagsApiController(Controller):
         ),
         name="knowledge-tags-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
-        opt={"pat_permissions": ("workspace.knowledge.create",)},
+        opt={"pat_permissions": ("workspace.knowledge.create",), "error_statuses": (400, 409)},
+        summary="Create tag",
     )
     async def create_tag(
         self,
@@ -99,7 +101,8 @@ class KnowledgeTagsApiController(Controller):
         name="knowledge-tags-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_tag_params)},
-        opt={"pat_permissions": ("workspace.knowledge.update",)},
+        opt={"pat_permissions": ("workspace.knowledge.update",), "error_statuses": (400, 404, 409)},
+        summary="Update tag",
     )
     async def update_tag(
         self,
@@ -121,7 +124,8 @@ class KnowledgeTagsApiController(Controller):
         name="knowledge-tags-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_tag_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.knowledge.delete",)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",), "error_statuses": (400, 404, 409)},
+        summary="Delete tag",
     )
     async def delete_tag(
         self,

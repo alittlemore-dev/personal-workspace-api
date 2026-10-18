@@ -83,6 +83,7 @@ async def provide_update_person_params(
                     "birthday": None,
                     "description": "",
                     "tagIds": [],
+                    "notificationsEnabled": True,
                     "relationshipChanges": {
                         "create": [],
                         "update": [],

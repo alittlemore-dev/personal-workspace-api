@@ -25,7 +25,15 @@ TelegramItemId = Annotated[
 
 
 class TelegramLabelRequest(CamelCaseSchema):
-    label: Annotated[str, Field(min_length=1, max_length=100)]
+    label: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=100,
+            description="User-defined label for this invitation or connection.",
+            examples=["Family notifications"],
+        ),
+    ]
 
     @field_validator("label")
     @classmethod
@@ -38,9 +46,18 @@ class TelegramLabelRequest(CamelCaseSchema):
 
 
 class TelegramInvitationResponse(CamelCaseSchema):
-    id: str
-    label: str
-    expires_at: datetime
+    id: str = Field(
+        description="Opaque resource identifier; use the value returned by this API.",
+        examples=["4e92d4de561f4bc7a3eed227868952db"],
+    )
+    label: str = Field(
+        description="User-defined label for this invitation or connection.",
+        examples=["Family notifications"],
+    )
+    expires_at: datetime = Field(
+        description="Expiration timestamp in ISO 8601 format.",
+        examples=["2026-10-19T09:00:00Z"],
+    )
 
     @classmethod
     def from_domain_schema(cls, schema: TelegramInvitation) -> TelegramInvitationResponse:
@@ -48,20 +65,56 @@ class TelegramInvitationResponse(CamelCaseSchema):
 
 
 class TelegramConnectionResponse(CamelCaseSchema):
-    id: str
-    label: str
-    telegram_user_id: int
-    username: str
-    first_name: str
-    state: str
-    requested_at: datetime
-    connected_at: datetime | None
-    last_contact_at: datetime
-    notify_birthday: bool
-    notify_memorable_date: bool
-    notify_finance_transaction: bool
-    notify_finance_limit: bool
-    language: LanguageEnum
+    id: str = Field(
+        description="Opaque resource identifier; use the value returned by this API.",
+        examples=["4e92d4de561f4bc7a3eed227868952db"],
+    )
+    label: str = Field(
+        description="User-defined label for this invitation or connection.",
+        examples=["Family notifications"],
+    )
+    telegram_user_id: int = Field(description="Telegram user identifier.", examples=[123456789])
+    username: str = Field(
+        description="Telegram username, without the @ prefix.",
+        examples=["alex_morgan"],
+    )
+    first_name: str = Field(description="Given name.", examples=["Alex"])
+    state: str = Field(
+        description="Connection lifecycle state: pending, active, revoked, or blocked.",
+        examples=["active"],
+    )
+    requested_at: datetime = Field(
+        description="Time the Telegram connection was requested.",
+        examples=["2026-10-18T09:00:00Z"],
+    )
+    connected_at: datetime | None = Field(
+        description="Time the connection was approved; null until approved.",
+        examples=["2026-10-18T09:05:00Z"],
+    )
+    last_contact_at: datetime = Field(
+        description="Last contact received from this Telegram connection.",
+        examples=["2026-10-18T10:00:00Z"],
+    )
+    notify_birthday: bool = Field(
+        description="Receive birthday notifications through this connection.",
+        examples=[True],
+    )
+    notify_memorable_date: bool = Field(
+        description="Receive memorable date notifications through this connection.",
+        examples=[True],
+    )
+    notify_finance_transaction: bool = Field(
+        description="Receive notifications about finance transactions.",
+        examples=[True],
+    )
+    notify_finance_limit: bool = Field(
+        description="Receive notifications when finance spending limits are exceeded.",
+        examples=[True],
+    )
+    language: LanguageEnum = Field(
+        description="Language; allowed values are listed in the referenced enumeration.",
+        examples=["en"],
+    )
 
     @classmethod
     def from_domain_schema(cls, schema: TelegramConnection) -> TelegramConnectionResponse:
@@ -84,11 +137,26 @@ class TelegramConnectionResponse(CamelCaseSchema):
 
 
 class TelegramConnectionSettingsRequest(CamelCaseSchema):
-    notify_birthday: bool
-    notify_memorable_date: bool
-    notify_finance_transaction: bool
-    notify_finance_limit: bool
-    language: LanguageEnum
+    notify_birthday: bool = Field(
+        description="Receive birthday notifications through this connection.",
+        examples=[True],
+    )
+    notify_memorable_date: bool = Field(
+        description="Receive memorable date notifications through this connection.",
+        examples=[True],
+    )
+    notify_finance_transaction: bool = Field(
+        description="Receive notifications about finance transactions.",
+        examples=[True],
+    )
+    notify_finance_limit: bool = Field(
+        description="Receive notifications when finance spending limits are exceeded.",
+        examples=[True],
+    )
+    language: LanguageEnum = Field(
+        description="Language; allowed values are listed in the referenced enumeration.",
+        examples=["en"],
+    )
 
     def to_domain_schema(self) -> TelegramConnectionSettings:
         return TelegramConnectionSettings(
@@ -101,16 +169,35 @@ class TelegramConnectionSettingsRequest(CamelCaseSchema):
 
 
 class TelegramSettingsResponse(CamelCaseSchema):
-    available: bool
-    status: TelegramRuntimeStatus
-    invitations: list[TelegramInvitationResponse]
-    connections: list[TelegramConnectionResponse]
+    available: bool = Field(
+        description="Whether the Telegram service can currently accept management operations.",
+        examples=[True],
+    )
+    status: TelegramRuntimeStatus = Field(
+        description="Status; allowed values are listed in the referenced enumeration.",
+        examples=["ready"],
+    )
+    invitations: list[TelegramInvitationResponse] = Field(
+        description="Invitations returned by this operation.",
+    )
+    connections: list[TelegramConnectionResponse] = Field(
+        description="Connections returned by this operation.",
+    )
 
 
 class TelegramRuntimeStatusResponse(CamelCaseSchema):
-    status: TelegramRuntimeStatus
+    status: TelegramRuntimeStatus = Field(
+        description="Status; allowed values are listed in the referenced enumeration.",
+        examples=["ready"],
+    )
 
 
 class TelegramIssuedInvitationResponse(CamelCaseSchema):
-    url: str
-    expires_at: datetime
+    url: str = Field(
+        description="Telegram bot deep link. Treat the invitation token as a secret.",
+        examples=["https://t.me/example_bot?start=example-invitation-token"],
+    )
+    expires_at: datetime = Field(
+        description="Expiration timestamp in ISO 8601 format.",
+        examples=["2026-10-19T09:00:00Z"],
+    )

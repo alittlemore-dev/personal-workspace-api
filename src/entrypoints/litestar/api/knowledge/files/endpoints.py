@@ -29,7 +29,10 @@ from entrypoints.litestar.api.knowledge.files.dependencies import (
     provide_upload_editor_image_params,
 )
 from entrypoints.litestar.api.knowledge.files.post_commit import register_knowledge_object_cleanup
-from entrypoints.litestar.api.knowledge.files.responses import build_knowledge_file_content_response
+from entrypoints.litestar.api.knowledge.files.responses import (
+    KNOWLEDGE_CONTENT_OPENAPI_RESPONSE,
+    build_knowledge_file_content_response,
+)
 from entrypoints.litestar.api.knowledge.files.schemas import (
     KnowledgeAttachmentUploadRequestSchema,
     KnowledgeEditorImageUploadRequestSchema,
@@ -62,7 +65,12 @@ class KnowledgeFilesApiController(Controller):
         dependencies={
             "params": Provide(provide_replace_person_photo_params),
         },
-        opt={"pat_permissions": ("workspace.knowledge.update",)},
+        opt={
+            "pat_permissions": ("workspace.knowledge.update",),
+            "error_statuses": (400, 404, 413),
+            "upload_media_types": ("image/jpeg", "image/png", "image/webp"),
+        },
+        summary="Replace person photo",
     )
     async def replace_person_photo(
         self,
@@ -101,7 +109,8 @@ class KnowledgeFilesApiController(Controller):
         name="knowledge-person-photo-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_person_photo_params)},
-        opt={"pat_permissions": ("workspace.knowledge.delete",)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",), "error_statuses": (400, 404)},
+        summary="Delete person photo",
     )
     async def delete_person_photo(
         self,
@@ -131,7 +140,12 @@ class KnowledgeFilesApiController(Controller):
         dependencies={
             "params": Provide(provide_upload_attachment_params),
         },
-        opt={"pat_permissions": ("workspace.knowledge.create",)},
+        opt={
+            "pat_permissions": ("workspace.knowledge.create",),
+            "error_statuses": (400, 404, 413),
+            "upload_media_types": ("*/*",),
+        },
+        summary="Upload attachment",
     )
     async def upload_attachment(
         self,
@@ -165,7 +179,12 @@ class KnowledgeFilesApiController(Controller):
         dependencies={
             "params": Provide(provide_upload_editor_image_params),
         },
-        opt={"pat_permissions": ("workspace.knowledge.create",)},
+        opt={
+            "pat_permissions": ("workspace.knowledge.create",),
+            "error_statuses": (400, 404, 413),
+            "upload_media_types": ("image/jpeg", "image/png", "image/webp"),
+        },
+        summary="Upload editor image",
     )
     async def upload_editor_image(
         self,
@@ -195,7 +214,8 @@ class KnowledgeFilesApiController(Controller):
         name="knowledge-attachment-rename-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_rename_attachment_params)},
-        opt={"pat_permissions": ("workspace.knowledge.update",)},
+        opt={"pat_permissions": ("workspace.knowledge.update",), "error_statuses": (400, 404)},
+        summary="Rename attachment",
     )
     async def rename_attachment(
         self,
@@ -217,7 +237,8 @@ class KnowledgeFilesApiController(Controller):
         name="knowledge-attachment-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_attachment_params)},
-        opt={"pat_permissions": ("workspace.knowledge.delete",)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",), "error_statuses": (400, 404)},
+        summary="Delete attachment",
     )
     async def delete_attachment(
         self,
@@ -244,7 +265,12 @@ class KnowledgeFilesApiController(Controller):
         name="knowledge-file-content-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_file_content_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.knowledge.read",)},
+        opt={
+            "pat_permissions": ("workspace.knowledge.read",),
+            "binary_response": KNOWLEDGE_CONTENT_OPENAPI_RESPONSE,
+            "error_statuses": (404,),
+        },
+        summary="Get file content",
     )
     async def get_file_content(
         self,

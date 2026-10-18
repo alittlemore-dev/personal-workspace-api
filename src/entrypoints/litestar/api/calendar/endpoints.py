@@ -41,6 +41,7 @@ class CalendarApiController(Controller):
         cache=False,
         dependencies={"params": Provide(provide_get_calendar_params, sync_to_thread=False)},
         opt={"pat_permissions": ("workspace.calendar.read",)},
+        summary="Get calendar",
     )
     async def get_calendar(
         self,
@@ -61,7 +62,13 @@ class CalendarApiController(Controller):
             "params": Provide(provide_get_occurrences_params, sync_to_thread=False),
         },
         opt={"pat_permissions": ("workspace.calendar.read",)},
-        description=("Personal API token permissions: workspace.calendar.read."),
+        description=(
+            "Expand private events, birthdays, and memorable dates over [startDate, endDate). "
+            "Both dates are required; endDate must follow startDate and the range must not "
+            "exceed 420 days. Unplaced annual entries are returned separately.\n\n"
+            "Personal API token permissions: workspace.calendar.read."
+        ),
+        summary="Get occurrences",
     )
     async def get_occurrences(
         self,

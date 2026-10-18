@@ -7,7 +7,10 @@ from entrypoints.litestar.api.schemas import CamelCaseSchema
 
 
 class WikiLinkTargetsResponseSchema(CamelCaseSchema):
-    targets: Annotated[tuple[()], Field(title="Targets")]
+    targets: Annotated[
+        tuple[()],
+        Field(title="Targets", description="Targets returned by this operation."),
+    ]
 
     @classmethod
     def from_domain_schema(cls, *, schema: WikiLinkTargets) -> Self:

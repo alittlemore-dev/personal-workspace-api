@@ -1,3 +1,4 @@
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from backend_sdk import Principal
@@ -17,11 +18,30 @@ from core.events.schemas import (
     UpdateEventParams,
 )
 from entrypoints.litestar.api.events.schemas import EventRequestSchema
-from entrypoints.litestar.api.parameters import EventIdPath
+from entrypoints.litestar.api.parameters import EventIdPath, api_json_body
 
 
 def provide_create_event_params(
-    data: EventRequestSchema,
+    data: Annotated[
+        EventRequestSchema,
+        api_json_body(
+            title="Event payload",
+            description=(
+                "Complete event. Timed events require explicit UTC offsets; all-day "
+                "events use YYYY-MM-DD. The end is exclusive."
+            ),
+            examples=(
+                {
+                    "title": "Project planning",
+                    "description": "Monthly planning session.",
+                    "allDay": False,
+                    "start": "2026-10-18T09:00:00Z",
+                    "end": "2026-10-18T10:00:00Z",
+                    "recurrence": {"frequency": "none", "untilDate": None},
+                },
+            ),
+        ),
+    ],
     request: Request[Principal, AuthContext, State],
     account_time_zone: NamedDependency[ZoneInfo],
 ) -> CreateEventParams:
@@ -47,7 +67,26 @@ def provide_get_event_params(
 
 def provide_update_event_params(
     event_id: EventIdPath,
-    data: EventRequestSchema,
+    data: Annotated[
+        EventRequestSchema,
+        api_json_body(
+            title="Event payload",
+            description=(
+                "Complete event. Timed events require explicit UTC offsets; all-day "
+                "events use YYYY-MM-DD. The end is exclusive."
+            ),
+            examples=(
+                {
+                    "title": "Project planning",
+                    "description": "Monthly planning session.",
+                    "allDay": False,
+                    "start": "2026-10-18T09:00:00Z",
+                    "end": "2026-10-18T10:00:00Z",
+                    "recurrence": {"frequency": "none", "untilDate": None},
+                },
+            ),
+        ),
+    ],
     request: Request[Principal, AuthContext, State],
     account_time_zone: NamedDependency[ZoneInfo],
 ) -> UpdateEventParams:

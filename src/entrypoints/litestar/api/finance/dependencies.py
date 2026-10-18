@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Annotated
 
 from backend_sdk import Principal
 from backend_sdk.integrations.litestar import AuthContext
@@ -57,6 +58,7 @@ from entrypoints.litestar.api.parameters import (
     FinanceTransactionIdPath,
     FinanceVersionQuery,
     FinanceYearPath,
+    api_json_body,
 )
 
 
@@ -70,7 +72,14 @@ async def provide_finance_context(
 
 @inject
 async def provide_ensure_month_params(
-    data: EnsureFinanceMonthRequest,
+    data: Annotated[
+        EnsureFinanceMonthRequest,
+        api_json_body(
+            title="Initialize finance month",
+            description=("Language for the initial month currency and category names."),
+            examples=({"language": "en"},),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
     time_zone_reader: FromDishka[AccountTimeZoneReader],
 ) -> EnsureFinanceMonthParams:
@@ -83,7 +92,14 @@ async def provide_ensure_month_params(
 
 
 def provide_opening_balance_params(
-    data: OpeningBalanceRequest,
+    data: Annotated[
+        OpeningBalanceRequest,
+        api_json_body(
+            title="Opening balance replacement",
+            description=("New opening balance in the month currency."),
+            examples=({"amount": "20000.00"},),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> UpdateOpeningBalanceParams:
     return UpdateOpeningBalanceParams(
@@ -94,7 +110,14 @@ def provide_opening_balance_params(
 
 
 def provide_currency_change_params(
-    data: ChangeMonthCurrencyRequest,
+    data: Annotated[
+        ChangeMonthCurrencyRequest,
+        api_json_body(
+            title="Month currency change",
+            description=("Supported currency to use for this finance month."),
+            examples=({"currency": "RUB"},),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> ChangeFinanceCurrencyParams:
     return ChangeFinanceCurrencyParams(
@@ -105,7 +128,14 @@ def provide_currency_change_params(
 
 
 def provide_create_category_params(
-    data: CreateFinanceCategoryRequest,
+    data: Annotated[
+        CreateFinanceCategoryRequest,
+        api_json_body(
+            title="Create finance category",
+            description=("Income or expense category with an optional plan."),
+            examples=({"kind": "expense", "name": "Groceries", "plannedAmount": "15000.00"},),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> CreateFinanceCategoryParams:
     return CreateFinanceCategoryParams(
@@ -119,7 +149,14 @@ def provide_create_category_params(
 
 def provide_update_category_params(
     category_id: FinanceCategoryIdPath,
-    data: UpdateFinanceCategoryRequest,
+    data: Annotated[
+        UpdateFinanceCategoryRequest,
+        api_json_body(
+            title="Replace finance category",
+            description=("Complete editable category fields, including its display position."),
+            examples=({"name": "Groceries", "plannedAmount": "15000.00", "position": 0},),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> UpdateFinanceCategoryParams:
     return UpdateFinanceCategoryParams(
@@ -179,7 +216,25 @@ def provide_list_transactions_params(
 
 
 def provide_create_transaction_params(
-    data: FinanceTransactionRequest,
+    data: Annotated[
+        FinanceTransactionRequest,
+        api_json_body(
+            title="Create finance transaction",
+            description=(
+                "Positive amount, supported currency, category in this month, and "
+                "occurrence timestamp."
+            ),
+            examples=(
+                {
+                    "categoryId": "4e92d4de561f4bc7a3eed227868952db",
+                    "amount": "1250.50",
+                    "currency": "RUB",
+                    "occurredAt": "2026-10-18T09:00:00Z",
+                    "description": "Weekly groceries",
+                },
+            ),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> CreateFinanceTransactionParams:
     return CreateFinanceTransactionParams(
@@ -193,7 +248,25 @@ def provide_create_transaction_params(
 
 def provide_update_transaction_params(
     transaction_id: FinanceTransactionIdPath,
-    data: FinanceTransactionUpdateRequest,
+    data: Annotated[
+        FinanceTransactionUpdateRequest,
+        api_json_body(
+            title="Replace finance transaction",
+            description=(
+                "Complete transaction fields and the latest optimistic concurrency version."
+            ),
+            examples=(
+                {
+                    "categoryId": "4e92d4de561f4bc7a3eed227868952db",
+                    "amount": "1300.00",
+                    "currency": "RUB",
+                    "occurredAt": "2026-10-18T09:00:00Z",
+                    "description": "Corrected grocery receipt",
+                    "version": 2,
+                },
+            ),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> UpdateFinanceTransactionParams:
     return UpdateFinanceTransactionParams(
@@ -223,7 +296,16 @@ def provide_delete_transaction_params(
 
 def provide_restore_transaction_params(
     transaction_id: FinanceTransactionIdPath,
-    data: FinanceVersionRequest,
+    data: Annotated[
+        FinanceVersionRequest,
+        api_json_body(
+            title="Transaction version",
+            description=(
+                "Latest version returned for this transaction; stale versions produce HTTP 409."
+            ),
+            examples=({"version": 2},),
+        ),
+    ],
     month_context: NamedDependency[FinanceMonthParams],
 ) -> SetFinanceTransactionDeletedParams:
     return SetFinanceTransactionDeletedParams(
@@ -313,7 +395,25 @@ def provide_statistics_params(
 
 
 def provide_historical_create_transaction_params(
-    data: FinanceTransactionRequest,
+    data: Annotated[
+        FinanceTransactionRequest,
+        api_json_body(
+            title="Create finance transaction",
+            description=(
+                "Positive amount, supported currency, category in this month, and "
+                "occurrence timestamp."
+            ),
+            examples=(
+                {
+                    "categoryId": "4e92d4de561f4bc7a3eed227868952db",
+                    "amount": "1250.50",
+                    "currency": "RUB",
+                    "occurredAt": "2026-10-18T09:00:00Z",
+                    "description": "Weekly groceries",
+                },
+            ),
+        ),
+    ],
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
 ) -> CreateFinanceTransactionParams:
     return CreateFinanceTransactionParams(
@@ -327,7 +427,25 @@ def provide_historical_create_transaction_params(
 
 def provide_historical_update_transaction_params(
     transaction_id: FinanceTransactionIdPath,
-    data: FinanceTransactionUpdateRequest,
+    data: Annotated[
+        FinanceTransactionUpdateRequest,
+        api_json_body(
+            title="Replace finance transaction",
+            description=(
+                "Complete transaction fields and the latest optimistic concurrency version."
+            ),
+            examples=(
+                {
+                    "categoryId": "4e92d4de561f4bc7a3eed227868952db",
+                    "amount": "1300.00",
+                    "currency": "RUB",
+                    "occurredAt": "2026-10-18T09:00:00Z",
+                    "description": "Corrected grocery receipt",
+                    "version": 2,
+                },
+            ),
+        ),
+    ],
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
 ) -> UpdateFinanceTransactionParams:
     return UpdateFinanceTransactionParams(
@@ -357,7 +475,16 @@ def provide_historical_delete_transaction_params(
 
 def provide_historical_restore_transaction_params(
     transaction_id: FinanceTransactionIdPath,
-    data: FinanceVersionRequest,
+    data: Annotated[
+        FinanceVersionRequest,
+        api_json_body(
+            title="Transaction version",
+            description=(
+                "Latest version returned for this transaction; stale versions produce HTTP 409."
+            ),
+            examples=({"version": 2},),
+        ),
+    ],
     historical_context: NamedDependency[FinanceHistoricalMonthParams],
 ) -> SetFinanceTransactionDeletedParams:
     return SetFinanceTransactionDeletedParams(

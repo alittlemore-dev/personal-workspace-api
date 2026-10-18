@@ -1,9 +1,12 @@
 from urllib.parse import quote
 
+from litestar.openapi.spec import OpenAPIHeader, Schema
+from litestar.openapi.spec.enums import OpenAPIType
 from litestar.response import Stream
 
 from core.knowledge.files.enums import KnowledgeFileKind, KnowledgeFileProcessing
 from core.knowledge.files.schemas import KnowledgeFileContent
+from entrypoints.litestar.openapi_responses import BinaryResponseMetadata
 from infra.config.constants import constants
 
 
@@ -40,3 +43,40 @@ def build_knowledge_file_content_response(*, result: KnowledgeFileContent) -> St
             ),
         },
     )
+
+
+KNOWLEDGE_CONTENT_OPENAPI_RESPONSE = BinaryResponseMetadata(
+    media_types=("image/webp", "application/octet-stream"),
+    description=(
+        "Normalized raster images are returned inline as image/webp. All other attachments "
+        "are downloaded as application/octet-stream, regardless of their stored mimeType. "
+        "Content-Disposition supplies an ASCII filename and a UTF-8 filename* for attachments. "
+        "Only the author may read the file."
+    ),
+    headers={
+        "Content-Disposition": OpenAPIHeader(
+            description="inline for normalized WebP images; attachment for other files.",
+            schema=Schema(
+                type=OpenAPIType.STRING,
+                examples=[
+                    'inline; filename="image.webp"',
+                    (
+                        'attachment; filename="project-notes.pdf"; '
+                        "filename*=UTF-8''project-notes.pdf"
+                    ),
+                ],
+            ),
+        ),
+        "Cache-Control": OpenAPIHeader(
+            description="Private content must not be stored in caches.",
+            schema=Schema(
+                type=OpenAPIType.STRING,
+                examples=[constants.knowledge_files.no_store_header_value],
+            ),
+        ),
+        "X-Content-Type-Options": OpenAPIHeader(
+            description="Disable MIME sniffing for uploaded content.",
+            schema=Schema(type=OpenAPIType.STRING, examples=["nosniff"]),
+        ),
+    },
+)

@@ -42,7 +42,12 @@ class ImportantInfoApiController(Controller):
         "",
         status_code=status_codes.HTTP_200_OK,
         opt={"pat_permissions": ("workspace.important_info.read",)},
-        description=("Personal API token permissions: workspace.important_info.read."),
+        description=(
+            "Return the authenticated user’s single-line notes in display order. "
+            "This list is not paginated.\n\nPersonal API token permissions: "
+            "workspace.important_info.read."
+        ),
+        summary="List items",
     )
     async def list_items(
         self,
@@ -60,7 +65,12 @@ class ImportantInfoApiController(Controller):
             "params": Provide(provide_create_item_params, sync_to_thread=False),
         },
         opt={"pat_permissions": ("workspace.important_info.create",)},
-        description=("Personal API token permissions: workspace.important_info.create."),
+        description=(
+            "Append a private single-line note. The text is limited to 255 "
+            "characters.\n\nPersonal API token permissions: "
+            "workspace.important_info.create."
+        ),
+        summary="Create item",
     )
     async def create_item(
         self,
@@ -79,8 +89,14 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_set_order_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.important_info.update",)},
-        description=("Personal API token permissions: workspace.important_info.update."),
+        opt={"pat_permissions": ("workspace.important_info.update",), "error_statuses": (400,)},
+        description=(
+            "Replace note display order. Send every current note identifier "
+            "exactly once; omitted, duplicate, or foreign identifiers return "
+            "400.\n\nPersonal API token permissions: "
+            "workspace.important_info.update."
+        ),
+        summary="Set order",
     )
     async def set_order(
         self,
@@ -99,8 +115,12 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_update_item_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.important_info.update",)},
-        description=("Personal API token permissions: workspace.important_info.update."),
+        opt={"pat_permissions": ("workspace.important_info.update",), "error_statuses": (400, 404)},
+        description=(
+            "Replace the text of one private note.\n\nPersonal API token "
+            "permissions: workspace.important_info.update."
+        ),
+        summary="Update item",
     )
     async def update_item(
         self,
@@ -119,8 +139,13 @@ class ImportantInfoApiController(Controller):
         dependencies={
             "params": Provide(provide_delete_item_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.important_info.delete",)},
-        description=("Personal API token permissions: workspace.important_info.delete."),
+        opt={"pat_permissions": ("workspace.important_info.delete",), "error_statuses": (404,)},
+        description=(
+            "Delete a private note and return 204 with no response "
+            "body.\n\nPersonal API token permissions: "
+            "workspace.important_info.delete."
+        ),
+        summary="Delete item",
     )
     async def delete_item(
         self,

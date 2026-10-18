@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Annotated
 
 from backend_sdk import Principal
 from backend_sdk.integrations.litestar import AuthContext
@@ -17,6 +18,7 @@ from core.telegram.schemas import (
     RenameTelegramConnectionParams,
     SetTelegramConnectionSettingsParams,
 )
+from entrypoints.litestar.api.parameters import api_json_body
 from entrypoints.litestar.api.telegram.schemas import (
     TelegramConnectionSettingsRequest,
     TelegramItemId,
@@ -37,7 +39,14 @@ async def provide_get_settings_params(
 
 @inject
 async def provide_create_invitation_params(
-    data: TelegramLabelRequest,
+    data: Annotated[
+        TelegramLabelRequest,
+        api_json_body(
+            title="Telegram connection label",
+            description=("User-defined, nonblank label of up to 100 characters."),
+            examples=({"label": "Family notifications"},),
+        ),
+    ],
     request: Request[Principal, AuthContext, State],
     current_datetime: FromDishka[datetime],
 ) -> CreateTelegramInvitationParams:
@@ -118,7 +127,14 @@ async def provide_unblock_connection_params(
 
 def provide_rename_connection_params(
     connection_id: TelegramItemId,
-    data: TelegramLabelRequest,
+    data: Annotated[
+        TelegramLabelRequest,
+        api_json_body(
+            title="Telegram connection label",
+            description=("User-defined, nonblank label of up to 100 characters."),
+            examples=({"label": "Family notifications"},),
+        ),
+    ],
     request: Request[Principal, AuthContext, State],
 ) -> RenameTelegramConnectionParams:
     return RenameTelegramConnectionParams(
@@ -130,7 +146,24 @@ def provide_rename_connection_params(
 
 def provide_update_connection_settings_params(
     connection_id: TelegramItemId,
-    data: TelegramConnectionSettingsRequest,
+    data: Annotated[
+        TelegramConnectionSettingsRequest,
+        api_json_body(
+            title="Telegram notification settings",
+            description=(
+                "Complete replacement of notification flags and the language for this connection."
+            ),
+            examples=(
+                {
+                    "notifyBirthday": True,
+                    "notifyMemorableDate": True,
+                    "notifyFinanceTransaction": True,
+                    "notifyFinanceLimit": True,
+                    "language": "en",
+                },
+            ),
+        ),
+    ],
     request: Request[Principal, AuthContext, State],
 ) -> SetTelegramConnectionSettingsParams:
     return SetTelegramConnectionSettingsParams(

@@ -64,7 +64,10 @@ async def provide_upload_photo_params(
         ResumePhotoUploadRequestSchema,
         api_multipart_body(
             title="Resume photo upload",
-            description="JPEG resume photo.",
+            description=(
+                "JPEG resume photo up to 256 KiB, with maximum dimensions 800 × 800 "
+                "pixels. Send the bytes in the file part."
+            ),
             examples=({"file": "photo.jpg"},),
         ),
     ],
@@ -119,12 +122,15 @@ async def provide_update_resume_params(
                         },
                         "profile": {
                             "fullName": "Dmitriy Lunev",
-                            "headline": "Backend Engineer",
+                            "role": "Backend Engineer",
+                            "photoFileId": "",
                             "location": "Moscow",
                             "email": "example@mail.ru",
                             "phone": "",
                             "telegram": "@alm_dmitriy_dev",
-                            "website": "https://example.com",
+                            "websiteUrl": "https://alex.example.com",
+                            "linkedinUrl": "https://www.linkedin.com/in/alex-morgan",
+                            "githubUrl": "https://github.com/alex-morgan",
                         },
                         "summary": {"text": "Builds reliable backend systems."},
                         "skills": [],
@@ -170,12 +176,15 @@ def provide_export_resume_params(
                         },
                         "profile": {
                             "fullName": "Dmitriy Lunev",
-                            "headline": "Backend Engineer",
+                            "role": "Backend Engineer",
+                            "photoFileId": "",
                             "location": "Moscow",
                             "email": "example@mail.ru",
                             "phone": "",
                             "telegram": "@alm_dmitriy_dev",
-                            "website": "https://example.com",
+                            "websiteUrl": "https://alex.example.com",
+                            "linkedinUrl": "https://www.linkedin.com/in/alex-morgan",
+                            "githubUrl": "https://github.com/alex-morgan",
                         },
                         "summary": {"text": "Builds reliable backend systems."},
                         "skills": [],

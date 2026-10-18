@@ -61,7 +61,8 @@ class PeopleApiController(Controller):
         name="knowledge-people-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"filters": Provide(provide_person_filters, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.knowledge.read",)},
+        opt={"pat_permissions": ("workspace.knowledge.read",), "error_statuses": (404,)},
+        summary="List people",
     )
     async def list_people(
         self,
@@ -80,7 +81,8 @@ class PeopleApiController(Controller):
         ),
         name="knowledge-people-create-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
-        opt={"pat_permissions": ("workspace.knowledge.create",)},
+        opt={"pat_permissions": ("workspace.knowledge.create",), "error_statuses": (400, 409)},
+        summary="Create person",
     )
     async def create_person(
         self,
@@ -110,7 +112,8 @@ class PeopleApiController(Controller):
         name="knowledge-people-detail-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_get_person_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.knowledge.read",)},
+        opt={"pat_permissions": ("workspace.knowledge.read",), "error_statuses": (404,)},
+        summary="Get person",
     )
     async def get_person(
         self,
@@ -133,7 +136,8 @@ class PeopleApiController(Controller):
         name="knowledge-people-update-api-handler",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_person_params)},
-        opt={"pat_permissions": ("workspace.knowledge.update",)},
+        opt={"pat_permissions": ("workspace.knowledge.update",), "error_statuses": (400, 404, 409)},
+        summary="Update person",
     )
     async def update_person(
         self,
@@ -155,7 +159,8 @@ class PeopleApiController(Controller):
         name="knowledge-people-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_delete_person_params)},
-        opt={"pat_permissions": ("workspace.knowledge.delete",)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",), "error_statuses": (400, 404, 409)},
+        summary="Delete person",
     )
     async def delete_person(
         self,
@@ -182,6 +187,7 @@ class PeopleApiController(Controller):
         name="knowledge-relationship-types-list-api-handler",
         status_code=status_codes.HTTP_200_OK,
         opt={"pat_permissions": ("workspace.knowledge.read",)},
+        summary="List relationship types",
     )
     async def list_relationship_types(
         self,
@@ -205,7 +211,8 @@ class PeopleApiController(Controller):
         dependencies={
             "params": Provide(provide_create_relationship_type_params),
         },
-        opt={"pat_permissions": ("workspace.knowledge.create",)},
+        opt={"pat_permissions": ("workspace.knowledge.create",), "error_statuses": (400, 409)},
+        summary="Create relationship type",
     )
     async def create_relationship_type(
         self,
@@ -229,7 +236,8 @@ class PeopleApiController(Controller):
         dependencies={
             "params": Provide(provide_update_relationship_type_params),
         },
-        opt={"pat_permissions": ("workspace.knowledge.update",)},
+        opt={"pat_permissions": ("workspace.knowledge.update",), "error_statuses": (400, 404, 409)},
+        summary="Update relationship type",
     )
     async def update_relationship_type(
         self,
@@ -253,7 +261,8 @@ class PeopleApiController(Controller):
         dependencies={
             "params": Provide(provide_delete_relationship_type_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.knowledge.delete",)},
+        opt={"pat_permissions": ("workspace.knowledge.delete",), "error_statuses": (400, 404, 409)},
+        summary="Delete relationship type",
     )
     async def delete_relationship_type(
         self,

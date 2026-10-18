@@ -199,6 +199,10 @@ files at the project root. Shared runtime and deployment infrastructure belongs 
 
 ## HTTP and Schemas
 
+- Keep OpenAPI synchronized with HTTP contract changes. Document operation intent, authorization,
+  required and nullable inputs, constraints, pagination, actual MIME types, applicable errors, and
+  realistic schema-valid examples. Verify generated schemas and relevant HTTP behavior through
+  Make-backed checks.
 - Name Litestar route modules `endpoints.py`. Keep only `Controller` classes, route handlers, and
   router registration in them; place transport schemas in `schemas.py`, access checks in
   `guards.py`, and request dependencies in `dependencies.py`. Use controllers for ordinary HTTP

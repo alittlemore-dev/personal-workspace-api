@@ -61,8 +61,14 @@ class TelegramApiController(Controller):
         dependencies={
             "params": Provide(provide_get_settings_params),
         },
-        opt={"pat_permissions": ("workspace.telegram.read",)},
-        description=("Personal API token permissions: workspace.telegram.read."),
+        opt={"pat_permissions": ("workspace.telegram.read",), "error_statuses": (400, 503)},
+        description=(
+            "Return active invitations, Telegram connections, notification "
+            "preferences, and bot runtime status for the authenticated account. "
+            "Requires the bot to be ready.\n\nPersonal API token permissions: "
+            "workspace.telegram.read."
+        ),
+        summary="Get settings",
     )
     async def get_settings(
         self,
@@ -91,8 +97,14 @@ class TelegramApiController(Controller):
         name="telegram-issue-invitation",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={"params": Provide(provide_create_invitation_params)},
-        opt={"pat_permissions": ("workspace.telegram.create",)},
-        description=("Personal API token permissions: workspace.telegram.create."),
+        opt={"pat_permissions": ("workspace.telegram.create",), "error_statuses": (400, 503)},
+        description=(
+            "Issue an expiring Telegram bot deep link. Send a nonblank label and "
+            "treat the returned invitation URL as a secret. Issuing invitations "
+            "is subject to service limits.\n\nPersonal API token permissions: "
+            "workspace.telegram.create."
+        ),
+        summary="Create invitation",
     )
     async def create_invitation(
         self,
@@ -109,8 +121,13 @@ class TelegramApiController(Controller):
         name="telegram-cancel-invitation",
         status_code=status_codes.HTTP_204_NO_CONTENT,
         dependencies={"params": Provide(provide_cancel_invitation_params)},
-        opt={"pat_permissions": ("workspace.telegram.delete",)},
-        description=("Personal API token permissions: workspace.telegram.delete."),
+        opt={"pat_permissions": ("workspace.telegram.delete",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Cancel an unused invitation owned by the authenticated account. "
+            "Returns 204 with no response body.\n\nPersonal API token permissions: "
+            "workspace.telegram.delete."
+        ),
+        summary="Cancel invitation",
     )
     async def cancel_invitation(
         self,
@@ -126,8 +143,12 @@ class TelegramApiController(Controller):
         name="telegram-approve-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_approve_connection_params)},
-        opt={"pat_permissions": ("workspace.telegram.update",)},
-        description=("Personal API token permissions: workspace.telegram.update."),
+        opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Approve a pending Telegram connection owned by the authenticated "
+            "account.\n\nPersonal API token permissions: workspace.telegram.update."
+        ),
+        summary="Approve connection",
     )
     async def approve_connection(
         self,
@@ -145,8 +166,13 @@ class TelegramApiController(Controller):
         name="telegram-revoke-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_revoke_connection_params)},
-        opt={"pat_permissions": ("workspace.telegram.update",)},
-        description=("Personal API token permissions: workspace.telegram.update."),
+        opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Revoke an owned Telegram connection so it can no longer receive "
+            "account notifications.\n\nPersonal API token permissions: "
+            "workspace.telegram.update."
+        ),
+        summary="Revoke connection",
     )
     async def revoke_connection(
         self,
@@ -164,8 +190,12 @@ class TelegramApiController(Controller):
         name="telegram-block-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_block_connection_params)},
-        opt={"pat_permissions": ("workspace.telegram.update",)},
-        description=("Personal API token permissions: workspace.telegram.update."),
+        opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Block an owned Telegram connection.\n\nPersonal API token "
+            "permissions: workspace.telegram.update."
+        ),
+        summary="Block connection",
     )
     async def block_connection(
         self,
@@ -183,8 +213,13 @@ class TelegramApiController(Controller):
         name="telegram-unblock-connection",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_unblock_connection_params)},
-        opt={"pat_permissions": ("workspace.telegram.update",)},
-        description=("Personal API token permissions: workspace.telegram.update."),
+        opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Unblock an owned Telegram connection according to its current "
+            "lifecycle state.\n\nPersonal API token permissions: "
+            "workspace.telegram.update."
+        ),
+        summary="Unblock connection",
     )
     async def unblock_connection(
         self,
@@ -203,8 +238,13 @@ class TelegramApiController(Controller):
         dependencies={
             "params": Provide(provide_rename_connection_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.telegram.update",)},
-        description=("Personal API token permissions: workspace.telegram.update."),
+        opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Replace the display label of an owned Telegram connection. The "
+            "label must contain non-whitespace characters.\n\nPersonal API token "
+            "permissions: workspace.telegram.update."
+        ),
+        summary="Rename connection",
     )
     async def rename_connection(
         self,
@@ -223,8 +263,14 @@ class TelegramApiController(Controller):
         dependencies={
             "params": Provide(provide_update_connection_settings_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.telegram.update",)},
-        description=("Personal API token permissions: workspace.telegram.update."),
+        opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Replace all notification flags and the language of an owned "
+            "Telegram connection. Every field in the settings body is "
+            "required.\n\nPersonal API token permissions: "
+            "workspace.telegram.update."
+        ),
+        summary="Update connection settings",
     )
     async def update_connection_settings(
         self,
@@ -274,6 +320,7 @@ class TelegramRuntimeController(Controller):
     @get(
         "/status",
         name="internal-telegram-runtime-status",
+        summary="Get status",
     )
     async def get_status(self, request: Request) -> TelegramRuntimeStatusResponse:
         return TelegramRuntimeStatusResponse(status=await get_runtime_status(request))

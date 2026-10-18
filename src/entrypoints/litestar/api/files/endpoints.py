@@ -33,7 +33,8 @@ class FilesApiController(Controller):
         ),
         name="files-upload-api-handler",
         status_code=status_codes.HTTP_201_CREATED,
-        opt={"pat_permissions": ("workspace.files.create",)},
+        opt={"pat_permissions": ("workspace.files.create",), "error_statuses": (400,)},
+        summary="Upload file",
     )
     async def upload_file(
         self,
@@ -77,6 +78,7 @@ class FilesApiController(Controller):
         ),
         name="files-list-api-handler",
         opt={"pat_permissions": ("workspace.files.read",)},
+        summary="List files",
     )
     async def list_files(
         self,
@@ -93,7 +95,8 @@ class FilesApiController(Controller):
             "Get managed file metadata.\n\nPersonal API token permissions: workspace.files.read."
         ),
         name="files-detail-api-handler",
-        opt={"pat_permissions": ("workspace.files.read",)},
+        opt={"pat_permissions": ("workspace.files.read",), "error_statuses": (404,)},
+        summary="Get file",
     )
     async def get_file(
         self,
@@ -111,7 +114,8 @@ class FilesApiController(Controller):
             "workspace.files.update."
         ),
         name="files-update-api-handler",
-        opt={"pat_permissions": ("workspace.files.update",)},
+        opt={"pat_permissions": ("workspace.files.update",), "error_statuses": (400, 404)},
+        summary="Update file",
     )
     async def update_file(
         self,
@@ -142,7 +146,8 @@ class FilesApiController(Controller):
         ),
         name="files-delete-api-handler",
         status_code=status_codes.HTTP_204_NO_CONTENT,
-        opt={"pat_permissions": ("workspace.files.delete",)},
+        opt={"pat_permissions": ("workspace.files.delete",), "error_statuses": (400, 404)},
+        summary="Delete file",
     )
     async def delete_file(
         self,

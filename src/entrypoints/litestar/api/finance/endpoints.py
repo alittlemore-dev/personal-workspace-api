@@ -72,8 +72,14 @@ class FinanceApiController(Controller):
         "/current-month/ensure",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_ensure_month_params)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={"pat_permissions": ("workspace.finance.update",), "error_statuses": (400, 503)},
+        description=(
+            "Initialize the current finance month if needed and return it. The "
+            "account time zone defines month boundaries; language selects the "
+            "initial currency and category labels.\n\nPersonal API token "
+            "permissions: workspace.finance.update."
+        ),
+        summary="Ensure month",
     )
     async def ensure_month(
         self,
@@ -85,8 +91,14 @@ class FinanceApiController(Controller):
     @get(
         "/current-month",
         status_code=status_codes.HTTP_200_OK,
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": (404,)},
+        description=(
+            "Return the current finance month, its opening and closing balances, "
+            "and categories. The month must first be initialized with POST "
+            "/api/finance/current-month/ensure.\n\nPersonal API token permissions: "
+            "workspace.finance.read."
+        ),
+        summary="Get month",
     )
     async def get_month(
         self,
@@ -99,8 +111,12 @@ class FinanceApiController(Controller):
         "/current-month/opening-balance",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_opening_balance_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={"pat_permissions": ("workspace.finance.update",), "error_statuses": (400, 404)},
+        description=(
+            "Replace the current month opening balance and return recalculated "
+            "balances.\n\nPersonal API token permissions: workspace.finance.update."
+        ),
+        summary="Update opening balance",
     )
     async def update_opening_balance(
         self,
@@ -113,8 +129,13 @@ class FinanceApiController(Controller):
         "/current-month/currency-changes",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_currency_change_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={"pat_permissions": ("workspace.finance.update",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Change the current month currency and return the recalculated "
+            "budget. Currency conversion requires an available exchange "
+            "rate.\n\nPersonal API token permissions: workspace.finance.update."
+        ),
+        summary="Change currency",
     )
     async def change_currency(
         self,
@@ -127,8 +148,14 @@ class FinanceApiController(Controller):
         "/current-month/categories",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={"params": Provide(provide_create_category_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.create",)},
-        description=("Personal API token permissions: workspace.finance.create."),
+        opt={"pat_permissions": ("workspace.finance.create",), "error_statuses": (400, 404)},
+        description=(
+            "Create a category in the current month. kind selects income or "
+            "expense; plannedAmount=null leaves the category without a spending "
+            "or income plan.\n\nPersonal API token permissions: "
+            "workspace.finance.create."
+        ),
+        summary="Create category",
     )
     async def create_category(
         self,
@@ -141,8 +168,13 @@ class FinanceApiController(Controller):
         "/current-month/categories/{category_id:str}",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_category_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={"pat_permissions": ("workspace.finance.update",), "error_statuses": (400, 404)},
+        description=(
+            "Replace the category name, plan, and display position in the "
+            "current month.\n\nPersonal API token permissions: "
+            "workspace.finance.update."
+        ),
+        summary="Update category",
     )
     async def update_category(
         self,
@@ -155,8 +187,12 @@ class FinanceApiController(Controller):
         "/current-month/categories/{category_id:str}",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_archive_category_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.delete",)},
-        description=("Personal API token permissions: workspace.finance.delete."),
+        opt={"pat_permissions": ("workspace.finance.delete",), "error_statuses": (400, 404)},
+        description=(
+            "Archive a current month category. Its transaction history is "
+            "retained.\n\nPersonal API token permissions: workspace.finance.delete."
+        ),
+        summary="Archive category",
     )
     async def archive_category(
         self,
@@ -169,8 +205,14 @@ class FinanceApiController(Controller):
         "/current-month/categories/{category_id:str}/permanent",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_delete_category_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.delete",)},
-        description=("Personal API token permissions: workspace.finance.delete."),
+        opt={"pat_permissions": ("workspace.finance.delete",), "error_statuses": (400, 404)},
+        description=(
+            "Permanently delete this stable category and its snapshots across "
+            "all months. Transaction records are retained but become "
+            "uncategorized. This also removes the category from historical month "
+            "budgets.\n\nPersonal API token permissions: workspace.finance.delete."
+        ),
+        summary="Delete category",
     )
     async def delete_category(
         self,
@@ -183,8 +225,12 @@ class FinanceApiController(Controller):
         "/current-month/categories/{category_id:str}/restore",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_restore_category_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={"pat_permissions": ("workspace.finance.update",), "error_statuses": (400, 404)},
+        description=(
+            "Restore an archived current month category and return the updated "
+            "month.\n\nPersonal API token permissions: workspace.finance.update."
+        ),
+        summary="Restore category",
     )
     async def restore_category(
         self,
@@ -197,8 +243,14 @@ class FinanceApiController(Controller):
         "/current-month/transactions",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_list_transactions_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": ()},
+        description=(
+            "Return transactions for the current month. The required "
+            "include_deleted query parameter controls whether soft-deleted "
+            "entries are included. This list is not paginated.\n\nPersonal API "
+            "token permissions: workspace.finance.read."
+        ),
+        summary="List transactions",
     )
     async def list_transactions(
         self,
@@ -211,8 +263,14 @@ class FinanceApiController(Controller):
         "/current-month/transactions",
         status_code=status_codes.HTTP_201_CREATED,
         dependencies={"params": Provide(provide_create_transaction_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.create",)},
-        description=("Personal API token permissions: workspace.finance.create."),
+        opt={"pat_permissions": ("workspace.finance.create",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Record a transaction in the current month. The amount must be "
+            "positive and use the precision supported by currency; exchange "
+            "rates convert it to the month currency.\n\nPersonal API token "
+            "permissions: workspace.finance.create."
+        ),
+        summary="Create transaction",
     )
     async def create_transaction(
         self,
@@ -225,8 +283,16 @@ class FinanceApiController(Controller):
         "/current-month/transactions/{transaction_id:str}",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_update_transaction_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={
+            "pat_permissions": ("workspace.finance.update",),
+            "error_statuses": (400, 404, 409, 503),
+        },
+        description=(
+            "Replace a current month transaction. Send its latest version; a "
+            "stale version returns 409. A revision is retained.\n\nPersonal API "
+            "token permissions: workspace.finance.update."
+        ),
+        summary="Update transaction",
     )
     async def update_transaction(
         self,
@@ -239,8 +305,16 @@ class FinanceApiController(Controller):
         "/current-month/transactions/{transaction_id:str}",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_delete_transaction_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.delete",)},
-        description=("Personal API token permissions: workspace.finance.delete."),
+        opt={
+            "pat_permissions": ("workspace.finance.delete",),
+            "error_statuses": (400, 404, 409),
+        },
+        description=(
+            "Soft-delete a current month transaction. The required version query "
+            "parameter prevents overwriting a concurrent change; a revision is "
+            "retained.\n\nPersonal API token permissions: workspace.finance.delete."
+        ),
+        summary="Delete transaction",
     )
     async def delete_transaction(
         self,
@@ -255,8 +329,16 @@ class FinanceApiController(Controller):
         "/current-month/transactions/{transaction_id:str}/restore",
         status_code=status_codes.HTTP_200_OK,
         dependencies={"params": Provide(provide_restore_transaction_params, sync_to_thread=False)},
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={
+            "pat_permissions": ("workspace.finance.update",),
+            "error_statuses": (400, 404, 409),
+        },
+        description=(
+            "Restore a soft-deleted current month transaction using its latest "
+            "version; a stale version returns 409.\n\nPersonal API token "
+            "permissions: workspace.finance.update."
+        ),
+        summary="Restore transaction",
     )
     async def restore_transaction(
         self,
@@ -273,8 +355,13 @@ class FinanceApiController(Controller):
         dependencies={
             "params": Provide(provide_transaction_revisions_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": (404,)},
+        description=(
+            "Return the ordered revision history of a current month transaction, "
+            "including previous states and the actor of each change.\n\nPersonal "
+            "API token permissions: workspace.finance.read."
+        ),
+        summary="Transaction revisions",
     )
     async def transaction_revisions(
         self,
@@ -288,8 +375,13 @@ class FinanceApiController(Controller):
         dependencies={
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": (404,)},
+        description=(
+            "Return the finance month identified by year and month, with its "
+            "balances and categories.\n\nPersonal API token permissions: "
+            "workspace.finance.read."
+        ),
+        summary="Historical month",
     )
     async def historical_month(
         self,
@@ -304,8 +396,14 @@ class FinanceApiController(Controller):
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
             "params": Provide(provide_historical_transactions_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": (404,)},
+        description=(
+            "Return transactions for a historical month. The required "
+            "include_deleted query parameter selects whether soft-deleted "
+            "entries are included. This list is not paginated.\n\nPersonal API "
+            "token permissions: workspace.finance.read."
+        ),
+        summary="Historical transactions",
     )
     async def historical_transactions(
         self,
@@ -322,8 +420,13 @@ class FinanceApiController(Controller):
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
             "params": Provide(provide_historical_revisions_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": (404,)},
+        description=(
+            "Return revision history for a transaction in the selected "
+            "historical month.\n\nPersonal API token permissions: "
+            "workspace.finance.read."
+        ),
+        summary="Historical revisions",
     )
     async def historical_revisions(
         self,
@@ -338,8 +441,13 @@ class FinanceApiController(Controller):
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
             "params": Provide(provide_historical_create_transaction_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.create",)},
-        description=("Personal API token permissions: workspace.finance.create."),
+        opt={"pat_permissions": ("workspace.finance.create",), "error_statuses": (400, 404, 503)},
+        description=(
+            "Record a transaction in the selected historical month using the "
+            "supplied category, currency, and occurrence timestamp.\n\nPersonal "
+            "API token permissions: workspace.finance.create."
+        ),
+        summary="Historical create transaction",
     )
     async def historical_create_transaction(
         self,
@@ -355,8 +463,16 @@ class FinanceApiController(Controller):
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
             "params": Provide(provide_historical_update_transaction_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={
+            "pat_permissions": ("workspace.finance.update",),
+            "error_statuses": (400, 404, 409, 503),
+        },
+        description=(
+            "Replace a transaction in the selected historical month. Send its "
+            "latest version; a stale version returns 409. A revision is "
+            "retained.\n\nPersonal API token permissions: workspace.finance.update."
+        ),
+        summary="Historical update transaction",
     )
     async def historical_update_transaction(
         self,
@@ -372,8 +488,16 @@ class FinanceApiController(Controller):
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
             "params": Provide(provide_historical_delete_transaction_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.delete",)},
-        description=("Personal API token permissions: workspace.finance.delete."),
+        opt={
+            "pat_permissions": ("workspace.finance.delete",),
+            "error_statuses": (400, 404, 409),
+        },
+        description=(
+            "Soft-delete a transaction in the selected historical month. Supply "
+            "the latest version query parameter; a stale version returns "
+            "409.\n\nPersonal API token permissions: workspace.finance.delete."
+        ),
+        summary="Historical delete transaction",
     )
     async def historical_delete_transaction(
         self,
@@ -391,8 +515,16 @@ class FinanceApiController(Controller):
             "historical_context": Provide(provide_historical_context, sync_to_thread=False),
             "params": Provide(provide_historical_restore_transaction_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.update",)},
-        description=("Personal API token permissions: workspace.finance.update."),
+        opt={
+            "pat_permissions": ("workspace.finance.update",),
+            "error_statuses": (400, 404, 409),
+        },
+        description=(
+            "Restore a soft-deleted transaction in the selected historical month "
+            "using its latest version.\n\nPersonal API token permissions: "
+            "workspace.finance.update."
+        ),
+        summary="Historical restore transaction",
     )
     async def historical_restore_transaction(
         self,
@@ -408,8 +540,15 @@ class FinanceApiController(Controller):
         dependencies={
             "params": Provide(provide_statistics_params, sync_to_thread=False),
         },
-        opt={"pat_permissions": ("workspace.finance.read",)},
-        description=("Personal API token permissions: workspace.finance.read."),
+        opt={"pat_permissions": ("workspace.finance.read",), "error_statuses": (404, 503)},
+        description=(
+            "Return income, expense, category breakdowns, and comparison totals "
+            "for the selected reporting period and currency. Month reports "
+            "require year and month together. Account time-zone boundaries "
+            "determine reporting windows.\n\nPersonal API token permissions: "
+            "workspace.finance.read."
+        ),
+        summary="Statistics",
     )
     async def statistics(
         self,

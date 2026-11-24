@@ -5,26 +5,54 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.finance.enums import FinanceEventKind
 from core.finance.event_dispatchers import FinanceEventDispatcher
 from core.finance.schemas import FinanceEvent
 from core.notifications.enums import DeliveryStatus
 from core.notifications.finance import FinanceDelivery, FinanceDeliveryStorage
+from core.notifications.finance.assets import AssetNotificationService
+from core.notifications.finance.schemas import (
+    AssetEventSource,
+    AssetFinanceDelivery,
+    AssetFinanceEvent,
+)
 from core.telegram.enums import TelegramConnectionState
 from infra.postgresql.models.finance_notifications import FinanceDeliveryModel, FinanceEventModel
 from infra.postgresql.models.telegram import TelegramConnectionModel
-from infra.postgresql.schemas.finance import FinanceEventPayloadSchema
+from infra.postgresql.schemas.finance import (
+    AssetEventSourceSchema,
+    FinanceEventPayloadSchema,
+    NotificationPayloadSchema,
+)
 
 
 @dataclass(kw_only=True, slots=True)
 class FinanceDatabaseEventDispatcher(FinanceEventDispatcher):
     session: AsyncSession
 
+    assets: AssetNotificationService
+
+    async def publish_asset_movement(
+        self,
+        *,
+        owner_username: str,
+        movement_id: str,
+        version: int,
+        now: datetime,
+    ) -> None:
+        await self.assets.publish_movement(owner_username, movement_id, version, now)
+
+    async def check_asset_goal(self, *, owner_username: str, now: datetime) -> None:
+        await self.assets.check_goal(owner_username, now)
+
     async def publish(self, *, event: FinanceEvent) -> None:
         self.session.add(
             FinanceEventModel(
                 owner_username=event.owner_username,
                 kind=event.kind,
-                payload=FinanceEventPayloadSchema.model_validate(event.payload),
+                payload=NotificationPayloadSchema(
+                    FinanceEventPayloadSchema.model_validate(event.payload),
+                ),
                 created_at=event.created_at,
                 expires_at=event.expires_at,
                 planned_at=None,
@@ -40,7 +68,7 @@ class FinanceDatabaseDeliveryStorage(FinanceDeliveryStorage):
     async def plan(self, *, now: datetime, limit: int) -> int:
         events = await self.session.scalars(
             select(FinanceEventModel)
-            .where(FinanceEventModel.planned_at.is_(None))
+            .where(FinanceEventModel.planned_at.is_(None), FinanceEventModel.source_active)
             .order_by(FinanceEventModel.created_at, FinanceEventModel.id)
             .limit(limit)
             .with_for_update(skip_locked=True),
@@ -48,14 +76,21 @@ class FinanceDatabaseDeliveryStorage(FinanceDeliveryStorage):
         count = 0
         for event in events:
             if event.expires_at > now:
-                connection_ids = await self.session.scalars(
-                    select(TelegramConnectionModel.id).where(
-                        TelegramConnectionModel.owner_username == event.owner_username,
-                        TelegramConnectionModel.state == TelegramConnectionState.ACTIVE,
-                        TelegramConnectionModel.connected_at <= event.created_at,
-                    ),
+                recipients = select(TelegramConnectionModel.id).where(
+                    TelegramConnectionModel.owner_username == event.owner_username,
+                    TelegramConnectionModel.state == TelegramConnectionState.ACTIVE,
+                    TelegramConnectionModel.connected_at <= event.created_at,
                 )
-                for connection_id in connection_ids:
+                connection = TelegramConnectionModel
+                flag = {
+                    FinanceEventKind.ASSET_MOVEMENT: connection.notify_asset_movement,
+                    FinanceEventKind.SAVINGS_GOAL: connection.notify_savings_goal_reached,
+                    FinanceEventKind.MONTH_SUMMARY: connection.notify_assets_month_summary,
+                    FinanceEventKind.DEPOSIT_MATURITY: connection.notify_deposit_maturity,
+                }.get(event.kind)
+                if flag is not None:
+                    recipients = recipients.where(flag)
+                for connection_id in await self.session.scalars(recipients):
                     await self.session.execute(
                         insert(FinanceDeliveryModel)
                         .values(
@@ -83,7 +118,7 @@ class FinanceDatabaseDeliveryStorage(FinanceDeliveryStorage):
         now: datetime,
         lease_until: datetime,
         max_attempts: int,
-    ) -> FinanceDelivery | None:
+    ) -> FinanceDelivery | AssetFinanceDelivery | None:
         await self.session.execute(
             update(FinanceDeliveryModel)
             .where(
@@ -135,22 +170,44 @@ class FinanceDatabaseDeliveryStorage(FinanceDeliveryStorage):
             )
             .execution_options(populate_existing=True),
         )
-        result = FinanceDelivery(
-            id=delivery.id,
-            attempts=delivery.attempts,
-            event=FinanceEvent(
-                owner_username=event.owner_username,
-                kind=event.kind,
-                payload=event.payload.to_domain_schema(),
-                created_at=event.created_at,
-                expires_at=event.expires_at,
-            ),
-            connection=connection.to_domain_schema() if connection is not None else None,
-        )
+        recipient = connection.to_domain_schema() if connection else None
+        payload = event.payload.root
+        result: AssetFinanceDelivery | FinanceDelivery
+        if isinstance(payload, AssetEventSourceSchema):
+            result = AssetFinanceDelivery(
+                id=delivery.id,
+                attempts=delivery.attempts,
+                connection=recipient,
+                event=AssetFinanceEvent(
+                    owner_username=event.owner_username,
+                    kind=event.kind,
+                    source=AssetEventSource(**payload.model_dump()),
+                    created_at=event.created_at,
+                    expires_at=event.expires_at,
+                ),
+            )
+        else:
+            result = FinanceDelivery(
+                id=delivery.id,
+                attempts=delivery.attempts,
+                connection=recipient,
+                event=FinanceEvent(
+                    owner_username=event.owner_username,
+                    kind=event.kind,
+                    payload=payload.to_domain_schema(),
+                    created_at=event.created_at,
+                    expires_at=event.expires_at,
+                ),
+            )
         await self.session.flush()
         return result
 
-    async def refresh(self, *, delivery: FinanceDelivery, now: datetime) -> FinanceDelivery | None:
+    async def refresh(
+        self,
+        *,
+        delivery: FinanceDelivery | AssetFinanceDelivery,
+        now: datetime,
+    ) -> FinanceDelivery | AssetFinanceDelivery | None:
         claimed = await self.session.scalar(
             select(FinanceDeliveryModel)
             .where(
@@ -180,7 +237,7 @@ class FinanceDatabaseDeliveryStorage(FinanceDeliveryStorage):
     async def finish(
         self,
         *,
-        delivery: FinanceDelivery,
+        delivery: FinanceDelivery | AssetFinanceDelivery,
         status: DeliveryStatus,
         now: datetime,
         next_attempt_at: datetime,

@@ -51,6 +51,10 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
     notify_memorable_date: Mapped[bool] = mapped_column(Boolean, server_default="false")
     notify_finance_transaction: Mapped[bool] = mapped_column(Boolean)
     notify_finance_limit: Mapped[bool] = mapped_column(Boolean)
+    notify_asset_movement: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    notify_savings_goal_reached: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    notify_assets_month_summary: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    notify_deposit_maturity: Mapped[bool] = mapped_column(Boolean, server_default="false")
     language: Mapped[LanguageEnum] = mapped_column(
         Enum(LanguageEnum, name="telegram_notification_language_enum", native_enum=True),
         server_default=LanguageEnum.EN.name,
@@ -96,6 +100,10 @@ class TelegramConnectionModel(HexUuidIDMixin, BaseModel):
             language=self.language,
             notify_finance_transaction=self.notify_finance_transaction,
             notify_finance_limit=self.notify_finance_limit,
+            notify_asset_movement=self.notify_asset_movement,
+            notify_savings_goal_reached=self.notify_savings_goal_reached,
+            notify_assets_month_summary=self.notify_assets_month_summary,
+            notify_deposit_maturity=self.notify_deposit_maturity,
         )
 
     def to_reminder_recipient(self) -> ReminderRecipient:

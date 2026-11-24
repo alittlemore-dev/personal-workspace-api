@@ -38,6 +38,10 @@ class FinanceSource(StrEnum):
 class FinanceEventKind(StrEnum):
     TRANSACTION = "finance.transaction_by_other"
     LIMIT = "finance.expense_limit_exceeded"
+    ASSET_MOVEMENT = "finance.asset_movement"
+    SAVINGS_GOAL = "finance.savings_goal_reached"
+    MONTH_SUMMARY = "finance.assets_month_summary"
+    DEPOSIT_MATURITY = "finance.deposit_maturity"
 
 
 class FinanceLimitScope(StrEnum):

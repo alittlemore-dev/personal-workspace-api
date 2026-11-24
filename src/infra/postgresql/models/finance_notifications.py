@@ -9,7 +9,7 @@ from core.finance.enums import FinanceEventKind
 from core.notifications.enums import DeliveryStatus
 from infra.postgresql.models.base import BaseModel, TableArgs
 from infra.postgresql.models.mixins.ids import HexUuidIDMixin
-from infra.postgresql.schemas.finance import FinanceEventPayloadSchema
+from infra.postgresql.schemas.finance import NotificationPayloadSchema
 
 
 class FinanceEventModel(HexUuidIDMixin, BaseModel):
@@ -17,12 +17,26 @@ class FinanceEventModel(HexUuidIDMixin, BaseModel):
     kind: Mapped[FinanceEventKind] = mapped_column(
         Enum(FinanceEventKind, name="finance_event_kind_enum", native_enum=True),
     )
-    payload: Mapped[FinanceEventPayloadSchema] = mapped_column(
-        PydanticType(FinanceEventPayloadSchema),
+    payload: Mapped[NotificationPayloadSchema] = mapped_column(
+        PydanticType(NotificationPayloadSchema),
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    source_key: Mapped[str | None] = mapped_column(String(128))
+    source_active: Mapped[bool] = mapped_column(server_default="true")
     planned_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    @declared_attr.directive
+    @classmethod
+    def __table_args__(cls) -> TableArgs:
+        return (
+            UniqueConstraint(
+                cls.owner_username,
+                cls.kind,
+                cls.source_key,
+                name="finance_event_source_once",
+            ),
+        )
 
 
 class FinanceDeliveryModel(HexUuidIDMixin, BaseModel):

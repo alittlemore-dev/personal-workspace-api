@@ -216,6 +216,7 @@ class FinanceEventService:
         transaction: FinanceTransaction,
         now: datetime,
     ) -> None:
+        await self.dispatcher.check_asset_goal(owner_username=owner_username, now=now)
         for payload in after.crossed_limits(before, transaction):
             await self.dispatcher.publish(
                 event=FinanceEvent(

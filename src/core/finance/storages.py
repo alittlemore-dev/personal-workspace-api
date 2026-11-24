@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from core.finance.enums import FinanceCurrency
 from core.finance.schemas import (
+    Amount,
     FinanceCategoryArchival,
     FinanceCategoryCreation,
     FinanceCategoryDeletion,
@@ -12,6 +13,7 @@ from core.finance.schemas import (
     FinanceMonth,
     FinanceMonthRollover,
     FinanceOpeningBalanceUpdate,
+    FinanceOpeningProjection,
     FinanceRateSet,
     FinanceStatisticsSource,
     FinanceTemplateCategory,
@@ -85,6 +87,14 @@ class FinanceStorage(ABC):
 
     @abstractmethod
     async def lock_month(self, *, owner_username: str, now: datetime) -> FinanceMonth: ...
+
+    @abstractmethod
+    async def project_opening_balance(
+        self,
+        *,
+        month: FinanceMonth,
+        projection: FinanceOpeningProjection,
+    ) -> Amount: ...
 
     @abstractmethod
     async def update_opening_balance(

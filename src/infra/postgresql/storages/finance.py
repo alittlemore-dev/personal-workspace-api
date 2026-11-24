@@ -3,10 +3,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, literal, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.finance.assets.enums import AssetMovementKind
 from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction
 from core.finance.exceptions import (
     FinanceConflictError,
@@ -28,6 +29,7 @@ from core.finance.schemas import (
     FinanceMonthRollover,
     FinanceMonthSnapshot,
     FinanceOpeningBalanceUpdate,
+    FinanceOpeningProjection,
     FinanceRateSet,
     FinanceStatisticsFact,
     FinanceStatisticsSource,
@@ -39,10 +41,14 @@ from core.finance.schemas import (
     FinanceTransactionPricing,
     FinanceTransactionRevision,
     FinanceTransactionUpdate,
+    FinanceTransfers,
 )
 from core.finance.storages import FinanceStorage
 from core.i18n.enums import LanguageEnum
 from infra.postgresql.models.finance import (
+    CURRENCY,
+    MONEY,
+    RATE,
     FinanceCategoryModel,
     FinanceMonthCategoryModel,
     FinanceMonthCurrencyChangeModel,
@@ -54,6 +60,7 @@ from infra.postgresql.models.finance import (
     FinanceTransactionModel,
     FinanceTransactionRevisionModel,
 )
+from infra.postgresql.models.finance_assets import AssetMovementModel
 from infra.postgresql.schemas.finance import (
     FinanceMonthCurrencySnapshotSchema,
     FinanceTransactionSnapshotSchema,
@@ -97,8 +104,9 @@ class FinanceDatabaseStorage(FinanceStorage):
     async def _actuals(
         self,
         month: FinanceMonthModel | FinanceMonth,
+        exclude_transaction_id: str | None,
     ) -> tuple[Decimal, Decimal, dict[str, Decimal]]:
-        rows = await self.session.execute(
+        query = (
             select(FinanceTransactionModel, FinanceRateModel)
             .join(
                 FinanceRateModel,
@@ -109,8 +117,11 @@ class FinanceDatabaseStorage(FinanceStorage):
                 FinanceTransactionModel.month_id == month.id,
                 FinanceTransactionModel.deleted_at.is_(None),
             )
-            .execution_options(populate_existing=True),
+            .execution_options(populate_existing=True)
         )
+        if exclude_transaction_id is not None:
+            query = query.where(FinanceTransactionModel.id != exclude_transaction_id)
+        rows = await self.session.execute(query)
         income = Decimal(0)
         expense = Decimal(0)
         by_category: dict[str, Decimal] = {}
@@ -124,6 +135,144 @@ class FinanceDatabaseStorage(FinanceStorage):
             else:
                 expense += value
         return income, expense, by_category
+
+    async def _asset_transfers(
+        self,
+        month_id: str,
+        projection: FinanceOpeningProjection | None,
+    ) -> dict[FinanceCurrency, FinanceTransfers]:
+        model = AssetMovementModel
+        rates = FinanceRateModel
+        postings = (
+            select(
+                model.kind,
+                rates.currency,
+                (model.budget_amount_rub / rates.rub_per_unit).label("amount"),
+            )
+            .join(rates, rates.rate_set_id == model.rate_set_id)
+            .where(
+                model.month_id == month_id,
+                model.deleted.is_(False),
+                model.kind.in_(
+                    (
+                        AssetMovementKind.CONTRIBUTION,
+                        AssetMovementKind.WITHDRAWAL,
+                        AssetMovementKind.BUY_FROM_BUDGET,
+                        AssetMovementKind.OPENING_BUDGET,
+                    ),
+                ),
+            )
+        )
+        if projection is not None:
+            if projection.movement_id is not None:
+                postings = postings.where(model.id != projection.movement_id)
+            proposed = select(
+                literal(AssetMovementKind.OPENING_BUDGET, type_=model.kind.type),
+                literal(projection.currency, type_=CURRENCY),
+                (
+                    literal(projection.amount_rub).cast(MONEY)
+                    / literal(projection.month_rate).cast(RATE)
+                ),
+            )
+            entries = postings.union_all(proposed).subquery()
+        else:
+            entries = postings.subquery()
+        rows = await self.session.execute(
+            select(entries.c.kind, entries.c.currency, func.sum(entries.c.amount)).group_by(
+                entries.c.kind,
+                entries.c.currency,
+            ),
+        )
+        grouped: dict[FinanceCurrency, dict[AssetMovementKind, Decimal]] = {}
+        for kind, currency, amount in rows:
+            if amount is not None:
+                grouped.setdefault(currency, {})[kind] = amount
+        return {
+            currency: FinanceTransfers(
+                contributions=Amount(
+                    values.get(AssetMovementKind.CONTRIBUTION, Decimal(0))
+                    + values.get(AssetMovementKind.BUY_FROM_BUDGET, Decimal(0)),
+                ).rounded(currency),
+                withdrawals=Amount(values.get(AssetMovementKind.WITHDRAWAL, Decimal(0))).rounded(
+                    currency,
+                ),
+                opening_allocation=Amount(
+                    values.get(AssetMovementKind.OPENING_BUDGET, Decimal(0)),
+                ).rounded(currency),
+            )
+            for currency, values in grouped.items()
+        }
+
+    async def project_opening_balance(
+        self,
+        *,
+        month: FinanceMonth,
+        projection: FinanceOpeningProjection,
+    ) -> Amount:
+        actuals = await self._month_actuals(month, projection)
+        return actuals.closing_balance(month.opening_balance, month.currency)
+
+    async def _month_actuals(
+        self,
+        month: FinanceMonthModel | FinanceMonth,
+        projection: FinanceOpeningProjection | None,
+    ) -> FinanceActuals:
+        income, expense, by_category = await self._actuals(
+            month,
+            projection.transaction_id if projection else None,
+        )
+        pending = await self._pending_carry(month)
+        return FinanceActuals(
+            income=Amount(income),
+            expense=Amount(expense),
+            by_category={key: Amount(value) for key, value in by_category.items()},
+            transfers=await self._asset_transfers(month.id, projection),
+            carry_correction=pending[1] if pending else None,
+        )
+
+    async def _pending_carry(
+        self,
+        month: FinanceMonthModel | FinanceMonth,
+    ) -> tuple[Amount, Amount] | None:
+        model = (
+            month
+            if isinstance(month, FinanceMonthModel)
+            else await self.session.get(FinanceMonthModel, month.id)
+        )
+        if model is None or model.previous_month_id is None:
+            return None
+        previous = await self.session.get(FinanceMonthModel, model.previous_month_id)
+        if previous is None:
+            return None
+        income, expense, _ = await self._actuals(previous, None)
+        transfers = await self._asset_transfers(previous.id, None)
+        effect = transfers.get(previous.currency, FinanceTransfers.empty()).effect
+        target = Amount(previous.opening_balance + income - expense + effect).rounded(
+            previous.currency,
+        )
+        accepted = (
+            model.accepted_transferred_balance
+            if model.accepted_transferred_balance is not None
+            else model.transferred_balance
+        )
+        if accepted is None or target == accepted:
+            return None
+        previous_close = target
+        basis = Amount(accepted)
+        changes = await self.session.scalars(
+            select(FinanceMonthCurrencyChangeModel)
+            .where(FinanceMonthCurrencyChangeModel.month_id == month.id)
+            .order_by(
+                FinanceMonthCurrencyChangeModel.changed_at,
+                FinanceMonthCurrencyChangeModel.id,
+            ),
+        )
+        for change in changes:
+            rates = await self.get_rate_set(rate_set_id=change.rate_set_id)
+            factor = rates.conversion_factor(change.previous_currency, change.new_currency)
+            target = target.converted(change.new_currency, factor)
+            basis = basis.converted(change.new_currency, factor)
+        return (previous_close, Amount(target - basis)) if target != basis else None
 
     async def _locked_month(
         self,
@@ -140,7 +289,6 @@ class FinanceDatabaseStorage(FinanceStorage):
         tracker: FinanceTrackerModel | FinanceTracker,
         month: FinanceMonthModel | FinanceMonth,
     ) -> FinanceMonth:
-        income, expense, by_category = await self._actuals(month)
         categories = list(
             await self.session.scalars(
                 select(FinanceMonthCategoryModel)
@@ -177,13 +325,7 @@ class FinanceDatabaseStorage(FinanceStorage):
                     for category in categories
                 ],
             ),
-            FinanceActuals(
-                income=Amount(income),
-                expense=Amount(expense),
-                by_category={
-                    category_id: Amount(value) for category_id, value in by_category.items()
-                },
-            ),
+            await self._month_actuals(month, None),
         )
 
     async def lock_tracker(self, *, owner_username: str) -> FinanceTracker | None:
@@ -392,11 +534,20 @@ class FinanceDatabaseStorage(FinanceStorage):
         *,
         write: FinanceOpeningBalanceUpdate,
     ) -> FinanceMonth:
+        values = {"opening_balance": write.params.amount}
+        correction = write.month.carry_correction
+        if (
+            correction is not None
+            and write.params.amount == write.month.opening_balance + correction
+        ):
+            pending = await self._pending_carry(write.month)
+            if pending:
+                values["accepted_transferred_balance"] = pending[0]
         month = await self.session.scalar(
             update(FinanceMonthModel)
             .where(FinanceMonthModel.id == write.month.id)
             .values(
-                opening_balance=write.params.amount,
+                **values,
                 version=FinanceMonthModel.version + 1,
             )
             .returning(FinanceMonthModel)
@@ -565,7 +716,7 @@ class FinanceDatabaseStorage(FinanceStorage):
         await self.session.execute(
             update(FinanceTransactionModel)
             .where(FinanceTransactionModel.month_category_id.in_(snapshots))
-            .values(month_category_id=None)
+            .values(month_category_id=None, former_category_id=write.category.stable_id)
             .execution_options(synchronize_session="fetch"),
         )
         await self.session.execute(
@@ -744,6 +895,7 @@ class FinanceDatabaseStorage(FinanceStorage):
         month_currency: FinanceCurrency,
     ) -> FinanceTransaction:
         return FinanceTransaction(
+            managed_by_assets=model.managed_by_assets,
             created_at=model.created_at,
             id=model.id,
             source=model.source,
@@ -917,6 +1069,7 @@ class FinanceDatabaseStorage(FinanceStorage):
             )
             .values(
                 month_category_id=write.category.id,
+                former_category_id=None,
                 kind=write.category.kind,
                 original_amount=write.params.draft.amount,
                 original_currency=write.params.draft.currency,

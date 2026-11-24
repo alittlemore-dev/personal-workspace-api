@@ -163,3 +163,22 @@ class TestOpenApiContract:
         assert (
             paths["/api/resumes/{resume_id}"]["delete"]["responses"]["204"].get("content") is None
         )
+
+    def test_assets_report_and_budget_permission_contract(self, app: Litestar) -> None:
+        paths = app.openapi_schema.to_schema()["paths"]
+        report = paths["/api/finance/assets/report"]["get"]
+        assert {p["name"] for p in report["parameters"]} == {"start", "end", "currency"}
+        assert "workspace.assets.read" in report["description"]
+        assert report["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+            "/AssetReportResponse",
+        )
+        for path, method, action in (
+            ("movements", "post", "create"),
+            ("movements/{movement_id}", "patch", "update"),
+            ("movements/{movement_id}", "delete", "delete"),
+            ("movements/{movement_id}/restore", "post", "update"),
+        ):
+            operation = paths[f"/api/finance/assets/{path}"][method]
+            assert f"workspace.assets.{action}" in operation["description"]
+            assert f"workspace.finance.{action}" in operation["description"]
+            assert "409" in operation["responses"]

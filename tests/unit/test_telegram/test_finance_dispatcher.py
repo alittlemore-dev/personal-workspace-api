@@ -114,6 +114,10 @@ class FinanceBotHarness:
             notify_memorable_date=False,
             notify_finance_transaction=False,
             notify_finance_limit=False,
+            notify_asset_movement=False,
+            notify_savings_goal_reached=False,
+            notify_assets_month_summary=False,
+            notify_deposit_maturity=False,
             language=LanguageEnum.EN,
         )
         self.telegram_use_case = cast("Mock", await self.container.get(TelegramUseCase))

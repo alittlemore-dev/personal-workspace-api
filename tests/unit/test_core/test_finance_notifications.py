@@ -29,6 +29,7 @@ from core.notifications.finance import (
     FinanceNotificationFormatter,
     ProcessFinanceNotificationsUseCase,
 )
+from core.notifications.finance.assets import AssetNotificationService
 from core.telegram.exceptions import TelegramAccessError
 from core.telegram.storages import (
     TelegramAccountSettingsReader,
@@ -185,8 +186,8 @@ class TestFinanceNotifications(TestCase):
         storage.claim.side_effect = [delivery, None]
         storage.refresh.return_value = delivery
         finance = AsyncMock(spec=FinanceStorage)
-        finance.get_month.return_value = self.factory.core.finance_month()
-        finance.get_transaction.return_value = self.factory.core.finance_transaction(
+        finance.get_month_for_period.return_value = self.factory.core.finance_month()
+        finance.transaction_for_period.return_value = self.factory.core.finance_transaction(
             version=2 if mode == "changed" else 1,
             deleted=mode == "deleted",
         )
@@ -199,6 +200,7 @@ class TestFinanceNotifications(TestCase):
             sender.send.side_effect = RetryableReminderSendError(retry_after_seconds=1800)
         transaction = AsyncMock(spec=TelegramTransaction)
         use_case = ProcessFinanceNotificationsUseCase(
+            assets=AsyncMock(spec=AssetNotificationService),
             storage=storage,
             finance_storage=finance,
             settings_reader=reader,
@@ -235,14 +237,14 @@ class TestFinanceNotifications(TestCase):
         storage.claim.side_effect = [delivery, None]
         storage.refresh.return_value = delivery
         finance = AsyncMock(spec=FinanceStorage)
-        finance.get_month.return_value = self.factory.core.finance_month()
-        finance.get_transaction.return_value = self.factory.core.finance_transaction()
+        finance.get_month_for_period.return_value = self.factory.core.finance_month()
+        finance.transaction_for_period.return_value = self.factory.core.finance_transaction()
         reader = AsyncMock(spec=TelegramAccountSettingsReader)
 
         async def check_settings(*, owner_username: str) -> bool:
             assert owner_username == "owner"
             if mode == "source":
-                finance.get_transaction.return_value = self.factory.core.finance_transaction(
+                finance.transaction_for_period.return_value = self.factory.core.finance_transaction(
                     version=2,
                 )
             else:
@@ -252,6 +254,7 @@ class TestFinanceNotifications(TestCase):
         reader.can_notify.side_effect = check_settings
         sender = AsyncMock(spec=ReminderSender)
         use_case = ProcessFinanceNotificationsUseCase(
+            assets=AsyncMock(spec=AssetNotificationService),
             storage=storage,
             finance_storage=finance,
             settings_reader=reader,

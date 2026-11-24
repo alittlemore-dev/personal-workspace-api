@@ -11,6 +11,11 @@ from .finance import FinanceTemplateCategoryModel as FinanceTemplateCategoryMode
 from .finance import FinanceTrackerModel as FinanceTrackerModel
 from .finance import FinanceTransactionModel as FinanceTransactionModel
 from .finance import FinanceTransactionRevisionModel as FinanceTransactionRevisionModel
+from .finance_asset_analytics import AssetGoalModel as AssetGoalModel
+from .finance_assets import AssetLocationModel as AssetLocationModel
+from .finance_assets import AssetMovementModel as AssetMovementModel
+from .finance_assets import AssetMovementRevisionModel as AssetMovementRevisionModel
+from .finance_assets import AssetPositionModel as AssetPositionModel
 from .finance_notifications import FinanceDeliveryModel as FinanceDeliveryModel
 from .finance_notifications import FinanceEventModel as FinanceEventModel
 from .important_info import ImportantInfoModel as ImportantInfoModel

@@ -151,7 +151,8 @@ def provide_update_connection_settings_params(
         api_json_body(
             title="Telegram notification settings",
             description=(
-                "Complete replacement of notification flags and the language for this connection."
+                "Legacy flags and language are required. Omitted asset subscriptions retain their "
+                "value."
             ),
             examples=(
                 {
@@ -166,6 +167,13 @@ def provide_update_connection_settings_params(
     ],
     request: Request[Principal, AuthContext, State],
 ) -> SetTelegramConnectionSettingsParams:
+    if (
+        data.notify_asset_movement is not None
+        or data.notify_savings_goal_reached is not None
+        or data.notify_assets_month_summary is not None
+        or data.notify_deposit_maturity is not None
+    ):
+        request.auth.require_permissions("workspace.assets.read")
     return SetTelegramConnectionSettingsParams(
         owner_username=request.user.username,
         connection_id=connection_id,

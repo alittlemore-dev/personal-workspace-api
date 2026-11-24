@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 from sqlalchemy_dev_utils.types.datetime import UTCDateTime
@@ -56,6 +57,7 @@ class FinanceMonthModel(HexUuidIDMixin, BaseModel):
         ForeignKey("finance__finance_month_model.id"),
     )
     transferred_balance: Mapped[Decimal | None] = mapped_column(MONEY)
+    accepted_transferred_balance: Mapped[Decimal | None] = mapped_column(MONEY)
     version: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
@@ -120,10 +122,12 @@ class FinanceRateModel(BaseModel):
 
 
 class FinanceTransactionModel(HexUuidIDMixin, BaseModel):
+    managed_by_assets: Mapped[bool] = mapped_column(Boolean, server_default=false())
     month_id: Mapped[str] = mapped_column(ForeignKey(FinanceMonthModel.id))
     month_category_id: Mapped[str | None] = mapped_column(
         ForeignKey(FinanceMonthCategoryModel.id, ondelete="SET NULL"),
     )
+    former_category_id: Mapped[str | None] = mapped_column(String(32))
     kind: Mapped[FinanceKind] = mapped_column(KIND)
     original_amount: Mapped[Decimal] = mapped_column(MONEY)
     original_currency: Mapped[FinanceCurrency] = mapped_column(CURRENCY)

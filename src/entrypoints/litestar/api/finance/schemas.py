@@ -22,6 +22,7 @@ from core.finance.schemas import (
     FinanceTransactionDraft,
     FinanceTransactionRevision,
     FinanceTransactions,
+    FinanceTransfers,
 )
 from core.i18n.enums import LanguageEnum
 from entrypoints.litestar.api.schemas import CamelCaseSchema
@@ -153,8 +154,28 @@ class FinanceMonthResponse(CamelCaseSchema):
         examples=["40000.00"],
     )
     closing_balance: Decimal = Field(
-        description="Opening balance plus actual income minus actual expense.",
+        description="Available balance including transfers and the initial allocation.",
         examples=["98749.50"],
+    )
+    contributions: Decimal = Field(
+        description="Transfers from budget to assets, excluding the initial allocation.",
+        examples=["10000.00"],
+    )
+    withdrawals: Decimal = Field(description="Returns from assets to budget.", examples=["4000.00"])
+    opening_allocation: Decimal = Field(
+        description="Existing assets initially included in the budget.",
+        examples=["0.00"],
+    )
+    income_minus_expenses: Decimal = Field(
+        description="Actual income less actual expenses for this month.",
+        examples=["100000.00"],
+    )
+    carry_correction: Decimal | None = Field(
+        description=(
+            "Adjustment to the opening balance after a previous month changed. "
+            "Applying it requires an explicit opening balance update."
+        ),
+        examples=["250.00"],
     )
     categories: list[FinanceCategoryResponse] = Field(
         description="Categories returned by this operation.",
@@ -162,7 +183,13 @@ class FinanceMonthResponse(CamelCaseSchema):
 
     @classmethod
     def from_domain(cls, month: FinanceMonth) -> FinanceMonthResponse:
+        transfers = month.transfers.get(month.currency, FinanceTransfers.empty())
         return cls(
+            contributions=transfers.contributions,
+            withdrawals=transfers.withdrawals,
+            opening_allocation=transfers.opening_allocation,
+            income_minus_expenses=month.income_minus_expenses,
+            carry_correction=month.carry_correction,
             id=month.id,
             period_start=month.period_start,
             timezone_name=month.time_zone.key,
@@ -236,6 +263,10 @@ class FinanceVersionRequest(CamelCaseSchema):
 
 
 class FinanceTransactionResponse(CamelCaseSchema):
+    allows_direct_changes: bool = Field(
+        description="Whether this budget entry can be edited directly during its writable period.",
+        examples=[True],
+    )
     created_at: datetime = Field(
         description="Creation timestamp in ISO 8601 format.",
         examples=["2026-10-18T09:00:00Z"],

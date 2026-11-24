@@ -6,6 +6,9 @@ from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.account_time_zone.clients import AccountTimeZoneReader
+from core.finance.assets.analytics_use_cases import AssetAnalyticsStorage, AssetAnalyticsUseCase
+from core.finance.assets.services import AssetMovementService
+from core.finance.assets.storages import AssetStorage
 from core.finance.clients import FinanceRateClient
 from core.finance.event_dispatchers import FinanceEventDispatcher
 from core.finance.schemas import FinanceEventConfig
@@ -24,14 +27,19 @@ from core.notifications.finance import (
     FinanceNotificationFormatter,
     ProcessFinanceNotificationsUseCase,
 )
+from core.notifications.finance.assets import AssetNoticeStorage, AssetNotificationService
 from core.telegram.storages import (
     TelegramAccountSettingsReader,
     TelegramStorage,
     TelegramTransaction,
 )
 from infra.config.constants import constants
+from infra.config.settings import settings
 from infra.http.finance_rates import BankOfRussiaFinanceRateClient
+from infra.postgresql.storages.asset_notifications import AssetDatabaseNoticeStorage
 from infra.postgresql.storages.finance import FinanceDatabaseStorage
+from infra.postgresql.storages.finance_asset_analytics import FinanceAssetAnalyticsStorage
+from infra.postgresql.storages.finance_assets import AssetDatabaseStorage
 from infra.postgresql.storages.finance_notifications import (
     FinanceDatabaseDeliveryStorage,
     FinanceDatabaseEventDispatcher,
@@ -39,6 +47,34 @@ from infra.postgresql.storages.finance_notifications import (
 
 
 class FinanceProvider(Provider):
+    asset_storage = provide(AssetDatabaseStorage, provides=AssetStorage, scope=Scope.REQUEST)
+    asset_analytics_storage = provide(
+        FinanceAssetAnalyticsStorage,
+        provides=AssetAnalyticsStorage,
+        scope=Scope.REQUEST,
+    )
+    asset_movements = provide(AssetMovementService, scope=Scope.REQUEST)
+    asset_analytics = provide(AssetAnalyticsUseCase, scope=Scope.REQUEST)
+    asset_notices = provide(
+        AssetDatabaseNoticeStorage,
+        provides=AssetNoticeStorage,
+        scope=Scope.REQUEST,
+    )
+
+    @provide(scope=Scope.REQUEST)
+    def provide_asset_notifications(
+        self,
+        storage: AssetNoticeStorage,
+        analytics: AssetAnalyticsUseCase,
+        time_zones: AccountTimeZoneReader,
+    ) -> AssetNotificationService:
+        return AssetNotificationService(
+            storage=storage,
+            analytics=analytics,
+            public_origin=settings.app.public_origin,
+            time_zones=time_zones,
+        )
+
     @provide(scope=Scope.APP)
     async def provide_rate_client(self) -> AsyncIterator[FinanceRateClient]:
         async with httpx.AsyncClient(timeout=constants.finance.http_timeout_seconds) as client:
@@ -83,8 +119,12 @@ class FinanceProvider(Provider):
         return FinanceTelegramAccessService(storage=storage, settings_reader=settings_reader)
 
     @provide(scope=Scope.REQUEST)
-    def provide_event_dispatcher(self, session: AsyncSession) -> FinanceEventDispatcher:
-        return FinanceDatabaseEventDispatcher(session=session)
+    def provide_event_dispatcher(
+        self,
+        session: AsyncSession,
+        assets: AssetNotificationService,
+    ) -> FinanceEventDispatcher:
+        return FinanceDatabaseEventDispatcher(session=session, assets=assets)
 
     @provide(scope=Scope.REQUEST)
     def provide_events(self, dispatcher: FinanceEventDispatcher) -> FinanceEventService:
@@ -100,8 +140,9 @@ class FinanceProvider(Provider):
         return FinanceDatabaseDeliveryStorage(session=session)
 
     @provide(scope=Scope.REQUEST)
-    def provide_notifications(
+    def provide_notifications(  # noqa: PLR0913
         self,
+        assets: AssetNotificationService,
         storage: FinanceDeliveryStorage,
         finance_storage: FinanceStorage,
         settings_reader: TelegramAccountSettingsReader,
@@ -109,6 +150,7 @@ class FinanceProvider(Provider):
         transaction: TelegramTransaction,
     ) -> ProcessFinanceNotificationsUseCase:
         return ProcessFinanceNotificationsUseCase(
+            assets=assets,
             storage=storage,
             finance_storage=finance_storage,
             settings_reader=settings_reader,

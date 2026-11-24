@@ -219,6 +219,10 @@ class TestTelegramStorage(StorageTestCase):
             language=LanguageEnum.RU,
             notify_finance_transaction=False,
             notify_finance_limit=False,
+            notify_asset_movement=None,
+            notify_savings_goal_reached=None,
+            notify_assets_month_summary=None,
+            notify_deposit_maturity=None,
         )
         with pytest.raises(TelegramAccessError):
             await use_case.set_connection_settings(

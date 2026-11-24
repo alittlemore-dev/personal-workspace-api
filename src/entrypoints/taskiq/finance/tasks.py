@@ -44,6 +44,7 @@ async def send_finance_notifications(
 ) -> int:
     if not settings.telegram.available or not await runtime_status.is_ready():
         return 0
+    await use_case.assets.plan_calendar(current_datetime)
     return await use_case.run(now=current_datetime)
 
 

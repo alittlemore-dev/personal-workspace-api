@@ -627,9 +627,53 @@ Filters are URL-backed and are not persisted in account settings. Charts use fea
 with localized text tables, existing theme colors, and no new chart dependency or inline styles.
 
 Personal Workspace exposes one Financial Tracker page at `/personal-workspace/finance`: overview,
-operations, and the summary/income/expense analytics tabs share the selected month. Tabs and
+operations, assets, and the summary/income/expense analytics tabs share the selected month. Tabs and
 statistics filters are query parameters; changing tabs preserves overview drafts. Monthly analytics
 use the same previous/current/next controls as overview and operations. Other analytics periods
 retain their existing windows and hide the monthly controls. Legacy `/finance/statistics` bookmarks
 redirect to the corresponding analytics tab and preserve filters. The single sidebar entry belongs
 to Working Area; the admin panel keeps its existing page organization.
+
+## Asset journal and reporting
+
+Overview has expense, income and asset columns. Each asset row keeps its editable name and balance
+on one line. Its disclosure exposes holding details and unit counts at every width. Changing the
+savings percentage in the heading applies it from the selected month and preserves the income
+categories already used for the goal. The goal card in Assets statistics also lets owners choose
+the effective month and income categories.
+
+In Operations, owners select an asset before choosing an action applicable to it. Deposits and
+withdrawals apply to monetary accounts. Buying and selling securities records the unit count and
+the total consideration. A monetary counter-position settles the trade within the portfolio.
+A trade funded or paid outside the tracker explicitly sets `externalFunds` and counts the money
+crossing the portfolio boundary once towards savings. Neither settlement writes a budget posting.
+Explicit cash deposits and withdrawals also count toward savings independently of the budget.
+For these movements, `enteredAmount` and `enteredCurrency` preserve the user's input in the
+journal and each revision. The server converts that input using the movement's dated exchange
+rates. The existing `amount` field continues to hold the amount in the position's currency.
+The Assets statistics tab shares chart components, filters and locale-aware dates with budget statistics.
+A dated balance observation updates portfolio value independently of budget income and transfers.
+Monthly budget rollover creates no asset position or movement. A contribution
+reduces the available balance, a withdrawal increases it, and an opening allocation from the budget
+reduces it once. The opening preview uses the same dated FX selection and rounding as confirmation.
+When editing, the preview accounts for the posting it replaces. Separate opening capital and historical statements do not count towards the goal.
+Each month's available closing balance becomes the opening balance of its successor. After a late
+change the owner can explicitly correct the carried amount.
+
+Movements have an owner-scoped request UUID and versioned revisions. A direct purchase from the
+budget counts once towards savings. Payouts credited to the budget create a linked income entry.
+Corrections, cancellation and restoration go through the movement group. The journal, affected
+budget postings, revisions and notification events share a PostgreSQL transaction.
+
+An asset report includes both date boundaries, dated valuation coverage, net contributions,
+effective monthly goals and a twelve-month projection. The projection uses up to three completed
+months of regular tracking. Securities use dated trades and manual valuations. Free external display
+rights have not been confirmed for automated Russian or US closing prices. Currency conversion
+uses the tracker's stored rates. [Product examples](finance-assets-concept.md),
+[MOEX market data](https://www.moex.com/a2193),
+[Twelve Data end-of-day terms](https://support.twelvedata.com/en/articles/12682324-end-of-day-eod-pricing-market-data).
+
+Apply the additive migration before starting updated event consumers and API processes. Publish
+the permission and translation catalogs before exposing the tab and recipient switches. During a
+rollback, stop new event generation and keep the journal, recipient preferences and queue for
+the compatible consumers. These tables share the existing Personal Workspace PostgreSQL backup.

@@ -128,6 +128,30 @@ class FinanceCategory:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceOpeningProjection:
+    currency: FinanceCurrency
+    amount_rub: Amount
+    month_rate: Decimal
+    movement_id: str | None
+    transaction_id: str | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FinanceTransfers:
+    contributions: Amount
+    withdrawals: Amount
+    opening_allocation: Amount
+
+    @property
+    def effect(self) -> Amount:
+        return Amount(self.withdrawals - self.contributions - self.opening_allocation)
+
+    @classmethod
+    def empty(cls) -> FinanceTransfers:
+        return cls(contributions=Amount(0), withdrawals=Amount(0), opening_allocation=Amount(0))
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceMonth:
     id: str
     tracker_id: str
@@ -140,7 +164,13 @@ class FinanceMonth:
     planned_income: Amount | None
     planned_expense: Amount | None
     closing_balance: Amount
+    transfers: dict[FinanceCurrency, FinanceTransfers]
+    carry_correction: Amount | None
     categories: list[FinanceCategory]
+
+    @property
+    def income_minus_expenses(self) -> Amount:
+        return Amount(self.actual_income - self.actual_expense)
 
     @classmethod
     def compose(cls, snapshot: FinanceMonthSnapshot, actuals: FinanceActuals) -> FinanceMonth:
@@ -163,9 +193,9 @@ class FinanceMonth:
             actual_expense=actuals.expense.rounded(snapshot.currency),
             planned_income=snapshot.planned_total(FinanceKind.INCOME),
             planned_expense=snapshot.planned_total(FinanceKind.EXPENSE),
-            closing_balance=Amount(
-                snapshot.opening_balance + actuals.income - actuals.expense,
-            ).rounded(snapshot.currency),
+            carry_correction=actuals.carry_correction,
+            transfers=actuals.transfers,
+            closing_balance=actuals.closing_balance(snapshot.opening_balance, snapshot.currency),
             categories=categories,
         )
 
@@ -306,6 +336,10 @@ class FinanceMonth:
                 ],
             ),
             FinanceActuals(
+                transfers=self.transfers,
+                carry_correction=self.carry_correction.converted(currency, factor)
+                if self.carry_correction is not None
+                else None,
                 income=Amount(
                     sum(
                         (fact.amount for fact in current if fact.kind == FinanceKind.INCOME),
@@ -381,9 +415,15 @@ class FinanceMonthSnapshot:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceActuals:
+    transfers: dict[FinanceCurrency, FinanceTransfers]
+    carry_correction: Amount | None
     income: Amount
     expense: Amount
     by_category: dict[str, Amount]
+
+    def closing_balance(self, opening: Amount, currency: FinanceCurrency) -> Amount:
+        transfers = self.transfers.get(currency, FinanceTransfers.empty())
+        return Amount(opening + self.income - self.expense + transfers.effect).rounded(currency)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -442,6 +482,7 @@ class FinanceTransactionDraft:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FinanceTransaction:
+    managed_by_assets: bool
     created_at: datetime
     source: FinanceSource
     author_id: str
@@ -460,7 +501,13 @@ class FinanceTransaction:
     deleted: bool
     pricing: FinanceTransactionPricing
 
+    @property
+    def allows_direct_changes(self) -> bool:
+        return not self.managed_by_assets
+
     def check_writable(self, month: FinanceMonth, now: datetime) -> None:
+        if not self.allows_direct_changes:
+            raise FinanceConflictError
         current = now.astimezone(month.time_zone).date().replace(day=1)
         if month.period_start != current and (
             next_month(month.period_start) != current

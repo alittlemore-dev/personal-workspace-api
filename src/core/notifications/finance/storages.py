@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 
 from core.notifications.enums import DeliveryStatus
-from core.notifications.finance.schemas import FinanceDelivery
+from core.notifications.finance.schemas import AssetFinanceDelivery, FinanceDelivery
 
 
 class FinanceDeliveryStorage(ABC):
@@ -16,21 +16,21 @@ class FinanceDeliveryStorage(ABC):
         now: datetime,
         lease_until: datetime,
         max_attempts: int,
-    ) -> FinanceDelivery | None: ...
+    ) -> FinanceDelivery | AssetFinanceDelivery | None: ...
 
     @abstractmethod
     async def refresh(
         self,
         *,
-        delivery: FinanceDelivery,
+        delivery: FinanceDelivery | AssetFinanceDelivery,
         now: datetime,
-    ) -> FinanceDelivery | None: ...
+    ) -> FinanceDelivery | AssetFinanceDelivery | None: ...
 
     @abstractmethod
     async def finish(
         self,
         *,
-        delivery: FinanceDelivery,
+        delivery: FinanceDelivery | AssetFinanceDelivery,
         status: DeliveryStatus,
         now: datetime,
         next_attempt_at: datetime,

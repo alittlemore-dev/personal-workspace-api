@@ -472,3 +472,16 @@ money, and delivery need focused integration regressions.
 - Button `callback_data` is limited to 64 bytes, so it holds only a short, non-privileged action
   identifier; state and authorization are checked on the server. [Bot
   API](https://core.telegram.org/bots/api#inlinekeyboardbutton).
+
+## Asset subscriptions
+
+Each Personal Workspace connection has four independent, initially disabled subscriptions for
+asset movements, savings goals, completed months and deposit maturity. An update that omits
+these fields preserves the saved choices. PAT updates that include them also require
+`workspace.assets.read`.
+
+A deposit reminder becomes due at 09:00 local time seven calendar days before maturity. The
+monthly summary becomes due at 09:00 on the first day of the following month. Delivery checks
+the owner's global preferences, connection, subscription and financial source again. The queue
+reuses the existing retry lease. If Telegram accepts a message immediately before a worker
+failure, a retry may deliver the same message again.

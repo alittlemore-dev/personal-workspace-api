@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from core.finance.enums import FinanceCurrency, FinanceKind, FinanceLimitScope
 from core.finance.schemas import Amount, FinanceEventPayload, FinanceTransactionSnapshot
@@ -95,3 +95,13 @@ class FinanceEventPayloadSchema(BaseModel):
             planned_amount=Amount(self.planned_amount) if self.planned_amount is not None else None,
             actual_amount=Amount(self.actual_amount) if self.actual_amount is not None else None,
         )
+
+
+class AssetEventSourceSchema(BaseModel):
+    identifier: str
+    version: int
+    on_date: date
+
+
+class NotificationPayloadSchema(RootModel[FinanceEventPayloadSchema | AssetEventSourceSchema]):
+    pass

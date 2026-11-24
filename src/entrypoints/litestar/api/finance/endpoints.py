@@ -23,6 +23,7 @@ from core.finance.schemas import (
     UpdateOpeningBalanceParams,
 )
 from core.finance.use_cases import FinanceUseCase
+from entrypoints.litestar.api.finance.assets.endpoints import FinanceAssetsController
 from entrypoints.litestar.api.finance.dependencies import (
     provide_archive_category_params,
     provide_create_category_params,
@@ -558,4 +559,4 @@ class FinanceApiController(Controller):
         return FinanceStatisticsResultResponse.from_domain(await use_case.statistics(params))
 
 
-api_router = DishkaRouter("", route_handlers=[FinanceApiController])
+api_router = DishkaRouter("", route_handlers=[FinanceApiController, FinanceAssetsController])

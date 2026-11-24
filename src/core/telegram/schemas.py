@@ -84,6 +84,10 @@ class TelegramConnection:
     notify_memorable_date: bool
     notify_finance_transaction: bool
     notify_finance_limit: bool
+    notify_asset_movement: bool
+    notify_savings_goal_reached: bool
+    notify_assets_month_summary: bool
+    notify_deposit_maturity: bool
     language: LanguageEnum
 
     def require_owner(self, *, owner_username: str) -> None:
@@ -97,6 +101,10 @@ class TelegramConnectionSettings:
     notify_memorable_date: bool
     notify_finance_transaction: bool
     notify_finance_limit: bool
+    notify_asset_movement: bool | None
+    notify_savings_goal_reached: bool | None
+    notify_assets_month_summary: bool | None
+    notify_deposit_maturity: bool | None
     language: LanguageEnum
 
 

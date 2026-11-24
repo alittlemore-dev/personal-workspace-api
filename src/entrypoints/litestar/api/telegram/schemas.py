@@ -111,6 +111,22 @@ class TelegramConnectionResponse(CamelCaseSchema):
         description="Receive notifications when finance spending limits are exceeded.",
         examples=[True],
     )
+    notify_asset_movement: bool = Field(
+        description="Receive notifications about asset movements and payouts.",
+        examples=[False],
+    )
+    notify_savings_goal_reached: bool = Field(
+        description="Receive notifications about reaching the savings goal.",
+        examples=[False],
+    )
+    notify_assets_month_summary: bool = Field(
+        description="Receive notifications about the monthly asset summary.",
+        examples=[False],
+    )
+    notify_deposit_maturity: bool = Field(
+        description="Receive notifications about upcoming deposit maturity.",
+        examples=[False],
+    )
     language: LanguageEnum = Field(
         description="Language; allowed values are listed in the referenced enumeration.",
         examples=["en"],
@@ -132,6 +148,10 @@ class TelegramConnectionResponse(CamelCaseSchema):
             notify_memorable_date=schema.notify_memorable_date,
             notify_finance_transaction=schema.notify_finance_transaction,
             notify_finance_limit=schema.notify_finance_limit,
+            notify_asset_movement=schema.notify_asset_movement,
+            notify_savings_goal_reached=schema.notify_savings_goal_reached,
+            notify_assets_month_summary=schema.notify_assets_month_summary,
+            notify_deposit_maturity=schema.notify_deposit_maturity,
             language=schema.language,
         )
 
@@ -153,6 +173,26 @@ class TelegramConnectionSettingsRequest(CamelCaseSchema):
         description="Receive notifications when finance spending limits are exceeded.",
         examples=[True],
     )
+    notify_asset_movement: bool | None = Field(
+        default=None,
+        description="Receive notifications about asset movements and payouts.",
+        examples=[False],
+    )
+    notify_savings_goal_reached: bool | None = Field(
+        default=None,
+        description="Receive notifications about reaching the savings goal.",
+        examples=[False],
+    )
+    notify_assets_month_summary: bool | None = Field(
+        default=None,
+        description="Receive notifications about the monthly asset summary.",
+        examples=[False],
+    )
+    notify_deposit_maturity: bool | None = Field(
+        default=None,
+        description="Receive notifications about upcoming deposit maturity.",
+        examples=[False],
+    )
     language: LanguageEnum = Field(
         description="Language; allowed values are listed in the referenced enumeration.",
         examples=["en"],
@@ -164,6 +204,10 @@ class TelegramConnectionSettingsRequest(CamelCaseSchema):
             notify_memorable_date=self.notify_memorable_date,
             notify_finance_transaction=self.notify_finance_transaction,
             notify_finance_limit=self.notify_finance_limit,
+            notify_asset_movement=self.notify_asset_movement,
+            notify_savings_goal_reached=self.notify_savings_goal_reached,
+            notify_assets_month_summary=self.notify_assets_month_summary,
+            notify_deposit_maturity=self.notify_deposit_maturity,
             language=self.language,
         )
 

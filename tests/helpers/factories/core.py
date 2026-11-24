@@ -21,6 +21,7 @@ from core.events.schemas import Event, EventDraft, EventRecurrence
 from core.files.enums import FilePurpose
 from core.files.schemas import FileRead, StoredFile
 from core.files.types import Namespace
+from core.finance.assets.analytics_use_cases import AssetAnalyticsUseCase
 from core.finance.clients import FinanceRateClient
 from core.finance.enums import FinanceCurrency, FinanceKind, FinanceRevisionAction, FinanceSource
 from core.finance.exceptions import FinanceRateUnavailableError
@@ -58,6 +59,7 @@ from core.knowledge.people.schemas import (
     PersonRelationshipType,
 )
 from core.notifications.enums import ReminderKind
+from core.notifications.finance.assets import AssetNotificationService
 from core.notifications.schemas import ReminderRecipient, ReminderSource
 from core.resumes.enums import ResumeCurrentStatusEnum, ResumeDateFormatEnum, ResumeSectionEnum
 from core.resumes.schemas import (
@@ -79,7 +81,10 @@ from core.resumes.schemas import (
 from core.telegram.enums import TelegramConnectionState
 from core.telegram.schemas import TelegramConnection
 from core.types import SearchName
+from infra.postgresql.storages.asset_notifications import AssetDatabaseNoticeStorage
 from infra.postgresql.storages.finance import FinanceDatabaseStorage
+from infra.postgresql.storages.finance_asset_analytics import FinanceAssetAnalyticsStorage
+from infra.postgresql.storages.finance_assets import AssetDatabaseStorage
 from infra.postgresql.storages.finance_notifications import FinanceDatabaseEventDispatcher
 
 
@@ -311,20 +316,27 @@ class CoreFactoryHelper:
             client = Mock(spec=FinanceRateClient)
             client.fetch = AsyncMock(side_effect=FinanceRateUnavailableError)
             rate_client = client
+        time_zones = AsyncMock(spec=AccountTimeZoneReader)
+        time_zones.get_time_zone.return_value = ZoneInfo("UTC")
         return FinanceUseCase(
             statistics_service=FinanceStatisticsService(),
             storage=storage,
-            months=FinanceMonthService(
-                storage=storage,
-                time_zone_reader=AsyncMock(
-                    spec=AccountTimeZoneReader,
-                    get_time_zone=AsyncMock(return_value=ZoneInfo("UTC")),
-                ),
-            ),
+            months=FinanceMonthService(storage=storage, time_zone_reader=time_zones),
             rate_client=rate_client,
             telegram_access=Mock(spec=FinanceTelegramAccessService),
             events=FinanceEventService(
-                dispatcher=FinanceDatabaseEventDispatcher(session=storage.session),
+                dispatcher=FinanceDatabaseEventDispatcher(
+                    session=storage.session,
+                    assets=AssetNotificationService(
+                        storage=AssetDatabaseNoticeStorage(session=storage.session),
+                        analytics=AssetAnalyticsUseCase(
+                            storage=FinanceAssetAnalyticsStorage(session=storage.session),
+                            journal=AssetDatabaseStorage(session=storage.session),
+                        ),
+                        public_origin="https://example.test",
+                        time_zones=time_zones,
+                    ),
+                ),
                 config=FinanceEventConfig(lifetime=timedelta(days=1)),
             )
             if isinstance(storage, FinanceDatabaseStorage)
@@ -410,6 +422,8 @@ class CoreFactoryHelper:
         categories: list[FinanceCategory] | None = None,
     ) -> FinanceMonth:
         return FinanceMonth(
+            carry_correction=None,
+            transfers={},
             id=month_id,
             tracker_id=tracker_id,
             period_start=period_start,
@@ -442,6 +456,7 @@ class CoreFactoryHelper:
         pricing: FinanceTransactionPricing | None = None,
     ) -> FinanceTransaction:
         return FinanceTransaction(
+            managed_by_assets=False,
             created_at=datetime(2026, 9, 15, tzinfo=UTC),
             id=transaction_id,
             category_id=category_id,
@@ -802,6 +817,10 @@ class CoreFactoryHelper:
         connection_id: str = "c" * 32,
         notify_finance_transaction: bool = True,
         notify_finance_limit: bool = True,
+        notify_asset_movement: bool = False,
+        notify_savings_goal_reached: bool = False,
+        notify_assets_month_summary: bool = False,
+        notify_deposit_maturity: bool = False,
     ) -> TelegramConnection:
         now = datetime(2026, 9, 15, 12, tzinfo=UTC)
         return TelegramConnection(
@@ -820,5 +839,9 @@ class CoreFactoryHelper:
             notify_memorable_date=False,
             notify_finance_transaction=notify_finance_transaction,
             notify_finance_limit=notify_finance_limit,
+            notify_asset_movement=notify_asset_movement,
+            notify_savings_goal_reached=notify_savings_goal_reached,
+            notify_assets_month_summary=notify_assets_month_summary,
+            notify_deposit_maturity=notify_deposit_maturity,
             language=LanguageEnum.RU,
         )

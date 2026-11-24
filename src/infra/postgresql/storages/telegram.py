@@ -248,6 +248,10 @@ class TelegramDatabaseStorage(TelegramStorage):
             notify_memorable_date=False,
             notify_finance_transaction=False,
             notify_finance_limit=False,
+            notify_asset_movement=False,
+            notify_savings_goal_reached=False,
+            notify_assets_month_summary=False,
+            notify_deposit_maturity=False,
             language=LanguageEnum.EN,
         )
         self.session.add(model)
@@ -309,6 +313,18 @@ class TelegramDatabaseStorage(TelegramStorage):
                 notify_memorable_date=settings.notify_memorable_date,
                 notify_finance_transaction=settings.notify_finance_transaction,
                 notify_finance_limit=settings.notify_finance_limit,
+                notify_asset_movement=settings.notify_asset_movement
+                if settings.notify_asset_movement is not None
+                else TelegramConnectionModel.notify_asset_movement,
+                notify_savings_goal_reached=settings.notify_savings_goal_reached
+                if settings.notify_savings_goal_reached is not None
+                else TelegramConnectionModel.notify_savings_goal_reached,
+                notify_assets_month_summary=settings.notify_assets_month_summary
+                if settings.notify_assets_month_summary is not None
+                else TelegramConnectionModel.notify_assets_month_summary,
+                notify_deposit_maturity=settings.notify_deposit_maturity
+                if settings.notify_deposit_maturity is not None
+                else TelegramConnectionModel.notify_deposit_maturity,
                 language=settings.language,
             )
             .returning(TelegramConnectionModel),

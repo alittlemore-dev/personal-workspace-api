@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 
 from core.finance.enums import FinanceEventKind, FinanceLimitScope, FinanceSource
 from core.finance.schemas import FinanceEvent, FinanceMonth
@@ -42,3 +42,39 @@ class FinanceDeliveryConfig:
     retry_interval: timedelta
     claim_lease: timedelta
     retention: timedelta
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AssetEventSource:
+    identifier: str
+    version: int
+    on_date: date
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AssetFinanceEvent:
+    owner_username: str
+    kind: FinanceEventKind
+    source: AssetEventSource
+    created_at: datetime
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AssetFinanceDelivery:
+    id: str
+    event: AssetFinanceEvent
+    connection: TelegramConnection | None
+    attempts: int
+
+    @property
+    def subscribed(self) -> bool:
+        recipient = self.connection
+        if recipient is None or recipient.owner_username != self.event.owner_username:
+            return False
+        return {
+            FinanceEventKind.ASSET_MOVEMENT: recipient.notify_asset_movement,
+            FinanceEventKind.SAVINGS_GOAL: recipient.notify_savings_goal_reached,
+            FinanceEventKind.MONTH_SUMMARY: recipient.notify_assets_month_summary,
+            FinanceEventKind.DEPOSIT_MATURITY: recipient.notify_deposit_maturity,
+        }[self.event.kind]

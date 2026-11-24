@@ -21,6 +21,7 @@ from core.account_time_zone.clients import AccountTimeZoneUnavailableError
 from core.events.exceptions import InvalidEventDataError
 from core.exceptions import DomainError, EntryNotFoundError
 from core.files.exceptions import FileClientInternalError, FileInUseError, InvalidFileDataError
+from core.finance.assets.exceptions import AssetPermissionError
 from core.finance.exceptions import (
     FinanceConflictError,
     FinanceNotFoundError,
@@ -39,6 +40,7 @@ from infra.healthcheck import ReadinessCheckError
 
 DOMAIN_ERROR_MAPPING: dict[type[DomainError], type[BaseVerboseHTTPException]] = {
     EntryNotFoundError: NotFoundHTTPException,
+    AssetPermissionError: ForbiddenHTTPException,
     InvalidFileDataError: BadRequestHTTPException,
     FileInUseError: BadRequestHTTPException,
     FileClientInternalError: InternalServerErrorHTTPException,

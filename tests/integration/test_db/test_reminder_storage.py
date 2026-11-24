@@ -418,6 +418,10 @@ async def test_reminder_sources_are_owner_scoped_and_include_related_people(
             language=LanguageEnum.EN,
             notify_finance_transaction=False,
             notify_finance_limit=False,
+            notify_asset_movement=None,
+            notify_savings_goal_reached=None,
+            notify_assets_month_summary=None,
+            notify_deposit_maturity=None,
         ),
     )
     key = ReminderDeliveryKey(

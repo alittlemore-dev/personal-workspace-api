@@ -285,23 +285,31 @@ async def test_status_lease_is_atomic_expires_and_deployment_slots_are_isolated(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("task", [send_reminders, send_finance_notifications])
+@pytest.mark.parametrize(
+    ("task", "plans_assets"),
+    [(send_reminders, False), (send_finance_notifications, True)],
+)
 async def test_notifications_are_not_claimed_until_bot_is_ready(
     task: AsyncTaskiqDecoratedTask[..., int],
+    plans_assets: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings.telegram, "available", True)
     use_case = Mock()
     use_case.run = AsyncMock(return_value=2)
+    use_case.assets.plan_calendar = AsyncMock()
     store = Mock(spec=TelegramRuntimeStatusStore)
     store.is_ready = AsyncMock(return_value=False)
     operation = cast("Any", task.original_func).__dishka_orig_func__
     now = datetime(2026, 10, 1, tzinfo=UTC)
     assert await operation(use_case=use_case, current_datetime=now, runtime_status=store) == 0
     use_case.run.assert_not_awaited()
+    use_case.assets.plan_calendar.assert_not_awaited()
     store.is_ready.return_value = True
     assert await operation(use_case=use_case, current_datetime=now, runtime_status=store) == 2
     use_case.run.assert_awaited_once_with(now=now)
+    if plans_assets:
+        use_case.assets.plan_calendar.assert_awaited_once_with(now)
 
 
 @pytest.mark.asyncio

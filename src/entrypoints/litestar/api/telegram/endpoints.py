@@ -265,9 +265,10 @@ class TelegramApiController(Controller):
         },
         opt={"pat_permissions": ("workspace.telegram.update",), "error_statuses": (400, 404, 503)},
         description=(
-            "Replace all notification flags and the language of an owned "
-            "Telegram connection. Every field in the settings body is "
-            "required.\n\nPersonal API token permissions: "
+            "Set notification flags and language for an owned "
+            "Telegram connection. Asset subscription changes additionally require "
+            "workspace.assets.read. Omitted asset subscriptions retain their "
+            "values.\n\nPersonal API token permissions: "
             "workspace.telegram.update."
         ),
         summary="Update connection settings",

@@ -143,6 +143,10 @@ class TestTelegramManagementApi(ApiTestCase):
             owner_username="test-owner",
             notify_finance_transaction=True,
             notify_finance_limit=False,
+            notify_asset_movement=False,
+            notify_savings_goal_reached=False,
+            notify_assets_month_summary=False,
+            notify_deposit_maturity=False,
         )
         response = self.api.client.put(
             "/api/telegram/connections/connection-id/settings",
@@ -166,7 +170,56 @@ class TestTelegramManagementApi(ApiTestCase):
                     notify_memorable_date=False,
                     notify_finance_transaction=True,
                     notify_finance_limit=False,
+                    notify_asset_movement=None,
+                    notify_savings_goal_reached=None,
+                    notify_assets_month_summary=None,
+                    notify_deposit_maturity=None,
                     language=LanguageEnum.RU,
                 ),
             ),
         )
+
+    @pytest.mark.parametrize(
+        ("api_field", "domain_field"),
+        [
+            ("notifyAssetMovement", "notify_asset_movement"),
+            ("notifySavingsGoalReached", "notify_savings_goal_reached"),
+            ("notifyAssetsMonthSummary", "notify_assets_month_summary"),
+            ("notifyDepositMaturity", "notify_deposit_maturity"),
+        ],
+    )
+    def test_explicit_asset_subscription_is_independent(
+        self,
+        api_field: str,
+        domain_field: str,
+    ) -> None:
+        self.use_case.set_connection_settings.return_value = self.factory.core.telegram_connection(
+            owner_username="test-owner",
+        )
+        response = self.api.client.put(
+            "/api/telegram/connections/connection-id/settings",
+            json={
+                "notifyBirthday": False,
+                "notifyMemorableDate": False,
+                "notifyFinanceTransaction": True,
+                "notifyFinanceLimit": False,
+                "language": "ru",
+                api_field: False,
+            },
+        )
+        self.asserts.status(response=response, expected_status=codes.OK)
+        parsed = self.use_case.set_connection_settings.await_args.kwargs["params"].settings
+        assert getattr(parsed, domain_field) is False
+        assert (
+            sum(
+                getattr(parsed, field) is None
+                for field in (
+                    "notify_asset_movement",
+                    "notify_savings_goal_reached",
+                    "notify_assets_month_summary",
+                    "notify_deposit_maturity",
+                )
+            )
+            == 3
+        )
+        assert response.json()[api_field] is False

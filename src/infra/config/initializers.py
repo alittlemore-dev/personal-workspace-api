@@ -2,7 +2,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk.types import Event, Hint, Log
 
 import sentry_sdk
 from sentry_sdk.integrations.litestar import LitestarIntegration
@@ -20,6 +20,11 @@ def scrub_authenticated_request_data(event: Event, _hint: Hint) -> Event:
     return event
 
 
+def scrub_log_request_data(log: Log, _hint: Hint) -> Log:
+    log["attributes"].pop("user_agent.original", None)
+    return log
+
+
 def init_sentry() -> None:
     if not settings.sentry.use:
         # Keep local development from sending events to Sentry; production enables it explicitly.
@@ -28,13 +33,13 @@ def init_sentry() -> None:
         return
     sentry_sdk.init(
         dsn=settings.sentry.dsn,
-        send_default_pii=False,
         include_local_variables=False,
         max_request_body_size="never",
         before_send=scrub_authenticated_request_data,
         before_send_transaction=scrub_authenticated_request_data,
         traces_sample_rate=1.0,
         enable_logs=True,
+        before_send_log=scrub_log_request_data,
         profile_lifecycle="trace",
         integrations=[LitestarIntegration()],
     )

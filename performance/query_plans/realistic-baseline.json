@@ -1,21 +1,21 @@
 {
   "profile": "realistic",
-  "sourceSha": "workspace-sha256:713c7da5a61522972ae7e0c50e0ac649837e905bad17ad15455e5d080eacba27",
+  "sourceSha": "workspace-sha256:48210dd789fabf371161861c5dbce3725397202643a4eed79eb876ba6cbf8cc7",
   "sampleCount": 5,
   "queries": {
-    "knowledge_date_backlinks__001": 0.038,
-    "knowledge_dates_page__001": 0.287,
-    "knowledge_dates_page__002": 0.13,
-    "knowledge_item_detail__001": 0.01,
-    "knowledge_item_detail__002": 0.11,
-    "knowledge_item_files__001": 0.049,
-    "knowledge_tags_list__001": 0.107,
-    "people_page__001": 0.176,
-    "people_page__002": 0.124,
-    "people_relationships__001": 0.082,
-    "resumes_list__001": 0.013,
-    "resumes_list__002": 0.034,
-    "vault_recent__001": 0.079,
-    "vault_statistics__001": 0.971
+    "knowledge_date_backlinks__001": 0.107,
+    "knowledge_dates_page__001": 0.679,
+    "knowledge_dates_page__002": 0.374,
+    "knowledge_item_detail__001": 0.035,
+    "knowledge_item_detail__002": 0.281,
+    "knowledge_item_files__001": 0.165,
+    "knowledge_tags_list__001": 0.241,
+    "people_page__001": 0.504,
+    "people_page__002": 0.407,
+    "people_relationships__001": 0.234,
+    "resumes_list__001": 0.038,
+    "resumes_list__002": 0.104,
+    "vault_recent__001": 0.204,
+    "vault_statistics__001": 1.839
   }
 }

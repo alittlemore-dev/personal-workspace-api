@@ -74,7 +74,23 @@ async def test_bot_uses_fresh_proxy_tunnels_and_decodes_credentials(protocol: st
             )
             await reader.readexactly(int(headers.get("Content-Length", "0")))
             results: dict[str, object] = {
-                "getMe": {"id": 123456, "is_bot": True, "first_name": "Test"},
+                "getMe": {
+                    "id": 123456,
+                    "is_bot": True,
+                    "first_name": "Test",
+                    "can_join_groups": True,
+                    "can_read_all_group_messages": False,
+                    "supports_guest_queries": False,
+                    "supports_inline_queries": False,
+                    "needs_inline_query_location": False,
+                    "can_connect_to_business": False,
+                    "has_main_web_app": False,
+                    "has_topics_enabled": False,
+                    "allows_users_to_create_topics": False,
+                    "has_topic_sidebar": False,
+                    "can_manage_bots": False,
+                    "supports_join_request_queries": False,
+                },
                 "setWebhook": True,
                 "deleteWebhook": True,
                 "getUpdates": [{"update_id": 42}],
@@ -252,7 +268,23 @@ async def test_real_proxy_pool_fails_over_stays_sticky_and_never_replays_send(  
             if method == "sendMessage" and uncertain_send:
                 return
             results: dict[str, object] = {
-                "getMe": {"id": 123456, "is_bot": True, "first_name": "Test"},
+                "getMe": {
+                    "id": 123456,
+                    "is_bot": True,
+                    "first_name": "Test",
+                    "can_join_groups": True,
+                    "can_read_all_group_messages": False,
+                    "supports_guest_queries": False,
+                    "supports_inline_queries": False,
+                    "needs_inline_query_location": False,
+                    "can_connect_to_business": False,
+                    "has_main_web_app": False,
+                    "has_topics_enabled": False,
+                    "allows_users_to_create_topics": False,
+                    "has_topic_sidebar": False,
+                    "can_manage_bots": False,
+                    "supports_join_request_queries": False,
+                },
                 "setWebhook": True,
             }
             body = json.dumps({"ok": True, "result": results[method]}).encode()

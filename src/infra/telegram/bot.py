@@ -9,7 +9,7 @@ from aiogram.client.session.base import BaseSession
 from aiogram.exceptions import TelegramAPIError, TelegramNetworkError, TelegramServerError
 from aiogram.methods import GetMe, SetWebhook, TelegramMethod
 from aiogram.methods.base import TelegramType
-from aiogram.types import User
+from aiogram.types import BotFullInfo
 from aiohttp_socks import ProxyConnectionError, ProxyError, ProxyTimeoutError
 from valkey.exceptions import ValkeyError
 
@@ -49,7 +49,7 @@ class TelegramFailoverSession(BaseSession):
     def candidate_available(self, index: int) -> bool:
         return monotonic() >= self.cooldowns.get(index, 0)
 
-    async def probe(self, bot: Bot, index: int) -> User:
+    async def probe(self, bot: Bot, index: int) -> BotFullInfo:
         return await self.request_candidate(bot=bot, method=GetMe(), index=index)
 
     async def set_webhook(self, bot: Bot, index: int, method: SetWebhook) -> bool:

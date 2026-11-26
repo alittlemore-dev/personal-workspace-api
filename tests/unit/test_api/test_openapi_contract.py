@@ -43,9 +43,13 @@ class TestOpenApiContract:
                     continue
                 assert body.get("description"), f"{method} {path}: missing body description"
                 assert media.get("examples"), f"{method} {path}: missing body examples"
-                model_name = media["schema"]["$ref"].rsplit("/", 1)[-1]
-                for example in media["examples"].values():
-                    models[model_name].model_validate(example["value"])
+                body_schema = media["schema"]
+                references = [body_schema] if "$ref" in body_schema else body_schema["allOf"]
+                assert references, f"{method} {path}: missing body model"
+                for reference in references:
+                    model_name = reference["$ref"].rsplit("/", 1)[-1]
+                    for example in media["examples"].values():
+                        models[model_name].model_validate(example["value"])
 
     @pytest.mark.parametrize(
         "query",
